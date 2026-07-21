@@ -17,6 +17,9 @@ wheels/
 htmlcov/
 .ruff_cache/
 
+# Local tooling binaries
+.tools/
+
 # OS / Environment / IDE
 .DS_Store
 .env
