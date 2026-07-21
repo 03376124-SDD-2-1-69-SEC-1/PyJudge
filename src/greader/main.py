@@ -9,11 +9,25 @@ from fastapi.templating import Jinja2Templates
 
 from greader.assignments.repository import AssignmentRepository
 from greader.assignments.routes import router as assignment_router
-from greader.assignments.seed import create_seed_repository
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _TEMPLATE_DIR = _PACKAGE_DIR / "templates"
 _STATIC_DIR = _PACKAGE_DIR / "static"
+
+
+def _default_repository() -> AssignmentRepository:
+    """Build the default SQLAlchemy-backed repository.
+
+    Schema management is handled exclusively by Alembic – this function
+    does **not** call ``Base.metadata.create_all()``.
+    """
+    from greader.assignments.sql_repository import SqlAlchemyAssignmentRepository
+    from greader.config import Settings
+    from greader.database import build_session_factory
+
+    settings = Settings()
+    session_factory = build_session_factory(settings.DATABASE_URL)
+    return SqlAlchemyAssignmentRepository(session_factory)
 
 
 def create_app(
@@ -26,7 +40,7 @@ def create_app(
     ----------
     assignment_repo:
         Optional assignment repository for dependency injection.
-        Defaults to the seed demo repository when *None*.
+        Defaults to a SQLAlchemy-backed repository when *None*.
     """
     application = FastAPI(title="GReader")
 
@@ -39,7 +53,7 @@ def create_app(
     # Store shared state for routes to access.
     application.state.templates = templates
     application.state.assignment_repo = (
-        assignment_repo if assignment_repo is not None else create_seed_repository()
+        assignment_repo if assignment_repo is not None else _default_repository()
     )
 
     # ------------------------------------------------------------------

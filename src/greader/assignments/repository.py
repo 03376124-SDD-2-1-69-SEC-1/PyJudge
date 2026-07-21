@@ -20,6 +20,10 @@ class AssignmentRepository(Protocol):
         """Create or update an assignment."""
         ...
 
+    def delete_assignment(self, assignment_id: str) -> bool:
+        """Delete an assignment and its test cases. Return True if it existed."""
+        ...
+
 
 class InMemoryAssignmentRepository:
     """In-memory implementation of the assignment repository."""
@@ -38,3 +42,10 @@ class InMemoryAssignmentRepository:
     def save_assignment(self, assignment: Assignment) -> None:
         """Create or update an assignment."""
         self._store[assignment.id] = assignment
+
+    def delete_assignment(self, assignment_id: str) -> bool:
+        """Delete an assignment. Return True if it existed."""
+        if assignment_id in self._store:
+            del self._store[assignment_id]
+            return True
+        return False

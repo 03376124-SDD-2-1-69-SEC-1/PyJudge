@@ -1,4 +1,4 @@
-# GReader
+# PYJudge
 
 **AI-assisted assignment authoring** — a web application for creating, managing, and grading assignments with the help of AI.
 

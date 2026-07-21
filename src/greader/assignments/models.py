@@ -1,6 +1,7 @@
 """Assignment domain models."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 
 
@@ -40,6 +41,9 @@ class TestCase:
     category: TestCaseCategory
     status: ReviewStatus
     explanation: str
+    assignment_id: str = ""
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass
@@ -58,3 +62,7 @@ class Assignment:
     ai_suggestions: list[str] = field(default_factory=list)
     coverage_score: float = 0.0
     mutation_score: float = 0.0
+    input_format: str = ""
+    output_format: str = ""
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

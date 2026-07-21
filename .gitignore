@@ -26,3 +26,6 @@ htmlcov/
 .vscode/
 .idea/
 
+# SQLite databases
+data/
+*.db

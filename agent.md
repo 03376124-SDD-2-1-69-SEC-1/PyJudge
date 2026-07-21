@@ -140,3 +140,60 @@ Suggested commit message.
 Do not claim completion unless the verification commands actually pass.
 Task-specific instructions from the current user prompt define the active scope.
 Complete only the active task and do not implement future tasks, even when their requirements are known.
+## AI Authoring Phase
+
+GReader now includes an instructor-facing AI authoring workflow.
+
+Permanent constraints:
+
+- The application remains a Python-only modular FastAPI monolith.
+- Frontend pages use Jinja2, Tailwind CSS, and minimal vanilla JavaScript.
+- Do not introduce React, Vue, Node.js, npm, PocketBase, MongoDB, or a frontend SPA.
+- Use synchronous SQLAlchemy 2.x sessions for the initial implementation.
+- Use SQLite during local development and tests.
+- Keep the database configuration compatible with PostgreSQL through `DATABASE_URL`.
+- Use Alembic for every database schema change.
+- AI-generated data must be validated with Pydantic before entering the domain layer.
+- AI-generated assignments and test cases are drafts until an instructor explicitly applies them.
+- Never automatically publish AI-generated content.
+- Never execute AI-generated Python code during this phase.
+- Never send API keys, system prompts, or internal errors to the browser.
+- Automated tests must never make real AI network requests.
+- Keep the AI provider behind an interface so the demo provider and Gemini provider are replaceable.
+- Version 1 supports Python stdin/stdout programming assignments only.
+- A reference solution is a complete Python program that reads stdin and writes stdout.
+- A test case contains plain-text input and its expected plain-text output.
+- Complete only the active task. Do not implement requirements from later tasks.
+Shared instruction for every task
+
+Place this before each individual task prompt:
+
+Read `AGENTS.md` completely before making changes.
+
+Inspect the repository, current models, routes, templates, tests, and recent commits before deciding where code belongs.
+
+Execute only the task below. Do not begin any later task.
+
+Use test-driven development:
+
+1. Write or update focused tests first.
+2. Run them and confirm they fail for the expected reason.
+3. Implement the minimum required behavior.
+4. Run focused tests.
+5. Run the full test suite.
+6. Run Ruff checks and formatting checks.
+7. Do not disable, skip, or weaken existing tests.
+
+Preserve existing working behavior and repository interfaces unless this task explicitly changes them.
+
+At the end, report:
+
+- files created
+- files modified
+- database migrations created
+- commands executed
+- focused test results
+- complete test results
+- lint and format results
+- remaining limitations
+- suggested commit message
