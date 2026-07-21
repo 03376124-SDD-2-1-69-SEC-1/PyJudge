@@ -1,0 +1,51 @@
+[project]
+name = "greader"
+version = "0.1.0"
+description = "AI-assisted assignment authoring"
+readme = "README.md"
+authors = [
+    { name = "Doonminus2", email = "piezapiezakok@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.139.2",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.32",
+    "uvicorn[standard]>=0.51.0",
+]
+
+[project.scripts]
+greader = "greader:main"
+
+[build-system]
+requires = ["uv_build>=0.11.14,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "anyio>=4.14.2",
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-anyio>=0.0.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.22",
+]
+
+# --------------- Tool configuration ---------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["greader"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
