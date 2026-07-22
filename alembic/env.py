@@ -34,7 +34,7 @@ if config.config_file_name is not None:
 
 # Override the URL from Settings so we never depend on alembic.ini alone.
 settings = Settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 # Target metadata for autogenerate support.
 target_metadata = Base.metadata
