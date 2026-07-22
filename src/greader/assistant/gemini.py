@@ -83,7 +83,13 @@ class GeminiAssignmentGenerator:
                 contents=_build_user_prompt(request, assignment),
                 config=config,
             )
-            payload = schema.model_validate(getattr(response, "parsed", None))
+            raw_parsed = getattr(response, "parsed", None)
+            if raw_parsed is not None:
+                payload = schema.model_validate(raw_parsed)
+            elif getattr(response, "text", None):
+                payload = schema.model_validate_json(response.text)
+            else:
+                raise GenerationError("provider_invalid_response")
         except ValidationError as exc:
             raise GenerationError("provider_invalid_response") from exc
         except (

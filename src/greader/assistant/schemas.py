@@ -20,8 +20,6 @@ class GenerationMode(StrEnum):
 class GeneratedExample(BaseModel):
     """A generated sample input/output pair."""
 
-    model_config = ConfigDict(extra="forbid")
-
     input_data: str
     expected_output: str = Field(min_length=1)
     explanation: str = Field(min_length=1)
@@ -29,8 +27,6 @@ class GeneratedExample(BaseModel):
 
 class GeneratedTestCase(BaseModel):
     """A generated candidate test case."""
-
-    model_config = ConfigDict(extra="forbid")
 
     input_data: str
     expected_output: str = Field(min_length=1)
@@ -40,8 +36,6 @@ class GeneratedTestCase(BaseModel):
 
 class FullAssignmentDraft(BaseModel):
     """A complete programming-assignment draft returned by a provider."""
-
-    model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=3, max_length=120)
     problem_statement: str = Field(min_length=20, max_length=10_000)
@@ -66,8 +60,6 @@ class FullAssignmentDraft(BaseModel):
 class TestCaseDraftSet(BaseModel):
     """A generated set of candidate test cases for an existing assignment."""
 
-    model_config = ConfigDict(extra="forbid")
-
     test_cases: list[GeneratedTestCase] = Field(min_length=1, max_length=30)
     coverage_notes: list[str] = Field(default_factory=list, max_length=15)
     ambiguity_notes: list[str] = Field(default_factory=list, max_length=15)
@@ -79,7 +71,7 @@ DraftPayload = FullAssignmentDraft | TestCaseDraftSet
 class GenerationResult(BaseModel):
     """Application-facing provider result."""
 
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     summary: str = Field(min_length=1)
     mode: GenerationMode

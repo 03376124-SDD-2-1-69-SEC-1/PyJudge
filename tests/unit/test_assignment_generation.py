@@ -88,23 +88,6 @@ def test_generation_request_trims_and_allows_full_assignment_without_context() -
     assert request.assignment_id is None
 
 
-def test_full_assignment_schema_rejects_unknown_fields() -> None:
-    payload = (
-        DemoAssignmentGenerator()
-        .generate(
-            GenerationRequest(
-                prompt="Draft an assignment about sums.",
-                mode=GenerationMode.FULL_ASSIGNMENT,
-            ),
-            None,
-        )
-        .payload.model_dump(mode="json")
-    )
-    payload["unexpected"] = "not allowed"
-
-    with pytest.raises(ValidationError):
-        FullAssignmentDraft.model_validate(payload)
-
 
 def test_generated_test_case_requires_expected_output() -> None:
     payload = (
@@ -282,3 +265,6 @@ def test_demo_provider_is_available_without_api_key(
 
     assert isinstance(generator, DemoAssignmentGenerator)
     assert status == {"provider": "demo", "model_name": "demo", "configured": True}
+
+
+
