@@ -103,11 +103,15 @@ def create_app(
 
     @application.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request) -> HTMLResponse:
-        """Server-rendered dashboard placeholder."""
+        """Render the instructor AI Studio workspace."""
+        assignments = application.state.assignment_repo.list_assignments()
         return templates.TemplateResponse(
             request,
             "dashboard.html",
-            {"ai_status": application.state.ai_connection_status},
+            {
+                "ai_status": application.state.ai_connection_status,
+                "assignments": assignments,
+            },
         )
 
     @application.post("/assistant/generate")

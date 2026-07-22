@@ -1,78 +1,181 @@
 {% extends "base.html" %}
 
-{% block title %}GReader - Dashboard{% endblock %}
+{% block title %}GReader - AI Studio{% endblock %}
 
 {% block content %}
-<div class="dashboard-header">
-    <div>
-        <h1>AI Studio</h1>
-        <p>AI-assisted assignment authoring</p>
+{% set first_assignment = assignments[0] if assignments else none %}
+
+<div class="mb-5 flex flex-col gap-4 border-b border-gray-200 pb-4 md:flex-row md:items-center md:justify-between">
+    <div class="flex items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-900 shadow-xs">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3m0 12v3m9-9h-3M6 12H3m14.95-6.95-2.12 2.12M8.17 15.83l-2.12 2.12m0-12.9 2.12 2.12m7.66 8.66 2.12 2.12" />
+                <circle cx="12" cy="12" r="3" />
+            </svg>
+        </div>
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-blue-600">AI Studio</p>
+            <h1 class="text-2xl font-semibold tracking-tight text-gray-950">Assignment Authoring Workspace</h1>
+            <p class="mt-1 text-sm text-gray-600">AI-assisted assignment authoring for university instructors.</p>
+        </div>
     </div>
-    <div class="ai-status" data-configured="{{ 'true' if ai_status.configured else 'false' }}">
-        <span></span>
-        {{ ai_status.provider }} / {{ ai_status.model_name }}
+
+    <div class="inline-flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs" data-configured="{{ 'true' if ai_status.configured else 'false' }}">
+        <span class="h-2 w-2 rounded-full {{ 'bg-emerald-500' if ai_status.configured else 'bg-amber-500' }}"></span>
+        <span class="capitalize text-gray-950">{{ ai_status.provider }}</span>
+        <span class="text-gray-300">/</span>
+        <span>{{ ai_status.model_name }}</span>
     </div>
 </div>
 
-<section class="ai-workspace" aria-label="AI assignment generator">
-    <div class="ai-chat">
-        <div class="chat-thread" id="chat-thread" aria-live="polite">
-            <article class="chat-message assistant">
-                <div class="message-label">AI</div>
-                <div class="message-body">
-                    <p>Ready for assignment drafting.</p>
+<section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] 2xl:grid-cols-[minmax(0,1fr)_28rem]" aria-label="AI Studio workspace">
+    <div class="flex min-h-[calc(100vh-9rem)] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs" aria-label="AI Conversation">
+        <header class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-950">AI Conversation</h2>
+                <p class="mt-0.5 text-xs text-gray-500">Python 3.12 programming assignments, test cases, and edge cases.</p>
+            </div>
+            <button type="button" id="clear-chat-button" class="inline-flex h-8 items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-950">
+                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 6V4h8v2" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m19 6-.8 14H5.8L5 6" />
+                </svg>
+                Clear
+            </button>
+        </header>
+
+        <div id="chat-thread" class="custom-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto bg-gray-50 px-4 py-5" aria-live="polite">
+            <article id="welcome-message" class="flex gap-3">
+                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-950 text-white">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" />
+                    </svg>
+                </div>
+                <div class="max-w-3xl rounded-lg border border-gray-200 bg-white p-4 shadow-xs">
+                    <p class="text-sm font-medium text-gray-950">Ready to draft assignment material.</p>
+                    <p class="mt-1 text-sm leading-6 text-gray-600">Choose a mode, select an assignment when needed, then send a natural-language instruction.</p>
+                    <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                        <button type="button" class="quick-chip rounded-lg border border-gray-200 bg-white p-3 text-left transition-colors hover:border-blue-300 hover:bg-blue-50" data-mode="full_assignment" data-prompt="Create a Python assignment about loops, list slicing, and array indexing.">
+                            <span class="block text-xs font-semibold uppercase tracking-wider text-blue-700">Full Assignment</span>
+                            <span class="mt-1 block text-sm font-medium text-gray-950">Loops and arrays</span>
+                        </button>
+                        <button type="button" class="quick-chip rounded-lg border border-gray-200 bg-white p-3 text-left transition-colors hover:border-cyan-300 hover:bg-cyan-50" data-mode="full_assignment" data-prompt="Create a medium-difficulty recursion assignment for string manipulation.">
+                            <span class="block text-xs font-semibold uppercase tracking-wider text-cyan-700">Full Assignment</span>
+                            <span class="mt-1 block text-sm font-medium text-gray-950">Recursion and strings</span>
+                        </button>
+                        <button type="button" class="quick-chip rounded-lg border border-gray-200 bg-white p-3 text-left transition-colors hover:border-emerald-300 hover:bg-emerald-50" data-mode="test_cases" data-assignment="{{ first_assignment.id if first_assignment else '' }}" data-prompt="Generate a complete suite of standard test cases for the selected assignment.">
+                            <span class="block text-xs font-semibold uppercase tracking-wider text-emerald-700">Test Cases</span>
+                            <span class="mt-1 block text-sm font-medium text-gray-950">{{ first_assignment.title if first_assignment else "Select assignment" }}</span>
+                        </button>
+                        <button type="button" class="quick-chip rounded-lg border border-gray-200 bg-white p-3 text-left transition-colors hover:border-amber-300 hover:bg-amber-50" data-mode="edge_cases" data-assignment="{{ first_assignment.id if first_assignment else '' }}" data-prompt="Find boundary, corner, and stress cases for the selected assignment.">
+                            <span class="block text-xs font-semibold uppercase tracking-wider text-amber-700">Edge Cases</span>
+                            <span class="mt-1 block text-sm font-medium text-gray-950">{{ first_assignment.title if first_assignment else "Select assignment" }}</span>
+                        </button>
+                    </div>
                 </div>
             </article>
         </div>
 
-        <form class="chat-composer" id="ai-form">
-            <label for="prompt">Prompt</label>
-            <textarea
-                id="prompt"
-                name="prompt"
-                rows="5"
-                maxlength="4000"
-                placeholder="Create a Python assignment about loops and arrays."
-                required
-            ></textarea>
+        <div id="ai-loading" class="hidden border-t border-gray-200 bg-blue-50 px-4 py-3" aria-hidden="true">
+            <div class="flex items-center gap-3 text-sm font-medium text-blue-900">
+                <span class="flex items-center gap-1" aria-hidden="true">
+                    <span class="dot-1 h-2 w-2 rounded-full bg-blue-600"></span>
+                    <span class="dot-2 h-2 w-2 rounded-full bg-cyan-600"></span>
+                    <span class="dot-3 h-2 w-2 rounded-full bg-emerald-600"></span>
+                </span>
+                Generating structured draft
+            </div>
+        </div>
 
-            <div class="generator-controls">
-                <div>
-                    <label for="mode">Output</label>
-                    <select id="mode" name="mode">
-                        <option value="full_assignment">Full assignment</option>
-                        <option value="test_cases">Test cases</option>
-                        <option value="edge_cases">Edge cases</option>
+        <form id="ai-form" action="/assistant/generate" method="post" class="sticky bottom-0 border-t border-gray-200 bg-white p-4" aria-label="Sticky prompt composer">
+            <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+                <fieldset class="min-w-0" aria-label="Generation mode">
+                    <legend class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Generation mode</legend>
+                    <div class="grid grid-cols-3 gap-1 rounded-lg border border-gray-200 bg-gray-100 p-1 text-center text-xs font-semibold text-gray-600">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="mode" value="full_assignment" checked class="peer sr-only">
+                            <span class="block rounded-md px-2 py-2 transition-colors peer-checked:bg-white peer-checked:text-gray-950 peer-checked:shadow-xs">Full</span>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="mode" value="test_cases" class="peer sr-only">
+                            <span class="block rounded-md px-2 py-2 transition-colors peer-checked:bg-white peer-checked:text-gray-950 peer-checked:shadow-xs">Tests</span>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="mode" value="edge_cases" class="peer sr-only">
+                            <span class="block rounded-md px-2 py-2 transition-colors peer-checked:bg-white peer-checked:text-gray-950 peer-checked:shadow-xs">Edges</span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <div id="assignment-id-container" class="min-w-0 opacity-60 transition-opacity">
+                    <label for="assignment-id" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">Target assignment</label>
+                    <select id="assignment-id" name="assignment_id" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20" disabled>
+                        <option value="">Not required</option>
+                        {% for assignment in assignments %}
+                        <option value="{{ assignment.id }}">{{ assignment.title }}</option>
+                        {% endfor %}
                     </select>
-                </div>
-                <div>
-                    <label for="assignment-id">Assignment ID</label>
-                    <input
-                        id="assignment-id"
-                        name="assignment_id"
-                        type="text"
-                        placeholder="two-sum-optimized"
-                    >
                 </div>
             </div>
 
-            <button type="submit" id="generate-button">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M22 2 11 13"></path>
-                    <path d="m22 2-7 20-4-9-9-4Z"></path>
-                </svg>
-                <span>Generate</span>
-            </button>
+            <div class="mt-3 rounded-lg border border-gray-300 bg-white p-2 shadow-xs focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                <label for="prompt" class="sr-only">Instruction</label>
+                <textarea id="prompt" name="prompt" rows="3" maxlength="4000" required class="block max-h-48 min-h-24 w-full resize-y border-0 bg-transparent px-2 py-2 text-sm leading-6 text-gray-950 placeholder-gray-400 focus:outline-hidden" placeholder="Ask GReader to draft a Python assignment, generate tests, or explore edge cases."></textarea>
+                <div class="flex items-center justify-between gap-3 border-t border-gray-100 px-2 pt-2">
+                    <span id="composer-status" class="text-xs text-gray-500">Ready</span>
+                    <button type="submit" id="generate-button" class="inline-flex h-9 items-center gap-2 rounded-lg bg-gray-950 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-60">
+                        <svg id="generate-icon" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m22 2-7 20-4-9-9-4Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13" />
+                        </svg>
+                        <span>Generate</span>
+                    </button>
+                </div>
+            </div>
         </form>
     </div>
 
-    <aside class="artifact-panel">
-        <div class="panel-head">
-            <p>Generated Draft</p>
-            <span id="artifact-meta">No artifact</span>
+    <aside class="flex min-h-[32rem] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)]" aria-label="Draft Inspector">
+        <header class="flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-3">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-950">Draft Inspector</h2>
+                <p id="artifact-status" class="mt-0.5 text-xs text-gray-500">No active artifact</p>
+            </div>
+            <span id="artifact-meta" class="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">Empty</span>
+        </header>
+
+        <div class="custom-scrollbar flex-1 overflow-y-auto bg-white p-4">
+            <div id="artifact-empty" class="flex min-h-96 flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+                <svg class="h-10 w-10 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 6h8M8 10h8M8 14h5" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 22h12a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 2v6h6" />
+                </svg>
+                <p class="mt-3 text-sm font-semibold text-gray-950">Structured preview appears here.</p>
+                <p class="mt-1 max-w-xs text-sm leading-6 text-gray-500">Generated drafts stay separate from official assignments until review.</p>
+            </div>
+            <div id="artifact-result" class="hidden space-y-4"></div>
         </div>
-        <div class="artifact-empty" id="artifact-empty">Draft output appears here.</div>
-        <div class="artifact-result" id="artifact-result" hidden></div>
+
+        <footer id="review-actions" class="border-t border-gray-200 bg-gray-50 p-4" aria-label="Review actions" data-artifact-state="empty">
+            <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Review actions</p>
+            <div class="grid grid-cols-2 gap-2">
+                <button type="button" id="save-artifact-button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-gray-950 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:pointer-events-none disabled:bg-gray-300" disabled>
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-8H7v8M7 3v5h8" />
+                    </svg>
+                    <span>Save Draft</span>
+                </button>
+                <button type="button" id="discard-artifact-button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-950 disabled:pointer-events-none disabled:opacity-50" disabled>
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                    <span>Discard</span>
+                </button>
+            </div>
+        </footer>
     </aside>
 </section>
 
@@ -81,93 +184,353 @@ const form = document.querySelector("#ai-form");
 const thread = document.querySelector("#chat-thread");
 const button = document.querySelector("#generate-button");
 const buttonLabel = button.querySelector("span");
+const promptInput = document.querySelector("#prompt");
+const aiLoading = document.querySelector("#ai-loading");
+const welcomeMessage = document.querySelector("#welcome-message");
+const clearChatButton = document.querySelector("#clear-chat-button");
+const composerStatus = document.querySelector("#composer-status");
+const assignmentSelect = document.querySelector("#assignment-id");
+const assignmentContainer = document.querySelector("#assignment-id-container");
+const modeInputs = document.querySelectorAll("input[name='mode']");
 const artifactMeta = document.querySelector("#artifact-meta");
+const artifactStatus = document.querySelector("#artifact-status");
 const artifactEmpty = document.querySelector("#artifact-empty");
 const artifactResult = document.querySelector("#artifact-result");
+const reviewActions = document.querySelector("#review-actions");
+const saveArtifactButton = document.querySelector("#save-artifact-button");
+const saveArtifactLabel = saveArtifactButton.querySelector("span");
+const discardArtifactButton = document.querySelector("#discard-artifact-button");
+
+let currentArtifact = null;
+
+const ERROR_MESSAGES = {
+    assignment_required: "Select a target assignment before generating tests or edge cases.",
+    invalid_prompt: "Enter an instruction before generating.",
+    provider_unavailable: "AI service is unavailable. Check provider settings and try again.",
+    provider_rate_limited: "AI provider rate limit reached. Retry later.",
+    provider_authentication_failed: "AI provider authentication failed.",
+    provider_invalid_response: "AI provider returned invalid structured data.",
+    provider_timeout: "AI generation request timed out.",
+};
 
 function text(value) {
     return String(value ?? "");
 }
 
-function addMessage(role, body) {
-    const article = document.createElement("article");
-    article.className = `chat-message ${role}`;
-    const label = document.createElement("div");
-    label.className = "message-label";
-    label.textContent = role === "user" ? "You" : "AI";
-    const content = document.createElement("div");
-    content.className = "message-body";
-    content.append(body);
-    article.append(label, content);
+function el(tagName, className = "", textContent = "") {
+    const element = document.createElement(tagName);
+    if (className) {
+        element.className = className;
+    }
+    if (textContent) {
+        element.textContent = textContent;
+    }
+    return element;
+}
+
+function icon(paths, className = "h-4 w-4") {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", className);
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("aria-hidden", "true");
+    paths.forEach((pathData) => {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("stroke-linejoin", "round");
+        path.setAttribute("d", pathData);
+        svg.append(path);
+    });
+    return svg;
+}
+
+function addMessage(role, bodyText) {
+    if (welcomeMessage && welcomeMessage.parentElement === thread) {
+        welcomeMessage.remove();
+    }
+
+    const article = el("article", `flex gap-3 ${role === "user" ? "justify-end" : "justify-start"}`);
+    const bubble = el(
+        "div",
+        role === "user"
+            ? "max-w-3xl rounded-lg bg-gray-950 px-4 py-3 text-sm leading-6 text-white shadow-xs"
+            : "max-w-3xl rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm leading-6 text-gray-700 shadow-xs"
+    );
+    const label = el(
+        "p",
+        role === "user"
+            ? "mb-1 text-xs font-semibold text-gray-300"
+            : "mb-1 text-xs font-semibold text-gray-950",
+        role === "user" ? "You" : "GReader"
+    );
+    const body = el("p", "whitespace-pre-wrap", bodyText);
+
+    bubble.append(label, body);
+
+    if (role === "user") {
+        article.append(bubble);
+    } else {
+        const avatar = el("div", "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white");
+        avatar.append(icon(["M12 6v12m6-6H6"], "h-4 w-4"));
+        article.append(avatar, bubble);
+    }
+
     thread.append(article);
     thread.scrollTop = thread.scrollHeight;
 }
 
-function paragraph(value) {
-    const p = document.createElement("p");
-    p.textContent = value;
-    return p;
+function setAssignmentMode(mode) {
+    const needsAssignment = mode === "test_cases" || mode === "edge_cases";
+    assignmentSelect.disabled = !needsAssignment;
+    assignmentContainer.classList.toggle("opacity-60", !needsAssignment);
+    assignmentContainer.classList.toggle("opacity-100", needsAssignment);
+    if (needsAssignment && !assignmentSelect.value && assignmentSelect.options.length > 1) {
+        assignmentSelect.selectedIndex = 1;
+    }
+    if (!needsAssignment) {
+        assignmentSelect.value = "";
+    }
 }
 
-function renderList(title, items) {
+modeInputs.forEach((input) => {
+    input.addEventListener("change", (event) => {
+        setAssignmentMode(event.target.value);
+    });
+});
+
+document.querySelectorAll(".quick-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+        const mode = chip.dataset.mode;
+        const prompt = chip.dataset.prompt;
+        const assignmentId = chip.dataset.assignment;
+        const modeInput = document.querySelector(`input[name='mode'][value='${mode}']`);
+
+        if (modeInput) {
+            modeInput.checked = true;
+            setAssignmentMode(mode);
+        }
+        if (assignmentId) {
+            assignmentSelect.value = assignmentId;
+        }
+        if (prompt) {
+            promptInput.value = prompt;
+        }
+        promptInput.focus();
+    });
+});
+
+function resetArtifactPanel() {
+    currentArtifact = null;
+    artifactMeta.textContent = "Empty";
+    artifactStatus.textContent = "No active artifact";
+    artifactEmpty.hidden = false;
+    artifactResult.hidden = true;
+    artifactResult.replaceChildren();
+    reviewActions.dataset.artifactState = "empty";
+    saveArtifactButton.disabled = true;
+    saveArtifactLabel.textContent = "Save Draft";
+    discardArtifactButton.disabled = true;
+}
+
+clearChatButton.addEventListener("click", () => {
+    thread.replaceChildren(welcomeMessage);
+    resetArtifactPanel();
+    composerStatus.textContent = "Ready";
+});
+
+function sectionShell(title, accent = "border-gray-200") {
+    const section = el("section", `rounded-lg border ${accent} bg-white p-4 shadow-xs`);
+    const heading = el("h3", "mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500", title);
+    section.append(heading);
+    return section;
+}
+
+function renderTextSection(title, content) {
+    if (!content) {
+        return null;
+    }
+    const section = sectionShell(title);
+    section.append(el("p", "whitespace-pre-wrap text-sm leading-6 text-gray-700", content));
+    return section;
+}
+
+function renderListSection(title, items) {
     if (!Array.isArray(items) || items.length === 0) {
         return null;
     }
-    const section = document.createElement("section");
-    const heading = document.createElement("h3");
-    heading.textContent = title;
-    const list = document.createElement("ul");
-    items.slice(0, 6).forEach((item) => {
-        const li = document.createElement("li");
-        li.textContent = typeof item === "string"
-            ? item
-            : `${text(item.input_data)} -> ${text(item.expected_output)}`;
-        list.append(li);
+    const section = sectionShell(title);
+    const list = el("ul", "space-y-2");
+    items.forEach((item) => {
+        const listItem = el("li", "rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm leading-6 text-gray-700", item);
+        list.append(listItem);
     });
-    section.append(heading, list);
+    section.append(list);
+    return section;
+}
+
+function renderFormatGrid(payload) {
+    if (!payload.input_format && !payload.output_format) {
+        return null;
+    }
+    const grid = el("section", "grid gap-3 sm:grid-cols-2");
+    [
+        ["Input Format", payload.input_format],
+        ["Output Format", payload.output_format],
+    ].forEach(([title, value]) => {
+        if (!value) {
+            return;
+        }
+        const panel = sectionShell(title);
+        panel.append(el("p", "whitespace-pre-wrap font-mono text-xs leading-5 text-gray-800", value));
+        grid.append(panel);
+    });
+    return grid;
+}
+
+function renderExamples(examples) {
+    if (!Array.isArray(examples) || examples.length === 0) {
+        return null;
+    }
+    const section = sectionShell("Examples");
+    const list = el("div", "space-y-3");
+    examples.forEach((example) => {
+        const item = el("div", "rounded-md border border-gray-200 bg-gray-50 p-3");
+        item.append(el("p", "text-xs font-semibold uppercase tracking-wider text-gray-500", "Input"));
+        item.append(el("pre", "mt-1 overflow-x-auto rounded-md bg-white p-2 font-mono text-xs leading-5 text-gray-900", text(example.input_data)));
+        item.append(el("p", "mt-3 text-xs font-semibold uppercase tracking-wider text-gray-500", "Expected output"));
+        item.append(el("pre", "mt-1 overflow-x-auto rounded-md bg-white p-2 font-mono text-xs leading-5 text-gray-900", text(example.expected_output)));
+        item.append(el("p", "mt-2 text-sm leading-6 text-gray-600", text(example.explanation)));
+        list.append(item);
+    });
+    section.append(list);
+    return section;
+}
+
+function categoryClass(category) {
+    const normalized = text(category).toLowerCase();
+    if (normalized === "normal") {
+        return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    }
+    if (normalized === "boundary") {
+        return "border-amber-200 bg-amber-50 text-amber-700";
+    }
+    if (normalized === "corner") {
+        return "border-cyan-200 bg-cyan-50 text-cyan-700";
+    }
+    if (normalized === "stress") {
+        return "border-rose-200 bg-rose-50 text-rose-700";
+    }
+    return "border-gray-200 bg-gray-50 text-gray-700";
+}
+
+function renderTestCases(testCases) {
+    if (!Array.isArray(testCases) || testCases.length === 0) {
+        return null;
+    }
+    const section = sectionShell(`Test Cases (${testCases.length})`);
+    const list = el("div", "space-y-3");
+    testCases.forEach((testCase) => {
+        const item = el("article", "rounded-lg border border-gray-200 bg-gray-50 p-3");
+        const header = el("div", "mb-3 flex items-center justify-between gap-2");
+        header.append(el("p", "text-xs font-semibold uppercase tracking-wider text-gray-500", "Candidate"));
+        header.append(el("span", `rounded-full border px-2 py-0.5 text-xs font-semibold ${categoryClass(testCase.category)}`, text(testCase.category)));
+        item.append(header);
+        item.append(el("p", "text-xs font-semibold uppercase tracking-wider text-gray-500", "Input"));
+        item.append(el("pre", "mt-1 overflow-x-auto rounded-md bg-white p-2 font-mono text-xs leading-5 text-gray-900", text(testCase.input_data)));
+        item.append(el("p", "mt-3 text-xs font-semibold uppercase tracking-wider text-gray-500", "Expected output"));
+        item.append(el("pre", "mt-1 overflow-x-auto rounded-md bg-white p-2 font-mono text-xs leading-5 text-gray-900", text(testCase.expected_output)));
+        item.append(el("p", "mt-2 text-sm leading-6 text-gray-600", text(testCase.explanation)));
+        list.append(item);
+    });
+    section.append(list);
+    return section;
+}
+
+function renderReferenceSolution(solution) {
+    if (!solution) {
+        return null;
+    }
+    const section = sectionShell("Reference Solution", "border-gray-800");
+    section.classList.remove("bg-white");
+    section.classList.add("bg-gray-950");
+    section.querySelector("h3").className = "mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400";
+    section.append(el("pre", "custom-scrollbar max-h-80 overflow-auto rounded-md bg-gray-900 p-3 font-mono text-xs leading-5 text-emerald-200", solution));
     return section;
 }
 
 function renderArtifact(data) {
     const payload = data.payload || {};
-    artifactMeta.textContent = `${data.provider} / ${data.model_name}`;
+    currentArtifact = data;
+    artifactMeta.textContent = data.mode.replace("_", " ");
+    artifactStatus.textContent = `Artifact ${data.artifact_id}`;
     artifactEmpty.hidden = true;
     artifactResult.hidden = false;
     artifactResult.replaceChildren();
 
-    const title = document.createElement("h2");
-    title.textContent = payload.title || data.summary;
-    artifactResult.append(title, paragraph(data.summary));
-
-    if (payload.problem_statement) {
-        artifactResult.append(paragraph(payload.problem_statement));
+    const header = el("section", "rounded-lg border border-blue-200 bg-blue-50 p-4");
+    const headerTop = el("div", "flex items-center justify-between gap-3");
+    headerTop.append(el("p", "text-xs font-semibold uppercase tracking-wider text-blue-700", data.provider));
+    if (payload.difficulty) {
+        headerTop.append(el("span", "rounded-full border border-blue-200 bg-white px-2 py-0.5 text-xs font-semibold text-blue-700", text(payload.difficulty)));
     }
+    header.append(headerTop);
+    header.append(el("h3", "mt-2 text-lg font-semibold tracking-tight text-gray-950", text(payload.title || data.summary)));
+    header.append(el("p", "mt-1 text-sm leading-6 text-gray-700", text(data.summary)));
+    artifactResult.append(header);
+
     [
-        renderList("Learning Objectives", payload.learning_objectives),
-        renderList("Constraints", payload.constraints),
-        renderList("Examples", payload.examples),
-        renderList("Test Cases", payload.test_cases),
-        renderList("Coverage Notes", payload.coverage_notes),
-        renderList("Ambiguity Notes", payload.ambiguity_notes),
+        renderTextSection("Problem Statement", payload.problem_statement),
+        renderFormatGrid(payload),
+        renderListSection("Learning Objectives", payload.learning_objectives),
+        renderListSection("Constraints", payload.constraints),
+        renderExamples(payload.examples),
+        renderTestCases(payload.test_cases),
+        renderListSection("Coverage Notes", payload.coverage_notes),
+        renderListSection("Ambiguity Notes", payload.ambiguity_notes),
+        renderReferenceSolution(payload.reference_solution),
     ].filter(Boolean).forEach((section) => artifactResult.append(section));
 
-    const code = document.createElement("pre");
-    code.textContent = JSON.stringify(payload, null, 2);
-    artifactResult.append(code);
+    reviewActions.dataset.artifactState = "draft";
+    saveArtifactButton.disabled = false;
+    saveArtifactLabel.textContent = "Save Draft";
+    discardArtifactButton.disabled = false;
 }
+
+saveArtifactButton.addEventListener("click", () => {
+    if (!currentArtifact) {
+        return;
+    }
+    reviewActions.dataset.artifactState = "saved";
+    saveArtifactButton.disabled = true;
+    saveArtifactLabel.textContent = "Draft Saved";
+    artifactStatus.textContent = `Saved artifact ${currentArtifact.artifact_id}`;
+    addMessage("assistant", "Draft artifact saved for instructor review.");
+});
+
+discardArtifactButton.addEventListener("click", () => {
+    if (!currentArtifact) {
+        return;
+    }
+    resetArtifactPanel();
+    addMessage("assistant", "Draft preview discarded from this workspace.");
+});
 
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const formData = new FormData(form);
     const prompt = text(formData.get("prompt")).trim();
     if (!prompt) {
+        composerStatus.textContent = ERROR_MESSAGES.invalid_prompt;
         return;
     }
 
-    addMessage("user", paragraph(prompt));
+    addMessage("user", prompt);
+    promptInput.value = "";
+    composerStatus.textContent = "Generating";
     button.disabled = true;
-    button.dataset.loading = "true";
-    buttonLabel.textContent = "Generating";
+    aiLoading.classList.remove("hidden");
 
     try {
         const response = await fetch("/assistant/generate", {
@@ -183,15 +546,21 @@ form.addEventListener("submit", async (event) => {
         if (!response.ok) {
             throw new Error(data.error || "provider_unavailable");
         }
-        addMessage("assistant", paragraph(data.summary));
+        addMessage("assistant", data.summary);
         renderArtifact(data);
+        composerStatus.textContent = "Draft ready";
     } catch (error) {
-        addMessage("assistant", paragraph(`Error: ${error.message}`));
+        const friendlyMessage = ERROR_MESSAGES[error.message] || error.message;
+        addMessage("assistant", `Error: ${friendlyMessage}`);
+        composerStatus.textContent = "Generation failed";
     } finally {
         button.disabled = false;
-        button.dataset.loading = "false";
-        buttonLabel.textContent = "Generate";
+        aiLoading.classList.add("hidden");
+        promptInput.focus();
     }
 });
+
+setAssignmentMode(document.querySelector("input[name='mode']:checked").value);
+resetArtifactPanel();
 </script>
 {% endblock %}
