@@ -29,9 +29,11 @@ def _set_test_env(monkeypatch):
     """Ensure tests never hit the production database."""
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("AI_PROVIDER", "demo")
 
 
 def pytest_configure(config):
     """Set environment to 'test' early, before any imports."""
     os.environ.setdefault("APP_ENV", "test")
     os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+    os.environ.setdefault("AI_PROVIDER", "demo")

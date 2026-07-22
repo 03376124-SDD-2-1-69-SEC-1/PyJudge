@@ -9,30 +9,40 @@ from fastapi.templating import Jinja2Templates
 
 from greader.assignments.repository import AssignmentRepository
 from greader.assignments.routes import router as assignment_router
+from greader.assistant.interface import AssignmentGenerator
+from greader.assistant.providers import ai_connection_status, build_assignment_generator
+from greader.assistant.repository import SqlAlchemyGenerationRepository
+from greader.config import Settings
+from greader.database import build_session_factory
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _TEMPLATE_DIR = _PACKAGE_DIR / "templates"
 _STATIC_DIR = _PACKAGE_DIR / "static"
 
 
-def _default_repository() -> AssignmentRepository:
-    """Build the default SQLAlchemy-backed repository.
+def _default_repositories(
+    settings: Settings,
+) -> tuple[AssignmentRepository, SqlAlchemyGenerationRepository]:
+    """Build the default SQLAlchemy-backed repositories.
 
-    Schema management is handled exclusively by Alembic – this function
-    does **not** call ``Base.metadata.create_all()``.
+    Schema management is handled exclusively by Alembic – this function does
+    **not** call ``Base.metadata.create_all()``.
     """
     from greader.assignments.sql_repository import SqlAlchemyAssignmentRepository
-    from greader.config import Settings
-    from greader.database import build_session_factory
 
-    settings = Settings()
     session_factory = build_session_factory(settings.DATABASE_URL)
-    return SqlAlchemyAssignmentRepository(session_factory)
+    return (
+        SqlAlchemyAssignmentRepository(session_factory),
+        SqlAlchemyGenerationRepository(session_factory),
+    )
 
 
 def create_app(
     *,
     assignment_repo: AssignmentRepository | None = None,
+    generation_repo: SqlAlchemyGenerationRepository | None = None,
+    assignment_generator: AssignmentGenerator | None = None,
+    settings: Settings | None = None,
 ) -> FastAPI:
     """Application factory.
 
@@ -41,7 +51,14 @@ def create_app(
     assignment_repo:
         Optional assignment repository for dependency injection.
         Defaults to a SQLAlchemy-backed repository when *None*.
+    generation_repo:
+        Optional generation repository for dependency injection.
+    assignment_generator:
+        Optional AI provider for dependency injection.
+    settings:
+        Optional application settings object.
     """
+    settings = settings or Settings()
     application = FastAPI(title="GReader")
 
     # Ensure the static directory exists so mounting never fails.
@@ -52,9 +69,20 @@ def create_app(
 
     # Store shared state for routes to access.
     application.state.templates = templates
-    application.state.assignment_repo = (
-        assignment_repo if assignment_repo is not None else _default_repository()
+    default_assignment_repo: AssignmentRepository | None = None
+    default_generation_repo: SqlAlchemyGenerationRepository | None = None
+    if assignment_repo is None or generation_repo is None:
+        default_assignment_repo, default_generation_repo = _default_repositories(
+            settings
+        )
+
+    application.state.settings = settings
+    application.state.assignment_repo = assignment_repo or default_assignment_repo
+    application.state.generation_repo = generation_repo or default_generation_repo
+    application.state.assignment_generator = (
+        assignment_generator or build_assignment_generator(settings)
     )
+    application.state.ai_connection_status = ai_connection_status(settings)
 
     # ------------------------------------------------------------------
     # Routers

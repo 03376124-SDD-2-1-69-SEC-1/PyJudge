@@ -20,3 +20,7 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     DATABASE_URL: str = "sqlite:///./data/greader.db"
     SECRET_KEY: str = "change-me-in-production"
+    AI_PROVIDER: str = "demo"
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.5-flash"
+    AI_REQUEST_TIMEOUT_SECONDS: int = 30

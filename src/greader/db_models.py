@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -45,6 +45,9 @@ class AssignmentRecord(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    generation_requests: Mapped[list["GenerationRequestRecord"]] = relationship(
+        back_populates="assignment",
+    )
 
     __table_args__ = (
         Index("ix_assignments_difficulty", "difficulty"),
@@ -82,4 +85,75 @@ class TestCaseRecord(Base):
     __table_args__ = (
         Index("ix_test_cases_assignment_id", "assignment_id"),
         Index("ix_test_cases_category", "category"),
+    )
+
+
+class GenerationRequestRecord(Base):
+    """Persistent audit record for one AI generation request."""
+
+    __tablename__ = "generation_requests"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    generation_mode: Mapped[str] = mapped_column(String(50), nullable=False)
+    assignment_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("assignments.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
+    safe_error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    assignment: Mapped["AssignmentRecord | None"] = relationship(
+        back_populates="generation_requests",
+    )
+    artifact: Mapped["GenerationArtifactRecord | None"] = relationship(
+        back_populates="generation_request",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
+
+    __table_args__ = (
+        Index("ix_generation_requests_assignment_id", "assignment_id"),
+        Index("ix_generation_requests_status", "status"),
+    )
+
+
+class GenerationArtifactRecord(Base):
+    """Persistent validated output produced by an AI provider."""
+
+    __tablename__ = "generation_artifacts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    generation_request_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("generation_requests.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    generation_mode: Mapped[str] = mapped_column(String(50), nullable=False)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    is_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    applied_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    generation_request: Mapped["GenerationRequestRecord"] = relationship(
+        back_populates="artifact",
+    )
+
+    __table_args__ = (
+        Index("ix_generation_artifacts_generation_request_id", "generation_request_id"),
     )
