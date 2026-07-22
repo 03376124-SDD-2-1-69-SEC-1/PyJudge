@@ -139,7 +139,7 @@ def _build_test_cases() -> list[TestCase]:
 def seed_demo() -> None:
     """Insert the Two Sum Optimized assignment if it doesn't already exist."""
     settings = Settings()
-    session_factory = build_session_factory(settings.DATABASE_URL)
+    session_factory = build_session_factory(settings.database_url)
     repo = SqlAlchemyAssignmentRepository(session_factory)
 
     existing = repo.get_assignment(_TWO_SUM_ID)

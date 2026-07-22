@@ -30,7 +30,7 @@ def _default_repositories(
     """
     from greader.assignments.sql_repository import SqlAlchemyAssignmentRepository
 
-    session_factory = build_session_factory(settings.DATABASE_URL)
+    session_factory = build_session_factory(settings.database_url)
     return (
         SqlAlchemyAssignmentRepository(session_factory),
         SqlAlchemyGenerationRepository(session_factory),

@@ -27,6 +27,7 @@ greader/
 
 - **Python 3.12+**
 - **[uv](https://docs.astral.sh/uv/getting-started/installation/)** — fast Python package manager
+- **Docker** — for the local PostgreSQL database
 
 ### Install uv
 
@@ -56,7 +57,36 @@ winget install --id=astral-sh.uv -e
 
 ## Getting Started
 
-### 1. Install dependencies
+### 1. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` to change PostgreSQL credentials, port, app port, or AI provider
+settings. Leave `DATABASE_URL` blank to build the connection URL from
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, and
+`POSTGRES_DB`. Set `DATABASE_URL` only when you need a full custom SQLAlchemy
+URL.
+
+### 2. Run with Docker
+
+```bash
+docker compose up --build
+```
+
+The compose app waits for PostgreSQL, runs Alembic migrations, then starts
+GReader at **http://127.0.0.1:8000**.
+
+### 3. Run locally with Docker PostgreSQL
+
+Start only the database:
+
+```bash
+docker compose up -d db
+```
+
+Install dependencies:
 
 ```bash
 uv sync
@@ -64,7 +94,13 @@ uv sync
 
 This installs both runtime and development dependencies and creates a `.venv` virtual environment automatically.
 
-### 2. Run the development server
+Run migrations:
+
+```bash
+uv run alembic upgrade head
+```
+
+Run the development server:
 
 ```bash
 uv run uvicorn greader.main:app --reload
