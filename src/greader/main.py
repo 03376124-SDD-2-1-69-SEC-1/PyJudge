@@ -2,13 +2,17 @@
 
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlmodel import Session
 
 from greader.core.topics.repository import InMemoryTopicRepository, TopicRepository
 from greader.core.topics.routes import router as topic_router
 from greader.core.topics.service import TopicService
+from greader.database.health import check_db
+from greader.database.session import get_session
+from greader.database.storage import check_r2, get_r2_client
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _WEB_DIR = _PACKAGE_DIR / "web"
@@ -40,6 +44,22 @@ def create_app(*, topic_repository: TopicRepository | None = None) -> FastAPI:
     def health() -> dict[str, str]:
         """Report application liveness without database dependencies."""
         return {"status": "ok", "service": "greader"}
+
+    @application.get("/health/db")
+    def health_db(session: Session = Depends(get_session)) -> dict:
+        """Confirm the Neon connection works and core/rag schemas exist."""
+        try:
+            return check_db(session)
+        except Exception as exc:  # noqa: BLE001 — surface as a 503, not a 500 traceback
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @application.get("/health/r2")
+    def health_r2(client=Depends(get_r2_client)) -> dict:
+        """Confirm the R2 bucket is reachable."""
+        try:
+            return check_r2(client)
+        except Exception as exc:  # noqa: BLE001 — surface as a 503, not a 500 traceback
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return application
 
