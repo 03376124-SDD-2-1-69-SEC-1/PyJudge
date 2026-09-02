@@ -6,7 +6,7 @@ GReader เป็นโครงตั้งต้นสำหรับระบ
 
 > สถานะปัจจุบันยังเป็น team scaffold ไม่ใช่ระบบที่เสร็จสมบูรณ์
 >
-> ฟีเจอร์ที่ใช้งานได้จริงมีเพียง Topics API ส่วน Assignment, AI และ Persistence ยังเป็นพื้นที่สำหรับทีมเจ้าของงาน
+> ฟีเจอร์ที่ใช้งานได้จริงมีเพียง Topics API ส่วน Assignment, AI และ Database ยังเป็นพื้นที่สำหรับทีมเจ้าของงาน
 
 ## เป้าหมายของ Scaffold
 
@@ -25,13 +25,13 @@ GReader เป็นโครงตั้งต้นสำหรับระบ
 
 ## สถานะของแต่ละส่วน
 
-| ส่วน | สถานะ | ผู้รับผิดชอบ |
-|---|---|---|
-| `core/topics` | CRUD API ตัวอย่างที่รันได้จริง | Foundation / Reference API |
-| `core/assignments` | Placeholder รอออกแบบและพัฒนา | Assignment team |
-| `ai` | Placeholder รอ Assignment contract เสถียร | AI team |
-| `persistence` | Placeholder รอออกแบบฐานข้อมูล | Database owner |
-| `web/templates/base.html` | Layout กลางของทุกหน้า | Design team |
+| ส่วน                      | สถานะ                                     | ผู้รับผิดชอบ               |
+| ------------------------- | ----------------------------------------- | -------------------------- |
+| `core/topics`             | CRUD API ตัวอย่างที่รันได้จริง            | Foundation / Reference API |
+| `core/assignments`        | Placeholder รอออกแบบและพัฒนา              | Assignment team            |
+| `ai`                      | Placeholder รอ Assignment contract เสถียร | AI team                    |
+| `database`                | Placeholder รอออกแบบฐานข้อมูล             | Database owner             |
+| `web/templates/base.html` | Layout กลางของทุกหน้า                     | Design team                |
 
 อย่า implement placeholder ของทีมอื่นโดยไม่ได้รับมอบหมาย เพราะแต่ละพื้นที่ตั้งใจเว้นไว้ให้เจ้าของงานเป็นผู้ออกแบบ contract และ implementation เอง
 
@@ -41,7 +41,7 @@ GReader เป็นโครงตั้งต้นสำหรับระบ
 
 - Assignment และ Test Case CRUD
 - AI generation, provider integration, RAG, embeddings หรือ PDF ingestion
-- Database schema, migration, ORM หรือ persistence guarantee
+- Database schema, migration, ORM หรือการรับประกันการจัดเก็บข้อมูล
 - Authentication, authorization, course management, document upload, analytics หรือ grading
 - Browser JavaScript ที่ทีมเขียนเอง
 - การรองรับ schema หรือข้อมูลจาก AI/database implementation รุ่นเก่า
@@ -52,12 +52,12 @@ GReader เป็นโครงตั้งต้นสำหรับระบ
 
 ใช้คำศัพท์เหล่านี้ให้เหมือนกันทั้งในโค้ด API เอกสาร และหน้าจอ
 
-| คำศัพท์ | ความหมาย | หลีกเลี่ยงการใช้คำว่า |
-|---|---|---|
-| **Instructor** | ผู้สร้างและดูแลโจทย์เขียนโปรแกรม | Teacher, Admin, User |
-| **Assignment** | โจทย์เขียนโปรแกรม ประกอบด้วยรายละเอียด เงื่อนไข และ Test Cases | Challenge, Task, Question |
-| **Test Case** | คู่ของ input และ expected output ซึ่งต้องเป็นของ Assignment เสมอ | Example, Check |
-| **Topic** | หัวข้อความรู้ที่ Assignment สามารถอ้างอิงได้ เช่น Array, Graph หรือ Dynamic Programming | Tag, Category, Label |
+| คำศัพท์        | ความหมาย                                                                                | หลีกเลี่ยงการใช้คำว่า     |
+| -------------- | --------------------------------------------------------------------------------------- | ------------------------- |
+| **Instructor** | ผู้สร้างและดูแลโจทย์เขียนโปรแกรม                                                        | Teacher, Admin, User      |
+| **Assignment** | โจทย์เขียนโปรแกรม ประกอบด้วยรายละเอียด เงื่อนไข และ Test Cases                          | Challenge, Task, Question |
+| **Test Case**  | คู่ของ input และ expected output ซึ่งต้องเป็นของ Assignment เสมอ                        | Example, Check            |
+| **Topic**      | หัวข้อความรู้ที่ Assignment สามารถอ้างอิงได้ เช่น Array, Graph หรือ Dynamic Programming | Tag, Category, Label      |
 
 ## เทคโนโลยีที่ใช้
 
@@ -88,18 +88,18 @@ uv sync
 เปิด development server:
 
 ```bash
-uv run uvicorn greader.main:app --reload
+uv run fastapi dev src/greader/main.py
 ```
 
 เมื่อ server เริ่มทำงานแล้ว เปิด URL ต่อไปนี้:
 
-| URL | หน้าที่ |
-|---|---|
-| <http://127.0.0.1:8000/> | หน้าเว็บตัวอย่างที่ใช้ layout กลาง |
-| <http://127.0.0.1:8000/health> | ตรวจว่าแอปยังทำงานอยู่ |
-| <http://127.0.0.1:8000/docs> | Swagger UI สำหรับทดลอง API |
-| <http://127.0.0.1:8000/openapi.json> | OpenAPI specification |
-| <http://127.0.0.1:8000/api/v1/topics> | Topics API |
+| URL                                   | หน้าที่                            |
+| ------------------------------------- | ---------------------------------- |
+| <http://127.0.0.1:8000/>              | หน้าเว็บตัวอย่างที่ใช้ layout กลาง |
+| <http://127.0.0.1:8000/health>        | ตรวจว่าแอปยังทำงานอยู่             |
+| <http://127.0.0.1:8000/docs>          | Swagger UI สำหรับทดลอง API         |
+| <http://127.0.0.1:8000/openapi.json>  | OpenAPI specification              |
+| <http://127.0.0.1:8000/api/v1/topics> | Topics API                         |
 
 หยุด server ด้วย `Ctrl+C`
 
@@ -116,7 +116,7 @@ greader/
 │   ├── adr/
 │   │   ├── 0001-reset-to-core-schema.md
 │   │   ├── 0002-use-topics-as-the-reference-slice.md
-│   │   └── 0003-use-neon-and-r2-for-future-persistence.md
+│   │   └── 0003-use-neon-and-r2-for-future-database.md
 │
 ├── src/greader/
 │   ├── main.py
@@ -139,7 +139,7 @@ greader/
 │   │       ├── service.py
 │   │       └── routes.py
 │   │
-│   ├── persistence/
+│   ├── database/
 │   │   └── README.md
 │   │
 │   └── web/
@@ -158,13 +158,13 @@ greader/
 
 ### ไฟล์ระดับโปรเจกต์
 
-| ไฟล์ | หน้าที่ |
-|---|---|
-| `README.md` | ภาพรวม วิธีเริ่มใช้งาน โครงสร้าง คำศัพท์ ownership และกติกาหลัก |
-| `pyproject.toml` | Dependencies และ configuration ของ Pytest, Ruff และ Coverage |
-| `uv.lock` | ล็อก dependency versions เพื่อให้ทุกเครื่องติดตั้งเหมือนกัน |
-| `Dockerfile` | วิธีสร้าง production container |
-| `docs/adr/` | เหตุผลของการตัดสินใจด้านสถาปัตยกรรมที่ไม่ควรเปลี่ยนโดยไม่หารือกับทีม |
+| ไฟล์             | หน้าที่                                                              |
+| ---------------- | -------------------------------------------------------------------- |
+| `README.md`      | ภาพรวม วิธีเริ่มใช้งาน โครงสร้าง คำศัพท์ ownership และกติกาหลัก      |
+| `pyproject.toml` | Dependencies และ configuration ของ Pytest, Ruff และ Coverage         |
+| `uv.lock`        | ล็อก dependency versions เพื่อให้ทุกเครื่องติดตั้งเหมือนกัน          |
+| `Dockerfile`     | วิธีสร้าง production container                                       |
+| `docs/adr/`      | เหตุผลของการตัดสินใจด้านสถาปัตยกรรมที่ไม่ควรเปลี่ยนโดยไม่หารือกับทีม |
 
 ### `src/greader/main.py`
 
@@ -200,13 +200,13 @@ in-memory หรือ database adapter
 
 หน้าที่ของแต่ละไฟล์:
 
-| ไฟล์ | หน้าที่ | ไม่ควรมี |
-|---|---|---|
-| `models.py` | Domain model และคำศัพท์ทางธุรกิจ | FastAPI, ORM, storage client |
-| `schemas.py` | Request/response schema ที่แสดงใน OpenAPI | Business workflow |
-| `repository.py` | Interface สำหรับอ่านและบันทึกข้อมูล รวมถึง adapter | HTTP handling |
-| `service.py` | Use case และ business rule | FastAPI, ORM, SQL |
-| `routes.py` | รับ HTTP request เรียก service และแปลง error เป็น HTTP response | Business rule หรือ SQL |
+| ไฟล์            | หน้าที่                                                         | ไม่ควรมี                     |
+| --------------- | --------------------------------------------------------------- | ---------------------------- |
+| `models.py`     | Domain model และคำศัพท์ทางธุรกิจ                                | FastAPI, ORM, storage client |
+| `schemas.py`    | Request/response schema ที่แสดงใน OpenAPI                       | Business workflow            |
+| `repository.py` | Interface สำหรับอ่านและบันทึกข้อมูล รวมถึง adapter              | HTTP handling                |
+| `service.py`    | Use case และ business rule                                      | FastAPI, ORM, SQL            |
+| `routes.py`     | รับ HTTP request เรียก service และแปลง error เป็น HTTP response | Business rule หรือ SQL       |
 
 Dependency ควรไหลจาก adapter เข้าหา domain ไม่ใช่ให้ domain รู้จัก framework หรือฐานข้อมูล
 
@@ -229,13 +229,13 @@ Core service ─X→ database technology
 
 Topics API เป็น CRUD reference ที่ทำงานได้โดยไม่ต้องมีฐานข้อมูล
 
-| Method | Path | ความหมาย | สำเร็จ |
-|---|---|---|---|
-| `POST` | `/api/v1/topics` | สร้าง Topic | `201` |
-| `GET` | `/api/v1/topics` | ดู Topic ทั้งหมด | `200` |
-| `GET` | `/api/v1/topics/{topic_id}` | ดู Topic เดียว | `200` |
-| `PUT` | `/api/v1/topics/{topic_id}` | แทนที่ข้อมูล Topic | `200` |
-| `DELETE` | `/api/v1/topics/{topic_id}` | ลบ Topic | `204` |
+| Method   | Path                        | ความหมาย           | สำเร็จ |
+| -------- | --------------------------- | ------------------ | ------ |
+| `POST`   | `/api/v1/topics`            | สร้าง Topic        | `201`  |
+| `GET`    | `/api/v1/topics`            | ดู Topic ทั้งหมด   | `200`  |
+| `GET`    | `/api/v1/topics/{topic_id}` | ดู Topic เดียว     | `200`  |
+| `PUT`    | `/api/v1/topics/{topic_id}` | แทนที่ข้อมูล Topic | `200`  |
+| `DELETE` | `/api/v1/topics/{topic_id}` | ลบ Topic           | `204`  |
 
 ตัวอย่างสร้าง Topic:
 
@@ -261,11 +261,11 @@ curl -X POST http://127.0.0.1:8000/api/v1/topics \
 
 Error ที่ service แปลงเป็น HTTP response:
 
-| สถานการณ์ | Status | Error code |
-|---|---|---|
-| ไม่พบ Topic | `404` | `topic_not_found` |
-| ชื่อ Topic ซ้ำ | `409` | `topic_name_conflict` |
-| Request ไม่ผ่าน schema validation | `422` | FastAPI validation error |
+| สถานการณ์                         | Status | Error code               |
+| --------------------------------- | ------ | ------------------------ |
+| ไม่พบ Topic                       | `404`  | `topic_not_found`        |
+| ชื่อ Topic ซ้ำ                    | `409`  | `topic_name_conflict`    |
+| Request ไม่ผ่าน schema validation | `422`  | FastAPI validation error |
 
 ข้อมูล Topic ถูกเก็บใน memory ของ process จึงหายเมื่อ restart server และไม่ควรถูกมองว่าเป็น database contract ตัวจริง
 
@@ -324,12 +324,12 @@ Dependency direction ที่ห้าม:
 Core → AI
 ```
 
-## Persistence module
+## Database module
 
 เริ่มที่:
 
 ```text
-src/greader/persistence/README.md
+src/greader/database/README.md
 ```
 
 สถานะปัจจุบันยังไม่มี schema, migration, credential หรือ database adapter
@@ -343,7 +343,7 @@ FastAPI → Cloudflare R2    สำหรับ PDF และ uploaded objects
 
 ฐานข้อมูลเก็บเฉพาะ object key และ metadata ของไฟล์ ส่วนไฟล์จริงเก็บใน R2
 
-เมื่อเริ่มงาน persistence:
+เมื่อเริ่มงาน database:
 
 1. Database owner ออกแบบ Core schema หนึ่งชุด
 2. สร้าง migration หลัง schema ได้รับการตกลง
@@ -497,9 +497,9 @@ src/greader/ai/README.md
 เริ่มที่:
 
 ```text
-src/greader/persistence/README.md
+src/greader/database/README.md
 docs/adr/0001-reset-to-core-schema.md
-docs/adr/0003-use-neon-and-r2-for-future-persistence.md
+docs/adr/0003-use-neon-and-r2-for-future-database.md
 ```
 
 อย่าเพิ่ม schema หรือ migration จนกว่าจะได้รับ task และตกลง Core schema แล้ว
@@ -568,7 +568,7 @@ ADR ใน `docs/adr/` บันทึกเหตุผลของการต
 
 - `0001-reset-to-core-schema.md` — ยังไม่เก็บ schema หรือ migration เก่า และใช้ in-memory จนกว่า Database owner จะออกแบบ Core schema
 - `0002-use-topics-as-the-reference-slice.md` — ใช้ Topics เป็น executable reference เพียงชุดเดียว
-- `0003-use-neon-and-r2-for-future-persistence.md` — เลือก Neon สำหรับ structured data และ R2 สำหรับ object storage ในอนาคต
+- `0003-use-neon-and-r2-for-future-database.md` — เลือก Neon สำหรับ structured data และ R2 สำหรับ object storage ในอนาคต
 
 หากต้องการเปลี่ยนการตัดสินใจเหล่านี้ ควรตกลงกับทีมและเพิ่มหรือแก้ ADR แทนการเปลี่ยน implementation อย่างเงียบ ๆ
 

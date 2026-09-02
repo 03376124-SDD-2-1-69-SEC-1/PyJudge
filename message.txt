@@ -1,0 +1,1069 @@
+# GReader — Backend Teammate Plan
+
+## 1. เป้าหมายของงาน
+
+งานของคุณคือทำ **CRUD API** สำหรับ
+
+- Assignment
+- Test Case
+
+ให้ Frontend สามารถ:
+
+- ดูรายการ Assignment
+- ดู Assignment รายตัว
+- เพิ่ม Assignment
+- แก้ Assignment
+- ลบ Assignment
+- เพิ่ม Test Case
+- แก้ Test Case
+- ลบ Test Case
+
+เท่านั้น
+
+---
+
+# 2. Scope งาน
+
+คุณรับผิดชอบเฉพาะ
+
+```text
+Assignment CRUD
+
+Create
+Read
+Update
+Delete
+
+Test Case CRUD
+
+Create
+Read
+Update
+Delete
+```
+
+ไม่ต้องออกแบบระบบใหม่
+
+ไม่ต้องจัดการ Database
+
+ไม่ต้องทำ AI
+
+---
+
+# 3. สิ่งที่ Tech Lead เตรียมให้
+
+Tech Lead จะเตรียมสิ่งเหล่านี้ไว้แล้ว:
+
+- FastAPI project
+- Database connection
+- Database models
+- Database tables
+- Relationship
+- Migration
+- SQLAlchemy setup
+- Authentication
+- Middleware
+- Error handler
+- Project structure
+- CRUD ตัวอย่าง
+- Test setup
+- `.env.example`
+
+คุณไม่ต้องแก้หรือสร้างสิ่งเหล่านี้เอง
+
+---
+
+# 4. สิ่งที่ห้ามทำ
+
+ห้ามแก้:
+
+- Database schema
+- Database table
+- SQLAlchemy model
+- Migration
+- Alembic
+- Relationship
+- Foreign Key
+- Database config
+- Database credential
+- Docker
+- CI/CD
+- Auth
+- Middleware
+- AI Service
+- RAG
+- Vector Search
+- PDF Processing
+- Generation Service
+
+ถ้าทำ CRUD แล้วติดเพราะส่วนเหล่านี้
+
+**ให้แจ้ง Tech Lead**
+
+ห้ามแก้เอง
+
+---
+
+# 5. API ที่ต้องทำ
+
+## Assignment
+
+### GET `/assignments`
+
+ใช้สำหรับแสดง Assignment ทั้งหมด
+
+ต้องทำ:
+
+```text
+GET /assignments
+```
+
+ผลลัพธ์:
+
+- มีข้อมูล → return list
+- ไม่มีข้อมูล → return `[]`
+
+---
+
+### GET `/assignments/{id}`
+
+ใช้สำหรับดู Assignment รายตัว
+
+ต้องทำ:
+
+```text
+GET /assignments/{id}
+```
+
+ผลลัพธ์:
+
+- เจอ → return assignment
+- ไม่เจอ → `404`
+
+ควร return Test Case ของ Assignment นั้นด้วยถ้า schema ที่ Tech Lead เตรียมไว้รองรับ
+
+---
+
+### POST `/assignments`
+
+ใช้สำหรับสร้าง Assignment
+
+```text
+POST /assignments
+```
+
+ข้อมูลหลัก:
+
+```text
+title
+problem_statement
+difficulty
+metadata
+```
+
+Validation:
+
+```text
+title ห้ามว่าง
+
+problem_statement ห้ามว่าง
+
+difficulty ต้องเป็น
+- easy
+- medium
+- hard
+```
+
+---
+
+### PUT `/assignments/{id}`
+
+ใช้สำหรับแก้ Assignment
+
+```text
+PUT /assignments/{id}
+```
+
+แก้ได้:
+
+```text
+title
+problem_statement
+difficulty
+metadata
+```
+
+ผลลัพธ์:
+
+```text
+เจอ → update
+
+ไม่เจอ → 404
+```
+
+---
+
+### DELETE `/assignments/{id}`
+
+ใช้สำหรับลบ Assignment
+
+```text
+DELETE /assignments/{id}
+```
+
+ผลลัพธ์:
+
+```text
+เจอ → delete
+
+ไม่เจอ → 404
+```
+
+เรื่อง Test Case ที่เกี่ยวข้องหรือ Cascade
+
+**ไม่ต้องจัดการเอง**
+
+ให้ใช้ behavior ที่ Tech Lead เตรียมไว้
+
+---
+
+# 6. Test Case API
+
+## POST `/assignments/{id}/test-cases`
+
+เพิ่ม Test Case ให้ Assignment
+
+```text
+POST /assignments/{id}/test-cases
+```
+
+ข้อมูล:
+
+```text
+input_data
+expected_output
+is_hidden
+order_index
+```
+
+ผลลัพธ์:
+
+```text
+Assignment มี → create
+
+Assignment ไม่มี → 404
+```
+
+---
+
+## PUT `/test-cases/{id}`
+
+แก้ Test Case
+
+```text
+PUT /test-cases/{id}
+```
+
+แก้ได้:
+
+```text
+input_data
+expected_output
+is_hidden
+order_index
+```
+
+ผลลัพธ์:
+
+```text
+เจอ → update
+
+ไม่เจอ → 404
+```
+
+---
+
+## DELETE `/test-cases/{id}`
+
+ลบ Test Case
+
+```text
+DELETE /test-cases/{id}
+```
+
+ผลลัพธ์:
+
+```text
+เจอ → delete
+
+ไม่เจอ → 404
+```
+
+---
+
+# 7. Tasks
+
+ทำตามลำดับนี้
+
+---
+
+## BE-01 — Run Project
+
+ทำ:
+
+```text
+clone project
+
+install dependency
+
+run FastAPI
+```
+
+Done เมื่อ:
+
+```text
+project run ได้
+
+GET /health ใช้งานได้
+```
+
+ถ้า Database connect ไม่ได้
+
+→ แจ้ง Tech Lead
+
+ไม่ต้องแก้ Database เอง
+
+---
+
+## BE-02 — อ่าน CRUD ตัวอย่าง
+
+Tech Lead จะมี CRUD ตัวอย่างให้
+
+ให้อ่านว่า project ใช้ pattern แบบไหน
+
+เช่น:
+
+```text
+Router
+
+↓
+
+Schema
+
+↓
+
+Service
+
+↓
+
+Model
+```
+
+งานของคุณคือ
+
+**ลอก pattern เดิม**
+
+ห้ามออกแบบ architecture ใหม่
+
+Done เมื่อ:
+
+สามารถอธิบายได้ว่า
+
+```text
+request เข้าไฟล์ไหน
+
+service อยู่ไหน
+
+response ออกตรงไหน
+```
+
+---
+
+## BE-03 — GET Assignment List
+
+ทำ:
+
+```http
+GET /assignments
+```
+
+Done เมื่อ:
+
+```text
+ไม่มีข้อมูล → []
+
+มีข้อมูล → list assignments
+
+API ไม่ error
+```
+
+---
+
+## BE-04 — GET Assignment Detail
+
+ทำ:
+
+```http
+GET /assignments/{id}
+```
+
+Done เมื่อ:
+
+```text
+เจอ → return assignment
+
+ไม่เจอ → 404
+
+return test cases ได้ถ้า schema รองรับ
+```
+
+---
+
+## BE-05 — CREATE Assignment
+
+ทำ:
+
+```http
+POST /assignments
+```
+
+Done เมื่อ:
+
+```text
+สร้าง Assignment ได้
+
+title ว่าง → reject
+
+problem_statement ว่าง → reject
+
+difficulty ผิด → reject
+```
+
+---
+
+## BE-06 — UPDATE Assignment
+
+ทำ:
+
+```http
+PUT /assignments/{id}
+```
+
+Done เมื่อ:
+
+```text
+แก้ข้อมูลได้
+
+id ไม่มี → 404
+
+invalid input → reject
+```
+
+---
+
+## BE-07 — DELETE Assignment
+
+ทำ:
+
+```http
+DELETE /assignments/{id}
+```
+
+Done เมื่อ:
+
+```text
+ลบ Assignment ได้
+
+id ไม่มี → 404
+```
+
+ไม่ต้องจัดการ Cascade หรือ Relationship เอง
+
+---
+
+## BE-08 — CREATE Test Case
+
+ทำ:
+
+```http
+POST /assignments/{id}/test-cases
+```
+
+Done เมื่อ:
+
+```text
+สร้าง Test Case ได้
+
+Assignment ไม่มี → 404
+```
+
+---
+
+## BE-09 — UPDATE Test Case
+
+ทำ:
+
+```http
+PUT /test-cases/{id}
+```
+
+Done เมื่อ:
+
+```text
+แก้ Test Case ได้
+
+Test Case ไม่มี → 404
+```
+
+---
+
+## BE-10 — DELETE Test Case
+
+ทำ:
+
+```http
+DELETE /test-cases/{id}
+```
+
+Done เมื่อ:
+
+```text
+ลบได้
+
+Test Case ไม่มี → 404
+```
+
+---
+
+## BE-11 — Integration Check
+
+ทดสอบ CRUD ทั้งชุด
+
+Flow:
+
+```text
+Create Assignment
+
+↓
+
+Get Assignment List
+
+↓
+
+Get Assignment Detail
+
+↓
+
+Update Assignment
+
+↓
+
+Add Test Case
+
+↓
+
+Update Test Case
+
+↓
+
+Delete Test Case
+
+↓
+
+Delete Assignment
+```
+
+Done เมื่อ CRUD ทั้งหมดทำงาน
+
+---
+
+# 8. ไฟล์ที่ทำงานได้
+
+ให้ยึด structure ที่ project มีอยู่
+
+ตัวอย่าง:
+
+```text
+app/
+├── routers/
+│   ├── assignments.py
+│   └── test_cases.py
+│
+├── schemas/
+│   ├── assignment.py
+│   └── test_case.py
+│
+├── services/
+│   ├── assignment_service.py
+│   └── test_case_service.py
+│
+└── tests/
+    ├── test_assignments.py
+    └── test_test_cases.py
+```
+
+ถ้า project ใช้ชื่อหรือ structure อื่น
+
+ให้ใช้ของเดิม
+
+ห้ามสร้าง architecture ใหม่
+
+---
+
+# 9. ไฟล์ที่ห้ามแก้
+
+ห้ามแก้:
+
+```text
+database.py
+
+config.py
+
+models/*
+
+migrations/*
+
+alembic/*
+
+.env
+
+Dockerfile
+
+docker-compose.yml
+
+.github/workflows/*
+
+auth/*
+
+middleware/*
+
+AI service
+
+RAG service
+
+generation service
+
+document ingestion
+```
+
+รวมถึงไฟล์ shared/core ที่ไม่ได้เกี่ยวกับ CRUD Assignment / Test Case
+
+---
+
+# 10. Error ที่ต้องรองรับ
+
+ขั้นต่ำ:
+
+## 404
+
+กรณี:
+
+```text
+Assignment ไม่พบ
+
+Test Case ไม่พบ
+```
+
+---
+
+## 422
+
+ใช้เมื่อ request validation ไม่ผ่าน
+
+เช่น:
+
+```text
+title ว่าง
+
+problem_statement ว่าง
+
+difficulty ไม่ถูกต้อง
+```
+
+---
+
+## 500
+
+ถ้าเกิด Internal Error
+
+ห้ามส่ง:
+
+```text
+stack trace
+
+database credential
+
+internal error detail
+```
+
+กลับไปให้ Frontend
+
+ให้ใช้ Error Handler ที่ project มีอยู่แล้ว
+
+---
+
+# 11. Test ขั้นต่ำ
+
+## Assignment
+
+ต้องทดสอบ:
+
+```text
+GET assignments
+
+GET assignment by id
+
+GET assignment ที่ไม่มี
+
+POST assignment
+
+POST invalid assignment
+
+PUT assignment
+
+PUT assignment ที่ไม่มี
+
+DELETE assignment
+
+DELETE assignment ที่ไม่มี
+```
+
+---
+
+## Test Case
+
+ต้องทดสอบ:
+
+```text
+POST test case
+
+POST test case กับ assignment ที่ไม่มี
+
+PUT test case
+
+PUT test case ที่ไม่มี
+
+DELETE test case
+
+DELETE test case ที่ไม่มี
+```
+
+ไม่ต้องเขียน Test เกี่ยวกับ:
+
+```text
+Migration
+
+Database schema
+
+Foreign Key
+
+Cascade
+
+Database connection
+
+AI
+
+RAG
+```
+
+---
+
+# 12. Definition of Done
+
+Task ถือว่า Done เมื่อ:
+
+```text
+Endpoint ทำงาน
+
+Validation ทำงาน
+
+404 ทำงาน
+
+Test ผ่าน
+
+Formatter ผ่าน
+
+ไม่มีไฟล์นอก Scope ถูกแก้
+
+เปิด PR แล้ว
+
+Tech Lead Review ผ่าน
+```
+
+ยิง API ได้อย่างเดียว
+
+**ยังไม่ถือว่า Done**
+
+---
+
+# 13. Git Rule
+
+ห้าม push เข้า `main`
+
+ใช้ branch เช่น:
+
+```text
+feature/backend-assignment-crud
+
+feature/backend-test-case-crud
+```
+
+ไม่จำเป็นต้องแตก branch ย่อยเยอะเกินไป
+
+แนะนำ:
+
+```text
+1 branch = Assignment CRUD
+
+1 branch = Test Case CRUD
+```
+
+ก่อนเปิด PR:
+
+```text
+1. run test
+
+2. run formatter
+
+3. git status
+
+4. git diff
+
+5. เช็คว่าไม่มีไฟล์นอก scope
+
+6. เปิด PR
+```
+
+---
+
+# 14. กฎตอนใช้ AI
+
+ใช้ AI ช่วยเขียนได้
+
+แต่ให้ AI อ่านไฟล์นี้ก่อน
+
+Prompt:
+
+```text
+Read backend-teammate-plan.md first.
+
+Your task is CRUD only.
+
+Do not modify database models, migrations, database configuration,
+authentication, middleware, Docker, CI/CD, AI service, RAG,
+generation service, or shared architecture.
+
+Use the existing project structure and existing CRUD pattern.
+
+Before editing:
+1. Tell me which task you are implementing.
+2. List files you plan to modify.
+
+After editing:
+1. List every modified file.
+2. Explain what changed.
+3. Show how to test it.
+
+Do not modify files outside the Assignment/Test Case CRUD scope.
+```
+
+ห้ามใช้ prompt เช่น:
+
+```text
+finish backend
+```
+
+```text
+complete the backend
+```
+
+```text
+fix everything
+```
+
+```text
+implement all missing features
+```
+
+เพราะ AI อาจแก้ไฟล์นอก Scope
+
+---
+
+# 15. ถ้าติด
+
+ถ้าติดเกินประมาณ 30–60 นาที
+
+ส่งให้ Tech Lead:
+
+```text
+1. กำลังทำ Task ไหน
+
+2. Error อะไร
+
+3. Endpoint ไหนมีปัญหา
+
+4. Code ส่วนที่เกี่ยวข้อง
+
+5. สิ่งที่ลองไปแล้ว
+```
+
+ห้ามแก้:
+
+```text
+Database
+
+Model
+
+Migration
+
+Architecture
+
+Middleware
+
+Auth
+```
+
+เพื่อหนี Bug
+
+---
+
+# 16. สิ่งที่ไม่ต้องทำ
+
+ไม่ต้องทำ:
+
+```text
+Database Design
+
+SQL Table
+
+Migration
+
+SQLAlchemy Model
+
+Foreign Key
+
+Relationship
+
+Cascade
+
+Repository Pattern
+
+CQRS
+
+Event Bus
+
+Redis
+
+Queue
+
+Microservice
+
+Clean Architecture ใหม่
+
+Generic CRUD Framework
+
+AI
+
+RAG
+
+Vector Search
+
+Embedding
+
+PDF Chunking
+```
+
+ใช้ของที่ Tech Lead เตรียมไว้
+
+แล้วทำ CRUD ให้เสร็จ
+
+---
+
+# 17. ขอบเขตแบบง่ายที่สุด
+
+ถ้าเกี่ยวกับ:
+
+```text
+GET Assignment
+POST Assignment
+PUT Assignment
+DELETE Assignment
+
+GET Test Case
+POST Test Case
+PUT Test Case
+DELETE Test Case
+```
+
+→ ทำ
+
+ถ้าเกี่ยวกับ:
+
+```text
+Database
+
+Model
+
+Migration
+
+Foreign Key
+
+Relationship
+
+Docker
+
+CI/CD
+
+Authentication
+
+Middleware
+
+AI
+
+RAG
+
+PDF
+
+Vector
+
+Generation
+```
+
+→ ไม่ทำ
+
+→ แจ้ง Tech Lead
+
+---
+
+# 18. เป้าหมายสุดท้าย
+
+Backend ที่คุณรับผิดชอบต้องทำ Flow นี้ได้:
+
+```text
+Instructor
+
+↓
+
+Assignment List
+
+├── Create Assignment
+├── View Assignment
+├── Edit Assignment
+└── Delete Assignment
+
+↓
+
+Assignment Detail
+
+↓
+
+Test Cases
+
+├── Add Test Case
+├── Edit Test Case
+└── Delete Test Case
+```
+
+งานของคุณจบที่ CRUD
+
+**ไม่ต้องจัดการ Database และไม่ต้องทำ AI**

@@ -1,4 +1,4 @@
-"""Topic use cases independent from HTTP and persistence technology."""
+"""Topic use cases independent from HTTP and database technology."""
 
 from uuid import uuid4
 

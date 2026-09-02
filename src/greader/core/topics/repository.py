@@ -1,7 +1,7 @@
 """Storage seam and in-memory adapter for Topics.
 
 When the database owner defines the Core schema, add a new adapter here or in
-the persistence package. Keep TopicService dependent on TopicRepository.
+the database package. Keep TopicService dependent on TopicRepository.
 """
 
 from typing import Protocol
@@ -10,7 +10,7 @@ from greader.core.topics.models import Topic
 
 
 class TopicRepository(Protocol):
-    """Persistence operations required by Topic use cases."""
+    """Database operations required by Topic use cases."""
 
     def list(self) -> list[Topic]:
         """Return every stored Topic."""

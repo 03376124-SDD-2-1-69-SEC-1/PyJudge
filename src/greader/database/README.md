@@ -1,11 +1,11 @@
-# Persistence Placeholder
+# Database Placeholder
 
 เจ้าของงาน: Database owner
 
 ตอนนี้ระบบใช้ in-memory state เพื่อให้ทีมเห็น API flow โดยไม่ผูกกับ schema
 จริง ข้อมูลจึงหายเมื่อ restart
 
-เมื่อเริ่ม persistence:
+เมื่อเริ่มงาน database:
 
 1. ออกแบบและ init Core schema หนึ่งชุดก่อน
 2. เพิ่ม database adapter หลัง repository interface ของ Core module

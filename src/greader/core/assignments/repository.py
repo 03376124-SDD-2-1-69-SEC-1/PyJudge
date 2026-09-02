@@ -1,4 +1,4 @@
-"""Assignment persistence-seam placeholder.
+"""Assignment database-seam placeholder.
 
 Owner: Assignment teammate.
 Derive repository operations from the service use cases. A future database
