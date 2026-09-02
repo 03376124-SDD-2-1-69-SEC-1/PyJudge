@@ -1,6 +1,36 @@
-# Ignore all new files by default. Keep only the root project guide and
-# the shareable environment template eligible for future tracking.
-*
-!.gitignore
-!.env.example
-!README.md
+# Python-generated files
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# Testing & Linting
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/
+
+# Local tooling binaries
+.tools/
+
+# OS / Environment / IDE
+.DS_Store
+.env
+.vscode/
+.idea/
+
+# SQLite databases
+data/
+*.db
+
+
+# Architecture decision records are local-only
+/docs/adr/
+.superpowers/
