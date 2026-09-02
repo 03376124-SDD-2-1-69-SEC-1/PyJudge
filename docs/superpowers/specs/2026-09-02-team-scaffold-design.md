@@ -174,7 +174,7 @@ The Assignment package is import-safe but behavior-free. Each module starts with
 
 ## Persistence Placeholder Guide
 
-`persistence/README.md` records that the database owner will initialize one Core schema later. It explains the adapter direction and migration expectations without defining tables. Until then, application state resets on process restart.
+`persistence/README.md` records that the database owner will initialize one Core schema later. Future structured data belongs in Neon PostgreSQL and uploaded objects belong in Cloudflare R2; it explains the adapter direction without defining tables. Until then, application state resets on process restart.
 
 ## Application and Web Flow
 

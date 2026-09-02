@@ -1,102 +1,44 @@
-"""GReader – AI-assisted assignment authoring."""
+"""Application composition for the GReader team scaffold."""
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from greader.ai.interface import AssignmentGenerator
-from greader.ai.providers import ai_connection_status, build_assignment_generator
-from greader.ai.repository import SqlAlchemyGenerationRepository
-from greader.ai.routes import router as ai_router
-from greader.assignments.repository import AssignmentRepository
-from greader.assignments.routes import router as assignment_router
-from greader.config import Settings
-from greader.database import build_session_factory
+from greader.core.topics.repository import InMemoryTopicRepository, TopicRepository
+from greader.core.topics.routes import router as topic_router
+from greader.core.topics.service import TopicService
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
-_TEMPLATE_DIR = _PACKAGE_DIR / "templates"
-_STATIC_DIR = _PACKAGE_DIR / "static"
+_WEB_DIR = _PACKAGE_DIR / "web"
+_TEMPLATE_DIR = _WEB_DIR / "templates"
+_STATIC_DIR = _WEB_DIR / "static"
 
 
-def _default_repositories(
-    settings: Settings,
-) -> tuple[AssignmentRepository, SqlAlchemyGenerationRepository]:
-    """Build the default SQLAlchemy-backed repositories.
-
-    Schema management is handled exclusively by Alembic – this function does
-    **not** call ``Base.metadata.create_all()``.
-    """
-    from greader.assignments.sql_repository import SqlAlchemyAssignmentRepository
-
-    session_factory = build_session_factory(settings.database_url)
-    return (
-        SqlAlchemyAssignmentRepository(session_factory),
-        SqlAlchemyGenerationRepository(session_factory),
+def create_app(*, topic_repository: TopicRepository | None = None) -> FastAPI:
+    """Build an isolated application with server-owned in-memory state."""
+    application = FastAPI(
+        title="GReader Team Scaffold",
+        description="A modular-monolith reference for the GReader team.",
+        version="0.1.0",
     )
-
-
-def create_app(
-    *,
-    assignment_repo: AssignmentRepository | None = None,
-    generation_repo: SqlAlchemyGenerationRepository | None = None,
-    assignment_generator: AssignmentGenerator | None = None,
-    settings: Settings | None = None,
-) -> FastAPI:
-    """Application factory.
-
-    Parameters
-    ----------
-    assignment_repo:
-        Optional assignment repository for dependency injection.
-        Defaults to a SQLAlchemy-backed repository when *None*.
-    generation_repo:
-        Optional generation repository for dependency injection.
-    assignment_generator:
-        Optional AI provider for dependency injection.
-    settings:
-        Optional application settings object.
-    """
-    settings = settings or Settings()
-    application = FastAPI(title="GReader")
-
-    # Ensure the static directory exists so mounting never fails.
-    _STATIC_DIR.mkdir(parents=True, exist_ok=True)
     application.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
-
-    # Store shared state for routes to access.
+    repository = topic_repository or InMemoryTopicRepository()
+    application.state.topic_service = TopicService(repository)
     application.state.templates = templates
-    default_assignment_repo: AssignmentRepository | None = None
-    default_generation_repo: SqlAlchemyGenerationRepository | None = None
-    if assignment_repo is None or generation_repo is None:
-        default_assignment_repo, default_generation_repo = _default_repositories(
-            settings
-        )
+    application.include_router(topic_router)
 
-    application.state.settings = settings
-    application.state.assignment_repo = assignment_repo or default_assignment_repo
-    application.state.generation_repo = generation_repo or default_generation_repo
-    application.state.assignment_generator = (
-        assignment_generator or build_assignment_generator(settings)
-    )
-    application.state.ai_connection_status = ai_connection_status(settings)
-
-    # ------------------------------------------------------------------
-    # Routers
-    # ------------------------------------------------------------------
-    application.include_router(assignment_router)
-    application.include_router(ai_router)
-
-    # ------------------------------------------------------------------
-    # Core routes
-    # ------------------------------------------------------------------
+    @application.get("/")
+    def home(request: Request):
+        """Render the shared layout example."""
+        return templates.TemplateResponse(request, "home.html")
 
     @application.get("/health")
-    async def health() -> dict:
-        """Liveness / readiness probe."""
+    def health() -> dict[str, str]:
+        """Report application liveness without database dependencies."""
         return {"status": "ok", "service": "greader"}
 
     return application

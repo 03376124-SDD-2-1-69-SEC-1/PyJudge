@@ -9,8 +9,6 @@ ENV PYTHONUNBUFFERED=1 \
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-COPY alembic.ini ./alembic.ini
-COPY alembic ./alembic
 
 RUN uv sync --frozen --no-dev
 

@@ -1,163 +1,117 @@
-# PYJudge
+# GReader — Team Scaffold
 
-**AI-assisted assignment authoring** — a web application for creating, managing, and grading assignments with the help of AI.
+GReader เป็นโครงตั้งต้นสำหรับงานกลุ่ม พัฒนาแบบ modular monolith ด้วย FastAPI
+และ Jinja2
 
-Built with [FastAPI](https://fastapi.tiangolo.com/), [Jinja2](https://jinja.palletsprojects.com/), and managed by [uv](https://docs.astral.sh/uv/).
+สถานะปัจจุบัน:
 
----
+- core/topics เป็น CRUD API ตัวอย่างที่ใช้งานได้จริง
+- core/assignments เป็น placeholder สำหรับทีม Assignment
+- ai เป็น placeholder สำหรับทีม AI
+- persistence เป็น placeholder สำหรับ Database owner
+- หน้า / เป็น layout ตัวอย่างที่ทีม design แก้ครั้งเดียวและ page อื่นจะ inherit
+  layout เดียวกัน
 
-## Project Structure
+## โครงสร้าง
 
-```
-greader/
-├── src/greader/
-│   ├── main.py               # Application factory and dependency wiring
-│   ├── ai/                   # AI providers, schemas, services, persistence, routes
-│   ├── assignments/          # Core assignment domain and HTTP routes
-│   ├── templates/
-│   │   ├── ai/               # Composer and artifact review pages
-│   │   └── assignments/      # Assignment list and editor pages
-│   └── static/css/           # Tailwind input and compiled stylesheet
-├── alembic/                  # Database migrations
-├── tests/                    # Unit and integration tests
-├── pyproject.toml            # Dependencies and tool settings
-└── README.md
-```
+~~~text
+src/greader/
+├── main.py                 # composition root
+├── core/
+│   ├── topics/             # CRUD reference API
+│   └── assignments/        # teammate-owned placeholder
+├── ai/                     # teammate-owned placeholder
+├── persistence/            # database-owner placeholder
+└── web/
+    ├── templates/          # base.html เป็น global layout
+    └── static/css/         # Tailwind source + compiled CSS
+~~~
 
-The `ai` package is part of the same FastAPI monolith. It may import shared
-assignment domain models, but it is not deployed as a separate service.
-Rendered pages intentionally use no JavaScript; interactions use normal HTML
-forms and POST-Redirect-GET.
+## เริ่มใช้งาน
 
-## Prerequisites
+ต้องมี Python 3.12+ และ uv
 
-- **Python 3.12+**
-- **[uv](https://docs.astral.sh/uv/getting-started/installation/)** — fast Python package manager
-- **Docker** — for the local PostgreSQL database
-
-### Install uv
-
-**macOS** (Homebrew):
-
-```bash
-brew install uv
-```
-
-or via the standalone installer:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-**Windows** (PowerShell):
-
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-or via winget:
-
-```powershell
-winget install --id=astral-sh.uv -e
-```
-
-## Getting Started
-
-### 1. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` to change PostgreSQL credentials, port, app port, or AI provider
-settings. Leave `DATABASE_URL` blank to build the connection URL from
-`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, and
-`POSTGRES_DB`. Set `DATABASE_URL` only when you need a full custom SQLAlchemy
-URL.
-
-### 2. Run with Docker
-
-```bash
-docker compose up --build
-```
-
-The compose app waits for PostgreSQL, runs Alembic migrations, then starts
-GReader at **http://127.0.0.1:8000**.
-
-### 3. Run locally with Docker PostgreSQL
-
-Start only the database:
-
-```bash
-docker compose up -d db
-```
-
-Install dependencies:
-
-```bash
+~~~bash
 uv sync
-```
-
-This installs both runtime and development dependencies and creates a `.venv` virtual environment automatically.
-
-Run migrations:
-
-```bash
-uv run alembic upgrade head
-```
-
-Run the development server:
-
-```bash
 uv run uvicorn greader.main:app --reload
-```
+~~~
 
-The app will be available at **http://127.0.0.1:8000**.
+เปิด:
 
-| Route                              | Description                         |
-| ---------------------------------- | ----------------------------------- |
-| `GET /` or `GET /assistant`        | AI assignment composer              |
-| `POST /assistant/generate`         | Generate a persisted draft          |
-| `GET /assistant/artifacts/{id}`    | Review an AI-generated artifact     |
-| `GET /assignments`                 | List saved assignments              |
-| `GET /health`                      | Health-check endpoint               |
-| `GET /docs`                        | Interactive API docs                |
+- หน้า layout: http://127.0.0.1:8000/
+- Swagger: http://127.0.0.1:8000/docs
+- OpenAPI JSON: http://127.0.0.1:8000/openapi.json
 
-## Testing
+## Topics API Reference
 
-Run the full test suite:
+core/topics เป็นตัวอย่างให้ทีม backend ดู flow ที่ควรใช้:
 
-```bash
-uv run pytest -v
-```
+~~~text
+HTTP route → service → repository interface → in-memory adapter
+~~~
 
-Run with coverage report:
+| Method | Path | ความหมาย |
+|---|---|---|
+| POST | /api/v1/topics | สร้าง Topic |
+| GET | /api/v1/topics | ดู Topics ทั้งหมด |
+| GET | /api/v1/topics/{id} | ดู Topic เดียว |
+| PUT | /api/v1/topics/{id} | แก้ Topic |
+| DELETE | /api/v1/topics/{id} | ลบ Topic |
 
-```bash
-uv run pytest --cov
-```
+ทดลอง endpoint เหล่านี้ได้จาก Swagger โดยไม่ต้องมีฐานข้อมูล ข้อมูลเป็น
+in-memory จึงหายเมื่อ restart server
 
-## Linting & Formatting
+## งานของแต่ละทีม
 
-Check for lint errors:
+| งาน | เริ่มที่ |
+|---|---|
+| Assignment และ Test Case | src/greader/core/assignments/README.md |
+| AI | src/greader/ai/README.md |
+| Database / storage | src/greader/persistence/README.md |
+| Design system / layout | src/greader/web/templates/base.html |
 
-```bash
+อ่าน AGENTS.md, CONTEXT.md, ADR และ plan.md ก่อนเริ่มงาน
+
+## Database และ File Storage ในอนาคต
+
+ล็อกแนวทางเป็น:
+
+~~~text
+FastAPI → Neon PostgreSQL  (structured data)
+FastAPI → Cloudflare R2    (PDF / uploaded objects)
+~~~
+
+Neon เก็บข้อมูล relational ส่วน R2 เก็บไฟล์จริง โดย database เก็บเพียง object
+key และ metadata. ตอนนี้ยังไม่มี schema, migration หรือ database adapter เพราะ
+Database owner จะออกแบบและ init เอง
+
+## Tailwind และข้อห้าม JavaScript
+
+Template ของทีมไม่มี script element, javascript URL หรือ inline event handler.
+FastAPI /docs ใช้ JavaScript ของ framework ได้ เพราะเป็น developer tooling
+ที่สร้างโดย FastAPI ไม่ใช่ feature template ของทีม
+
+แก้ Tailwind source ที่:
+
+~~~text
+src/greader/web/static/css/input.css
+~~~
+
+จากนั้น build ด้วย Tailwind standalone CLI ที่ทีมติดตั้งไว้:
+
+~~~bash
+tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css --minify
+~~~
+
+ห้ามใช้ Node/npm และห้ามโหลด Tailwind runtime ใน browser
+
+## Test และตรวจคุณภาพ
+
+~~~bash
+uv run pytest
 uv run ruff check .
-```
-
-Check formatting (no changes applied):
-
-```bash
 uv run ruff format --check .
-```
+~~~
 
-Auto-fix and format:
-
-```bash
-uv run ruff check --fix .
-uv run ruff format .
-```
-
-## License
-
-This project is for educational purposes (KMITL).
+Tests ครอบคลุม Topics API, in-memory seam, layout และ architecture guard ที่กัน
+JavaScript ใน template และกัน Core import AI
