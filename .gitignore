@@ -26,6 +26,17 @@ htmlcov/
 .vscode/
 .idea/
 
-# SQLite databases
+# AI / Agent tools
+.superpowers/
+.gemini/
+.claude/
+.cursor/
+.windsurf/
+.aider*
+
+# SQLite databases & Data folder
 data/
 *.db
+
+# Markdown files
+*.md
