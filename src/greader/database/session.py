@@ -4,7 +4,9 @@ from typing import Generator
 from sqlmodel import Session, create_engine
 
 # Neon pooled connection. Set in .env:
-#   DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
+#   DATABASE_URL=postgresql+psycopg://user:pass@host/db?sslmode=require
+# Must use the +psycopg driver tag: only psycopg (v3) is a project dependency,
+# and SQLAlchemy defaults a bare "postgresql://" URL to psycopg2.
 DATABASE_URL = os.environ["DATABASE_URL"]
 
 engine = create_engine(DATABASE_URL, echo=False)
