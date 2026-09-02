@@ -77,7 +77,7 @@ Use the following stack:
 - Jinja2 server-rendered HTML templates
 - Tailwind CSS
 - Tailwind standalone CLI without Node.js or npm
-- Minimal vanilla JavaScript
+- No browser JavaScript; use server-rendered HTML interactions
 - SQLAlchemy 2.x
 - Alembic
 - SQLite for local development and automated tests
@@ -476,7 +476,7 @@ Frontend pages must use:
 - Jinja2
 - Tailwind CSS
 - semantic HTML
-- minimal vanilla JavaScript
+- server-rendered interactions without browser JavaScript
 
 Prefer:
 
@@ -486,15 +486,9 @@ Prefer:
 - POST-Redirect-GET for form mutations
 - native `<select>`, `<textarea>`, `<input>`, and `<button>` controls
 
-Use JavaScript only when server-rendered HTML cannot reasonably provide the interaction.
-
-Examples of acceptable JavaScript:
-
-- Showing or hiding the assignment selector based on generation mode.
-- Populating a prompt textarea from a starter prompt.
-- Small presentational interactions.
-
-JavaScript must not become the source of truth for validation or application state.
+Do not render `<script>` tags or inline JavaScript event attributes. Use GET forms
+for presets and POST-Redirect-GET for mutations. It is acceptable for interactions
+to load a new server-rendered page.
 
 Server-side validation is always authoritative.
 
@@ -564,19 +558,15 @@ greader/
 │       ├── main.py
 │       ├── config.py
 │       ├── database.py
-│       ├── web/
-│       │   ├── __init__.py
-│       │   ├── routes.py
-│       │   └── dependencies.py
+│       ├── db_models.py
 │       ├── assignments/
 │       │   ├── __init__.py
 │       │   ├── models.py
-│       │   ├── records.py
-│       │   ├── mapping.py
+│       │   ├── mappers.py
 │       │   ├── repository.py
-│       │   ├── service.py
+│       │   ├── sql_repository.py
 │       │   └── routes.py
-│       ├── assistant/
+│       ├── ai/
 │       │   ├── __init__.py
 │       │   ├── models.py
 │       │   ├── schemas.py
@@ -585,24 +575,23 @@ greader/
 │       │   ├── gemini.py
 │       │   ├── repository.py
 │       │   ├── service.py
+│       │   ├── review.py
 │       │   └── routes.py
 │       ├── templates/
 │       │   ├── base.html
 │       │   ├── partials/
 │       │   │   └── sidebar.html
-│       │   ├── dashboard.html
 │       │   ├── assignments/
 │       │   │   ├── index.html
 │       │   │   └── editor.html
-│       │   └── assistant/
+│       │   └── ai/
 │       │       ├── index.html
-│       │       └── artifact.html
+│       │       ├── artifact.html
+│       │       └── not_found.html
 │       ├── static/
 │       │   ├── css/
 │       │   │   ├── input.css
 │       │   │   └── app.css
-│       │   └── js/
-│       │       └── assistant.js
 │       └── scripts/
 │           ├── seed_demo.py
 │           └── gemini_smoke_test.py

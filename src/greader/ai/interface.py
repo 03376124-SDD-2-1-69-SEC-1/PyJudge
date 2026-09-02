@@ -6,8 +6,8 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from greader.ai.schemas import GenerationMode, GenerationResult
 from greader.assignments.models import Assignment
-from greader.assistant.schemas import GenerationMode, GenerationResult
 
 
 class GenerationRequest(BaseModel):

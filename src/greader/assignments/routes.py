@@ -19,6 +19,14 @@ def _get_templates(request: Request) -> Jinja2Templates:
     return request.app.state.templates
 
 
+def _query_count(request: Request, name: str) -> int | None:
+    """Read a non-negative count from a safe redirect query parameter."""
+    value = request.query_params.get(name)
+    if value is None or not value.isdigit():
+        return None
+    return int(value)
+
+
 @router.get("", response_class=HTMLResponse)
 async def list_assignments(request: Request) -> HTMLResponse:
     """List all available assignments."""
@@ -48,5 +56,9 @@ async def assignment_editor(request: Request, assignment_id: str) -> HTMLRespons
     return templates.TemplateResponse(
         request,
         "assignments/editor.html",
-        {"assignment": assignment},
+        {
+            "assignment": assignment,
+            "saved_count": _query_count(request, "saved"),
+            "duplicate_count": _query_count(request, "duplicates"),
+        },
     )

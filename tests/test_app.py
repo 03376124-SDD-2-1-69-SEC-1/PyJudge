@@ -45,6 +45,12 @@ async def test_dashboard_returns_200(client):
 
 
 @pytest.mark.anyio
+async def test_ai_assistant_page_returns_200(client):
+    response = await client.get("/assistant")
+    assert response.status_code == 200
+
+
+@pytest.mark.anyio
 async def test_dashboard_returns_html(client):
     response = await client.get("/")
     assert "text/html" in response.headers["content-type"]
@@ -64,7 +70,7 @@ async def test_dashboard_contains_tagline(client):
 
 @pytest.mark.anyio
 async def test_ai_studio_preserves_generation_form_contract(client):
-    response = await client.get("/")
+    response = await client.get("/assistant")
     body = response.text
 
     assert 'id="ai-form"' in body
@@ -78,14 +84,48 @@ async def test_ai_studio_preserves_generation_form_contract(client):
 
 
 @pytest.mark.anyio
-async def test_ai_studio_has_chat_workspace_and_draft_inspector(client):
+async def test_ai_assistant_works_without_embedded_javascript(client):
+    response = await client.get("/assistant")
+    body = response.text.lower()
+
+    assert "<script" not in body
+    assert "javascript:" not in body
+    assert "onclick=" not in body
+    assert '<select id="assignment-id"' in body
+    assert 'name="assignment_id"' in body
+    assert (
+        "disabled"
+        not in body.split('<select id="assignment-id"', 1)[1].split(">", 1)[0]
+    )
+
+
+@pytest.mark.anyio
+async def test_starter_prompts_use_server_rendered_get_forms(client):
+    response = await client.get("/assistant")
+    body = response.text
+
+    assert 'action="/assistant" method="get"' in body
+    assert 'type="hidden" name="prompt"' in body
+    assert "Use prompt" in body
+
+
+@pytest.mark.anyio
+async def test_all_instructor_pages_render_without_script_tags(client):
+    for path in ["/", "/assistant", "/assignments", "/assignments/two-sum-optimized"]:
+        response = await client.get(path)
+        assert response.status_code == 200
+        assert "<script" not in response.text.lower()
+
+
+@pytest.mark.anyio
+async def test_ai_studio_has_composer_and_review_guidance(client):
     response = await client.get("/")
     body = response.text
 
     assert "AI Conversation" in body
     assert "Draft Inspector" in body
     assert "Sticky prompt composer" in body
-    assert "Review actions" in body
+    assert "How review works" in body
 
 
 @pytest.mark.anyio
@@ -99,13 +139,12 @@ async def test_ai_studio_uses_assignment_selector_for_context_modes(client):
 
 
 @pytest.mark.anyio
-async def test_ai_studio_exposes_artifact_review_controls(client):
+async def test_ai_studio_keeps_artifact_actions_off_the_composer(client):
     response = await client.get("/")
     body = response.text
 
-    assert 'id="save-artifact-button"' in body
-    assert 'id="discard-artifact-button"' in body
-    assert 'data-artifact-state="empty"' in body
+    assert "Save as Draft Assignment" not in body
+    assert "Discard generated artifact" not in body
 
 
 # ------------------------------------------------------------------
@@ -128,7 +167,7 @@ async def test_sidebar_contains_navigation_items(client):
     expected_items = [
         "Dashboard",
         "Assignments",
-        "AI Studio",
+        "AI Assistant",
         "Review",
         "Analytics",
         "Settings",

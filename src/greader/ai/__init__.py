@@ -1,8 +1,8 @@
 """AI assignment generation package."""
 
-from greader.assistant.demo import DemoAssignmentGenerator
-from greader.assistant.interface import AssignmentGenerator, GenerationRequest
-from greader.assistant.schemas import (
+from greader.ai.demo import DemoAssignmentGenerator
+from greader.ai.interface import AssignmentGenerator, GenerationRequest
+from greader.ai.schemas import (
     FullAssignmentDraft,
     GenerationMode,
     GenerationResult,

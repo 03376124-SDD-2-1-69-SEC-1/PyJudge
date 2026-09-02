@@ -28,3 +28,11 @@ class GeminiConfigurationError(GenerationError):
 
     def __init__(self) -> None:
         super().__init__("provider_authentication_failed")
+
+
+class ArtifactReviewError(Exception):
+    """Artifact review failure that exposes only a safe error code."""
+
+    def __init__(self, safe_error_code: str) -> None:
+        self.safe_error_code = safe_error_code
+        super().__init__(safe_error_code)

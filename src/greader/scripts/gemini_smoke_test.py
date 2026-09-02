@@ -7,10 +7,10 @@ uv run python -m greader.scripts.gemini_smoke_test
 
 from __future__ import annotations
 
-from greader.assistant.errors import GenerationError
-from greader.assistant.interface import GenerationRequest
-from greader.assistant.providers import build_assignment_generator
-from greader.assistant.schemas import FullAssignmentDraft, GenerationMode
+from greader.ai.errors import GenerationError
+from greader.ai.interface import GenerationRequest
+from greader.ai.providers import build_assignment_generator
+from greader.ai.schemas import FullAssignmentDraft, GenerationMode
 from greader.config import Settings
 
 

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from greader.assistant.demo import DemoAssignmentGenerator
-from greader.assistant.errors import GeminiConfigurationError, GenerationError
-from greader.assistant.gemini import GeminiAssignmentGenerator
-from greader.assistant.interface import AssignmentGenerator
+from greader.ai.demo import DemoAssignmentGenerator
+from greader.ai.errors import GeminiConfigurationError, GenerationError
+from greader.ai.gemini import GeminiAssignmentGenerator
+from greader.ai.interface import AssignmentGenerator
 from greader.config import Settings
 
 

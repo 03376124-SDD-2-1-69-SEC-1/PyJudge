@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}AI Assignment Assistant – GReader{% endblock %}
+
+{% block content %}
+<header class="mb-6 flex flex-col gap-4 border-b border-gray-200 pb-5 md:flex-row md:items-start md:justify-between">
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-wider text-blue-600">AI workspace</p>
+        <h1 class="mt-1 text-2xl font-semibold tracking-tight text-gray-950">AI Assignment Assistant</h1>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Create structured Python assignment material. Every generated result remains a draft until an instructor reviews and applies it.</p>
+    </div>
+    <div class="inline-flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs">
+        <span class="h-2 w-2 rounded-full {{ 'bg-emerald-500' if ai_status.configured else 'bg-amber-500' }}"></span>
+        {% if ai_status.provider == "demo" %}
+        <span>Demo provider active</span>
+        {% elif ai_status.configured %}
+        <span>Gemini connected</span>
+        {% else %}
+        <span>Gemini API key not configured</span>
+        {% endif %}
+    </div>
+</header>
+
+<div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <main class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs" aria-label="AI Conversation">
+        <div class="mb-5">
+            <h2 class="text-base font-semibold text-gray-950">Describe what you need</h2>
+            <p class="mt-1 text-sm leading-6 text-gray-500">Choose a generation mode and provide an existing assignment when generating tests.</p>
+        </div>
+
+        {% if errors.form %}
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ errors.form }}</div>
+        {% endif %}
+
+        <form id="ai-form" action="/assistant/generate" method="post" class="space-y-5" aria-label="Sticky prompt composer">
+            <fieldset>
+                <legend class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Generation mode</legend>
+                <div class="grid gap-2 md:grid-cols-3">
+                    {% for value, title, description in [
+                        ("full_assignment", "Complete Assignment", "Create a complete Python assignment draft."),
+                        ("test_cases", "Test Cases", "Generate normal and boundary cases."),
+                        ("edge_cases", "Edge Cases", "Find boundary, corner, and stress cases.")
+                    ] %}
+                    <label class="cursor-pointer rounded-lg border border-gray-200 bg-gray-50 p-3 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="mode" value="{{ value }}" class="mr-2" {{ 'checked' if form.mode == value else '' }}>
+                        <span class="text-sm font-semibold text-gray-950">{{ title }}</span>
+                        <span class="mt-1 block text-xs leading-5 text-gray-600">{{ description }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <div>
+                <label for="assignment-id" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">Target assignment</label>
+                <select id="assignment-id" name="assignment_id" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20">
+                    <option value="">Not required for Complete Assignment</option>
+                    {% for assignment in assignments %}
+                    <option value="{{ assignment.id }}" {{ 'selected' if form.assignment_id == assignment.id else '' }}>{{ assignment.title }}</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1.5 text-xs text-gray-500">Required for Test Cases and Edge Cases. The server validates this selection.</p>
+            </div>
+
+            <div>
+                <label for="prompt" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">Instructor instruction</label>
+                <textarea id="prompt" name="prompt" rows="7" maxlength="4000" required class="block w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm leading-6 text-gray-950 placeholder-gray-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20" placeholder="Create a medium Python assignment about counting word frequency...">{{ form.prompt }}</textarea>
+                {% if errors.prompt %}<p class="mt-1.5 text-xs font-medium text-red-700">{{ errors.prompt }}</p>{% endif %}
+            </div>
+
+            <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
+                <a href="/assistant" class="text-sm font-medium text-gray-500 hover:text-gray-900">Clear</a>
+                <button type="submit" id="generate-button" class="inline-flex h-10 items-center justify-center rounded-lg bg-gray-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Generate draft</button>
+            </div>
+        </form>
+    </main>
+
+    <aside class="space-y-4" aria-label="Draft Inspector">
+        <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+            <h2 class="text-sm font-semibold text-gray-950">How review works</h2>
+            <ol class="mt-3 space-y-3 text-sm leading-6 text-gray-600">
+                <li><span class="font-semibold text-gray-950">1.</span> Generate validated structured content.</li>
+                <li><span class="font-semibold text-gray-950">2.</span> Review it on a dedicated artifact page.</li>
+                <li><span class="font-semibold text-gray-950">3.</span> Apply or discard it explicitly.</li>
+            </ol>
+        </section>
+
+        <section class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500">Starter prompts</h2>
+            <div class="mt-3 space-y-2">
+                {% for preset_mode, preset_prompt in [
+                    ("full_assignment", "Create an easy Python assignment about student grades using if, elif, and else."),
+                    ("full_assignment", "Create a medium assignment about counting word frequency without collections.Counter."),
+                    ("test_cases", "Generate boundary tests for the selected assignment."),
+                    ("edge_cases", "Generate edge cases involving empty input, duplicate values, negative numbers, and maximum constraints.")
+                ] %}
+                <form action="/assistant" method="get">
+                    <input type="hidden" name="mode" value="{{ preset_mode }}">
+                    <input type="hidden" name="prompt" value="{{ preset_prompt }}">
+                    <button type="submit" class="w-full rounded-lg border border-gray-200 bg-white p-3 text-left text-sm leading-6 text-gray-700 transition-colors hover:border-blue-300 hover:bg-blue-50">
+                        <span class="block">{{ preset_prompt }}</span>
+                        <span class="mt-1 block text-xs font-semibold text-blue-700">Use prompt &rarr;</span>
+                    </button>
+                </form>
+                {% endfor %}
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

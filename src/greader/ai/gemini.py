@@ -11,15 +11,15 @@ from google.genai import errors as genai_errors
 from google.genai import types
 from pydantic import ValidationError
 
-from greader.assignments.models import Assignment
-from greader.assistant.errors import GeminiConfigurationError, GenerationError
-from greader.assistant.interface import GenerationRequest
-from greader.assistant.schemas import (
+from greader.ai.errors import GeminiConfigurationError, GenerationError
+from greader.ai.interface import GenerationRequest
+from greader.ai.schemas import (
     FullAssignmentDraft,
     GenerationMode,
     GenerationResult,
     TestCaseDraftSet,
 )
+from greader.assignments.models import Assignment
 
 SYSTEM_INSTRUCTION = """You assist university instructors in authoring Python 3.12
 stdin/stdout programming assignments.

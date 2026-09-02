@@ -6,17 +6,17 @@ import pytest
 from google.genai import errors as genai_errors
 from pydantic import ValidationError
 
-from greader.assignments.models import Assignment, Difficulty
-from greader.assistant.demo import DemoAssignmentGenerator
-from greader.assistant.errors import GeminiConfigurationError, GenerationError
-from greader.assistant.gemini import GeminiAssignmentGenerator
-from greader.assistant.interface import GenerationRequest
-from greader.assistant.providers import ai_connection_status, build_assignment_generator
-from greader.assistant.schemas import (
+from greader.ai.demo import DemoAssignmentGenerator
+from greader.ai.errors import GeminiConfigurationError, GenerationError
+from greader.ai.gemini import GeminiAssignmentGenerator
+from greader.ai.interface import GenerationRequest
+from greader.ai.providers import ai_connection_status, build_assignment_generator
+from greader.ai.schemas import (
     FullAssignmentDraft,
     GenerationMode,
     TestCaseDraftSet,
 )
+from greader.assignments.models import Assignment, Difficulty
 from greader.config import Settings
 
 
@@ -86,7 +86,6 @@ def test_generation_request_trims_and_allows_full_assignment_without_context() -
 
     assert request.prompt == "Draft an assignment about sums."
     assert request.assignment_id is None
-
 
 
 def test_generated_test_case_requires_expected_output() -> None:
@@ -265,6 +264,3 @@ def test_demo_provider_is_available_without_api_key(
 
     assert isinstance(generator, DemoAssignmentGenerator)
     assert status == {"provider": "demo", "model_name": "demo", "configured": True}
-
-
-

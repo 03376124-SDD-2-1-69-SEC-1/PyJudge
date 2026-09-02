@@ -10,18 +10,24 @@ Built with [FastAPI](https://fastapi.tiangolo.com/), [Jinja2](https://jinja.pall
 
 ```
 greader/
-├── src/greader/              # Application package
-│   ├── __init__.py
-│   ├── main.py               # FastAPI app factory (create_app)
-│   ├── templates/            # Jinja2 HTML templates
-│   │   ├── base.html         # Base layout
-│   │   └── dashboard.html    # Dashboard page
-│   └── static/               # Static assets (CSS, JS, images)
-├── tests/                    # Test suite
-│   └── test_app.py           # Integration tests
-├── pyproject.toml            # Project config, dependencies, tool settings
+├── src/greader/
+│   ├── main.py               # Application factory and dependency wiring
+│   ├── ai/                   # AI providers, schemas, services, persistence, routes
+│   ├── assignments/          # Core assignment domain and HTTP routes
+│   ├── templates/
+│   │   ├── ai/               # Composer and artifact review pages
+│   │   └── assignments/      # Assignment list and editor pages
+│   └── static/css/           # Tailwind input and compiled stylesheet
+├── alembic/                  # Database migrations
+├── tests/                    # Unit and integration tests
+├── pyproject.toml            # Dependencies and tool settings
 └── README.md
 ```
+
+The `ai` package is part of the same FastAPI monolith. It may import shared
+assignment domain models, but it is not deployed as a separate service.
+Rendered pages intentionally use no JavaScript; interactions use normal HTML
+forms and POST-Redirect-GET.
 
 ## Prerequisites
 
@@ -108,11 +114,14 @@ uv run uvicorn greader.main:app --reload
 
 The app will be available at **http://127.0.0.1:8000**.
 
-| Route        | Description                          |
-| ------------ | ------------------------------------ |
-| `GET /`      | Dashboard page                       |
-| `GET /health`| Health-check endpoint (JSON)         |
-| `GET /docs`  | Interactive API docs (Swagger UI)    |
+| Route                              | Description                         |
+| ---------------------------------- | ----------------------------------- |
+| `GET /` or `GET /assistant`        | AI assignment composer              |
+| `POST /assistant/generate`         | Generate a persisted draft          |
+| `GET /assistant/artifacts/{id}`    | Review an AI-generated artifact     |
+| `GET /assignments`                 | List saved assignments              |
+| `GET /health`                      | Health-check endpoint               |
+| `GET /docs`                        | Interactive API docs                |
 
 ## Testing
 

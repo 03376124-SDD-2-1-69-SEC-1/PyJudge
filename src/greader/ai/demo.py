@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from greader.assignments.models import Assignment, Difficulty, TestCaseCategory
-from greader.assistant.interface import GenerationRequest
-from greader.assistant.schemas import (
+from greader.ai.interface import GenerationRequest
+from greader.ai.schemas import (
     FullAssignmentDraft,
     GeneratedExample,
     GeneratedTestCase,
@@ -12,6 +11,7 @@ from greader.assistant.schemas import (
     GenerationResult,
     TestCaseDraftSet,
 )
+from greader.assignments.models import Assignment, Difficulty, TestCaseCategory
 
 
 class DemoAssignmentGenerator:

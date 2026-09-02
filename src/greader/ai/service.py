@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
-from greader.assignments.models import Assignment
-from greader.assignments.repository import AssignmentRepository
-from greader.assistant.errors import GenerationError
-from greader.assistant.interface import AssignmentGenerator, GenerationRequest
-from greader.assistant.models import GenerationArtifact
-from greader.assistant.repository import SqlAlchemyGenerationRepository
-from greader.assistant.schemas import (
+from greader.ai.errors import GenerationError
+from greader.ai.interface import AssignmentGenerator, GenerationRequest
+from greader.ai.models import GenerationArtifact
+from greader.ai.repository import SqlAlchemyGenerationRepository
+from greader.ai.schemas import (
     FullAssignmentDraft,
     GenerationMode,
     TestCaseDraftSet,
 )
+from greader.assignments.models import Assignment
+from greader.assignments.repository import AssignmentRepository
 
 
 class AssignmentGenerationService:

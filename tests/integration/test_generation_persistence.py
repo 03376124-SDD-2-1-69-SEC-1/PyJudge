@@ -4,13 +4,13 @@ import json
 
 import pytest
 
+from greader.ai.demo import DemoAssignmentGenerator
+from greader.ai.errors import GenerationError
+from greader.ai.repository import SqlAlchemyGenerationRepository
+from greader.ai.schemas import GenerationMode
+from greader.ai.service import AssignmentGenerationService
 from greader.assignments.models import Assignment, Difficulty
 from greader.assignments.repository import InMemoryAssignmentRepository
-from greader.assistant.demo import DemoAssignmentGenerator
-from greader.assistant.errors import GenerationError
-from greader.assistant.repository import SqlAlchemyGenerationRepository
-from greader.assistant.schemas import GenerationMode
-from greader.assistant.service import AssignmentGenerationService
 from greader.db_models import GenerationArtifactRecord, GenerationRequestRecord
 
 
@@ -56,7 +56,7 @@ def test_successful_generation_persists_request_and_validated_artifact(
     assert request.completed_at is not None
     assert stored_artifact is not None
     assert stored_artifact.generation_mode == GenerationMode.FULL_ASSIGNMENT.value
-    assert stored_artifact.is_applied is False
+    assert stored_artifact.review_status == "draft"
     assert json.loads(stored_artifact.payload_json)["title"] == artifact.payload.title
 
 
