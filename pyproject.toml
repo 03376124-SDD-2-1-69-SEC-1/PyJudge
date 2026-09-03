@@ -51,6 +51,10 @@ show_missing = true
 target-version = "py312"
 line-length = 88
 src = ["src", "tests"]
+exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/env.py" = ["E402", "I001"]

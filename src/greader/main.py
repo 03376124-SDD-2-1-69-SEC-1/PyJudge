@@ -46,7 +46,9 @@ def create_app(*, topic_repository: TopicRepository | None = None) -> FastAPI:
         return {"status": "ok", "service": "greader"}
 
     @application.get("/health/db")
-    def health_db(session: Session = Depends(get_session)) -> dict:
+    def health_db(
+        session: Session = Depends(get_session),  # noqa: B008 — FastAPI DI
+    ) -> dict:
         """Confirm the Neon connection works and core/rag schemas exist."""
         try:
             return check_db(session)
@@ -54,7 +56,9 @@ def create_app(*, topic_repository: TopicRepository | None = None) -> FastAPI:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @application.get("/health/r2")
-    def health_r2(client=Depends(get_r2_client)) -> dict:
+    def health_r2(
+        client=Depends(get_r2_client),  # noqa: B008 — FastAPI DI
+    ) -> dict:
         """Confirm the R2 bucket is reachable."""
         try:
             return check_r2(client)

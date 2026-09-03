@@ -31,8 +31,9 @@ PostgreSQL      <- Neon, schemas `core` and `rag`, pgvector extension
 
 - **Everything is synchronous.** No `async def`, no `AsyncSession`, no async
   drivers, anywhere.
-- **This project does not use `Depends()`.** Routes are `sync def` and pull
-  their service off `request.app.state`.
+- Domain services are pulled off `request.app.state`, never injected with
+  `Depends()`. The only exceptions are the infrastructure health checks in
+  `main.py` — do not copy that pattern into a slice.
 - DSN must be `postgresql+psycopg://`. Anything else resolves to psycopg2,
   which is not installed, and fails with an unhelpful `NoSuchModuleError`.
 - SQLModel does not re-export everything; `from sqlalchemy import Column,
