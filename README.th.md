@@ -330,7 +330,7 @@ from greader.database.rag import tables as rag_tables    # noqa: F401
 
 ```mermaid
 erDiagram
-    direction LR
+    direction TB
 
     %% ==================== schema: core ====================
 

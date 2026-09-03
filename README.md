@@ -299,7 +299,7 @@ before running it.**
 
 ```mermaid
 erDiagram
-    direction LR
+    direction TB
 
     %% ==================== schema: core ====================
 
