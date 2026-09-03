@@ -404,6 +404,7 @@ dependencies = [
     { name = "jinja2" },
     { name = "pgvector" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "python-dotenv" },
     { name = "sqlmodel" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -426,6 +427,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "pgvector", specifier = ">=0.5.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.5" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "sqlmodel", specifier = ">=0.0.42" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.51.0" },
 ]

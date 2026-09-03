@@ -56,9 +56,12 @@ Set in `.env` (never commit it — see `.env.example`):
 DATABASE_URL=postgresql+psycopg://user:pass@host/db?sslmode=require
 ```
 
-`alembic/env.py` reads `DATABASE_URL` from the process environment and
-overrides `alembic.ini`'s placeholder URL with it — same variable
-`session.py` uses at runtime.
+`alembic/env.py` reads `DATABASE_URL_UNPOOLED` from the process environment
+and overrides `alembic.ini`'s placeholder URL with it (changed from
+`DATABASE_URL` — Alembic runs DDL over a direct connection, not the pooled
+one). The app (`session.py`) still reads `DATABASE_URL`. Both `env.py` and
+`session.py` call `load_dotenv()` on import, so a local `.env` loads
+automatically — no manual `export` needed before `uv run alembic ...`.
 
 ## Prisma-equivalent workflow
 

@@ -1,7 +1,10 @@
 import os
 from typing import Generator
 
+from dotenv import load_dotenv
 from sqlmodel import Session, create_engine
+
+load_dotenv()
 
 # Neon pooled connection. Set in .env:
 #   DATABASE_URL=postgresql+psycopg://user:pass@host/db?sslmode=require

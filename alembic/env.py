@@ -1,11 +1,14 @@
 import os
 from logging.config import fileConfig
 
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlmodel import SQLModel
 
 from alembic import context
+
+load_dotenv()
 
 # Import every module that defines SQLModel tables so they register on
 # SQLModel.metadata before autogenerate diffs against it.
@@ -16,8 +19,10 @@ from greader.database import core_tables, rag_tables  # noqa: F401
 config = context.config
 
 # Override alembic.ini's placeholder sqlalchemy.url with the real one from
-# the environment (same DATABASE_URL used by greader/database/session.py).
-db_url = os.environ.get("DATABASE_URL")
+# the environment. Alembic runs migrations directly (DDL, long transactions)
+# so it uses the unpooled connection; the app uses DATABASE_URL (pooled) via
+# greader/database/session.py.
+db_url = os.environ.get("DATABASE_URL_UNPOOLED")
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
 
