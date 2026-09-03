@@ -6,7 +6,7 @@ Read by `/grill-me`. Keep in sync with the team board.
 | TASK-ID | Owner | May touch | Done when |
 |---|---|---|---|
 | OPS-* | พาย | anything | varies, see board |
-| CORE-01 | พาย | `core/generation/schemas.py` (both repos, identical) | contract file matches byte-for-byte in core and ai |
+| CORE-01 | พาย + ฟิล์ม | `core/generation/schemas.py` (both repos, identical) | `core/generation/schemas.py` exists in both repos and is byte-for-byte identical |
 | CORE-02 | พาย | `core/generation/routes.py`, `ai/client.py` | mock endpoint callable from outside |
 | CORE-03 | พาย | `core/topics/`, `tests/` | merged to dev and runs |
 | CORE-04 | นัด | `core/assignments/`, `database/core/assignment_repository.py`, `tests/` | create, update, delete via API |
