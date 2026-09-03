@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+  # อนุญาตให้กด "Re-run" ได้ตรง ๆ แม้ trigger จะเป็น pull_request เท่านั้น
+  workflow_dispatch:
+
+# ยกเลิก run เก่าของ PR เดียวกันถ้ามี push ใหม่เข้ามาทับ ประหยัดเวลา CI
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    # ยังไม่เปิดใช้งาน — คอมเมนต์ไว้เผื่ออนาคต
+    # ตอนนี้ tests/integration ใช้ ASGITransport + InMemoryRepository ล้วน
+    # ไม่มีเทสไหนต่อ Postgres จริง จึงยังไม่ต้องเปิด service นี้
+    # เมื่อไหร่ที่มี database adapter จริง (session.py / tables.py) และมี
+    # integration test ที่ต้องต่อ DB จริง ค่อยลบ comment ออกทั้งบล็อกนี้
+    # แล้วปรับ DATABASE_URL ด้านล่างให้ตรงกับ user/pass/db ที่ตั้งไว้ที่นี่
+    #
+    # services:
+    #   postgres:
+    #     image: pgvector/pgvector:pg16
+    #     env:
+    #       POSTGRES_USER: user
+    #       POSTGRES_PASSWORD: pass
+    #       POSTGRES_DB: greader_test
+    #     ports:
+    #       - 5432:5432
+    #     options: >-
+    #       --health-cmd pg_isready
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
+
+    # ค่า dummy สำหรับ config/settings ที่ต้องมี env ตอน import แอป
+    # ทดสอบ unit/architecture ไม่ได้ต่อ DB จริง จึงใส่ค่าปลอมพอให้ import ผ่าน
+    env:
+      APP_ENV: test
+      APP_PORT: 8000
+      DATABASE_URL: postgresql://user:pass@localhost:5432/greader_test
+      DATABASE_URL_UNPOOLED: postgresql://user:pass@localhost:5432/greader_test
+      SECRET_KEY: ci-dummy-secret-key
+      AI_PROVIDER: gemini
+      GEMINI_API_KEY: ci-dummy-key
+      GEMINI_MODEL: gemini-3.5-flash
+      R2_ENDPOINT_URL: https://example.r2.cloudflarestorage.com
+      R2_BUCKET_NAME: ci-dummy-bucket
+      R2_ACCESS_KEY_ID: ci-dummy-access-key
+      R2_SECRET_ACCESS_KEY: ci-dummy-secret-key
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-groups --locked
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Run tests
+        run: uv run pytest -q

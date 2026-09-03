@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==== แก้ตรงนี้ก่อนรัน ====
+OWNER="Doonminus2"
+REPO="greader"
+# ==========================
+
+# ชื่อ context ต้องตรงกับชื่อ job ใน ci.yml เป๊ะ ๆ
+# ci.yml: jobs.lint-and-test.name = "Lint & Test"
+CHECK_CONTEXT="Lint & Test"
+
+for BRANCH in dev main; do
+  echo "==> Setting branch protection for '${BRANCH}'..."
+
+  gh api \
+    --method PUT \
+    -H "Accept: application/vnd.github+json" \
+    "repos/${OWNER}/${REPO}/branches/${BRANCH}/protection" \
+    --input - <<EOF
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["${CHECK_CONTEXT}"]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 1,
+    "require_code_owner_reviews": false,
+    "dismiss_stale_reviews": true
+  },
+  "restrictions": null,
+  "required_linear_history": false,
+  "required_conversation_resolution": true,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "block_creations": false
+}
+EOF
+
+  echo "==> Done: ${BRANCH}"
+  echo
+done
+
+echo "==> ตรวจสอบผลลัพธ์:"
+for BRANCH in dev main; do
+  echo "--- ${BRANCH} ---"
+  gh api "repos/${OWNER}/${REPO}/branches/${BRANCH}/protection" | \
+    jq '{
+      required_status_checks: .required_status_checks.contexts,
+      strict: .required_status_checks.strict,
+      required_approvals: .required_pull_request_reviews.required_approving_review_count,
+      enforce_admins: .enforce_admins.enabled,
+      conversation_resolution: .required_conversation_resolution.enabled,
+      allow_force_pushes: .allow_force_pushes.enabled,
+      allow_deletions: .allow_deletions.enabled
+    }'
+done
