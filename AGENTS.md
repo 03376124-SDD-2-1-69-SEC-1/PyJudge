@@ -117,6 +117,26 @@ of a session.
 Instructor (not teacher/user) · Assignment (not challenge/task/question) ·
 Test Case (not example/check) · Topic (not tag/category/label).
 
+## Ports and adapters
+
+Every external dependency — AI service, database, storage — is called through
+a `typing.Protocol` defined in the module that needs it, never through a
+concrete client type directly.
+
+- The Protocol is the port. It lives next to the code that uses it
+  (e.g. `ai/client.py` defines the Protocol AND the interface's shape).
+- Concrete implementations are adapters: a stub for tests/mocks, a real one
+  for production. Both satisfy the same Protocol.
+- Callers (services, routes) type-hint against the Protocol only. They must
+  never import a concrete adapter class directly — only `main.py` picks the
+  adapter and puts it on `app.state`.
+- Swapping an adapter (mock → real, in-memory → database) must never require
+  changing the Protocol, the caller, or the route.
+
+If a task looks like it needs the caller to know which adapter it's talking
+to, stop — that means the Protocol is missing a method, not that the caller
+should reach past it.
+
 ## Commands
 
 ```bash
