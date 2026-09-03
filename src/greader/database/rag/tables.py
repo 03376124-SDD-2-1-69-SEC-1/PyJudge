@@ -19,7 +19,6 @@ column type — ตอนเช็ค pyproject.toml ใน handoff ยังไ
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -47,7 +46,7 @@ EMBEDDING_DIM = 768  # ล็อกตาม embedding model จริง (§6.4
 # ---------------------------------------------------------------------------
 
 
-def _pk() -> Optional[int]:
+def _pk() -> int | None:
     return Field(
         default=None,
         sa_column=Column(BigInteger, primary_key=True, autoincrement=True),
@@ -100,25 +99,25 @@ class KnowledgeSource(SQLModel, table=True):
             name="ck_knowledge_sources_status",
         ),
         # §6.1 — filter ตอน retrieval ต้องพึ่ง metadata ที่ mirror มาจาก core
-        Index(
-            "ix_knowledge_sources_metadata", "metadata", postgresql_using="gin"
-        ),
+        Index("ix_knowledge_sources_metadata", "metadata", postgresql_using="gin"),
         {"schema": SCHEMA},
     )
 
-    id: Optional[int] = _pk()
+    id: int | None = _pk()
     # logical link เท่านั้น ไม่ใช่ FK จริง (ดู module docstring ด้านบน)
     core_document_id: int = Field(sa_column=Column(BigInteger, nullable=False))
     r2_object_key: str = Field(nullable=False)  # ซ้ำกับ core ตั้งใจ ใช้ verify link
     content_hash: str = Field(nullable=False)
     status: str = Field(nullable=False, default="pending")
-    embedding_model: Optional[str] = Field(default=None)  # เช่น "text-embedding-004"
-    embedding_dim: Optional[int] = Field(default=None)
-    metadata_: dict = _metadata_jsonb()  # topic, difficulty, course — mirror มาเพื่อ filter
+    embedding_model: str | None = Field(default=None)  # เช่น "text-embedding-004"
+    embedding_dim: int | None = Field(default=None)
+    metadata_: dict = (
+        _metadata_jsonb()
+    )  # topic, difficulty, course — mirror มาเพื่อ filter
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    chunks: list["KnowledgeChunk"] = Relationship(
+    chunks: list[KnowledgeChunk] = Relationship(
         back_populates="source",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
@@ -132,13 +131,11 @@ class KnowledgeChunk(SQLModel, table=True):
             "source_id", "content_hash", name="uq_knowledge_chunks_source_content_hash"
         ),
         # §6.2 — ใช้ดึง chunk ข้างเคียง (ก่อนหน้า/ถัดไป) ภายใน source เดียวกัน
-        Index(
-            "ix_knowledge_chunks_source_chunk_index", "source_id", "chunk_index"
-        ),
+        Index("ix_knowledge_chunks_source_chunk_index", "source_id", "chunk_index"),
         {"schema": SCHEMA},
     )
 
-    id: Optional[int] = _pk()
+    id: int | None = _pk()
     source_id: int = Field(
         sa_column=Column(
             BigInteger,
@@ -147,19 +144,19 @@ class KnowledgeChunk(SQLModel, table=True):
         )
     )
     chunk_index: int = Field(nullable=False)  # ลำดับใน source (0, 1, 2, ...)
-    page: Optional[int] = Field(default=None)
+    page: int | None = Field(default=None)
     text: str = Field(nullable=False)
-    token_count: Optional[int] = Field(default=None)  # คุม context budget ตอนประกอบ prompt
+    token_count: int | None = Field(default=None)  # คุม context budget ตอนประกอบ prompt
     content_hash: str = Field(nullable=False)
     # ซ้ำจาก source ตั้งใจ (§6.4) — กัน vector คนละรุ่นปนกันแบบเงียบๆ
-    embedding_model: Optional[str] = Field(default=None)
+    embedding_model: str | None = Field(default=None)
     metadata_: dict = _metadata_jsonb()  # question_no, content_type
     # HNSW index ต้องเขียนมือใน Alembic migration (§7.1) — autogenerate ไม่สร้างให้:
     #   CREATE INDEX ON rag.knowledge_chunks USING hnsw (embedding vector_cosine_ops);
-    embedding: Optional[list[float]] = Field(
+    embedding: list[float] | None = Field(
         default=None, sa_column=Column(Vector(EMBEDDING_DIM), nullable=True)
     )
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    source: Optional[KnowledgeSource] = Relationship(back_populates="chunks")
+    source: KnowledgeSource | None = Relationship(back_populates="chunks")
