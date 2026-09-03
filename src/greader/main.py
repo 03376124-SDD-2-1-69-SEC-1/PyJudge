@@ -7,6 +7,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session
 
+from greader.ai.client import StubGenerationClient
+from greader.core.generation.repository import GenerationClient
+from greader.core.generation.routes import router as generation_router
 from greader.core.topics.repository import InMemoryTopicRepository, TopicRepository
 from greader.core.topics.routes import router as topic_router
 from greader.core.topics.service import TopicService
@@ -20,7 +23,11 @@ _TEMPLATE_DIR = _WEB_DIR / "templates"
 _STATIC_DIR = _WEB_DIR / "static"
 
 
-def create_app(*, topic_repository: TopicRepository | None = None) -> FastAPI:
+def create_app(
+    *,
+    topic_repository: TopicRepository | None = None,
+    generation_client: GenerationClient | None = None,
+) -> FastAPI:
     """Build an isolated application with server-owned in-memory state."""
     application = FastAPI(
         title="GReader Team Scaffold",
@@ -32,8 +39,10 @@ def create_app(*, topic_repository: TopicRepository | None = None) -> FastAPI:
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
     repository = topic_repository or InMemoryTopicRepository()
     application.state.topic_service = TopicService(repository)
+    application.state.generation_client = generation_client or StubGenerationClient()
     application.state.templates = templates
     application.include_router(topic_router)
+    application.include_router(generation_router)
 
     @application.get("/")
     def home(request: Request):
