@@ -20,16 +20,27 @@ Run `git status --porcelain` and `git branch --show-current`.
 Read `docs/task-scope.md`. Take every row whose Owner column contains `$1`,
 including shared rows like `นัด + โปรแกรม`.
 
-Run `git branch -a` and drop any task whose branch already exists locally or on
-the remote — that work has started.
+Run `git branch -a`, then sort the remaining tasks into three groups:
 
-Show what is left as a numbered list: TASK-ID, the done condition, and the
+- **A. Not started:** no matching branch exists locally or on the remote. Keep.
+- **B. In progress, assigned to `$1`:** a matching branch exists and the task
+  owner is `$1` or is shared with `$1`. Mark `[awaiting your action]` and keep.
+- **C. In progress, assigned to someone else:** a matching branch exists but
+  the task is assigned to someone else. Drop.
+
+Show groups A + B as a numbered list: TASK-ID, the done condition, and the
 paths it may touch. If nothing is left, say so and stop.
 
 Ask which one. Wait. Accept only a number or a TASK-ID from that list — if they
 name a task belonging to someone else, say who owns it and stop.
 
+When they pick a task from group B, switch to its existing local branch. If it
+exists only on the remote, create a local tracking branch and switch to it.
+The branch is now checked out; skip Step 3 and continue at Step 4.
+
 ## Step 3 — Branch
+
+Skip this step when Step 2 already checked out a group B branch.
 
 Confirm the type prefix with them (`feat`, `fix`, `chore`, `docs`, `refactor`),
 propose a slug from the task title, and show the full branch name for approval.
