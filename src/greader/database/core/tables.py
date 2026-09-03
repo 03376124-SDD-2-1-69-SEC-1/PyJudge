@@ -16,7 +16,6 @@ client โดยตรง" — ไฟล์นี้ถูก import ได้�
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     BigInteger,
@@ -39,7 +38,7 @@ SCHEMA = "core"
 # ---------------------------------------------------------------------------
 
 
-def _pk() -> Optional[int]:
+def _pk() -> int | None:
     """BIGSERIAL PK ตาม §4 (int ไม่ใช่ UUID)"""
     return Field(
         default=None,
@@ -91,15 +90,15 @@ class User(SQLModel, table=True):
         {"schema": SCHEMA},
     )
 
-    id: Optional[int] = _pk()
+    id: int | None = _pk()
     email: str = Field(nullable=False, unique=True, index=True)
-    display_name: Optional[str] = Field(default=None)
+    display_name: str | None = Field(default=None)
     role: str = Field(nullable=False, default="instructor")
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    documents: list["KnowledgeDocument"] = Relationship(back_populates="uploader")
-    generation_requests: list["GenerationRequest"] = Relationship(
+    documents: list[KnowledgeDocument] = Relationship(back_populates="uploader")
+    generation_requests: list[GenerationRequest] = Relationship(
         back_populates="requester"
     )
 
@@ -114,14 +113,14 @@ class KnowledgeDocument(SQLModel, table=True):
         {"schema": SCHEMA},
     )
 
-    id: Optional[int] = _pk()
+    id: int | None = _pk()
     # natural key ใช้ cross-check ตอน mirror ไป rag.knowledge_sources
     r2_object_key: str = Field(nullable=False, unique=True, index=True)
     filename: str = Field(nullable=False)
     content_hash: str = Field(nullable=False)  # sha256 กันไฟล์ซ้ำ
     status: str = Field(nullable=False, default="uploaded")
     metadata_: dict = _metadata_jsonb()  # topic, difficulty, course
-    uploaded_by: Optional[int] = Field(
+    uploaded_by: int | None = Field(
         default=None,
         sa_column=Column(
             BigInteger,
@@ -132,7 +131,7 @@ class KnowledgeDocument(SQLModel, table=True):
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    uploader: Optional[User] = Relationship(back_populates="documents")
+    uploader: User | None = Relationship(back_populates="documents")
 
 
 class GenerationRequest(SQLModel, table=True):
@@ -145,7 +144,7 @@ class GenerationRequest(SQLModel, table=True):
         {"schema": SCHEMA},
     )
 
-    id: Optional[int] = _pk()
+    id: int | None = _pk()
     prompt: str = Field(nullable=False)
     filters: dict = Field(
         default_factory=dict,
@@ -153,8 +152,8 @@ class GenerationRequest(SQLModel, table=True):
         # topic, difficulty — ต้อง match key ใน knowledge_documents.metadata
     )
     status: str = Field(nullable=False, default="pending")
-    error_code: Optional[str] = Field(default=None)
-    requested_by: Optional[int] = Field(
+    error_code: str | None = Field(default=None)
+    requested_by: int | None = Field(
         default=None,
         sa_column=Column(
             BigInteger,
@@ -165,8 +164,8 @@ class GenerationRequest(SQLModel, table=True):
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    requester: Optional[User] = Relationship(back_populates="generation_requests")
-    artifacts: list["GenerationArtifact"] = Relationship(back_populates="request")
+    requester: User | None = Relationship(back_populates="generation_requests")
+    artifacts: list[GenerationArtifact] = Relationship(back_populates="request")
 
 
 class GenerationArtifact(SQLModel, table=True):
@@ -179,7 +178,7 @@ class GenerationArtifact(SQLModel, table=True):
         {"schema": SCHEMA},
     )
 
-    id: Optional[int] = _pk()
+    id: int | None = _pk()
     request_id: int = Field(
         sa_column=Column(
             BigInteger,
@@ -196,18 +195,18 @@ class GenerationArtifact(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
         # แต่ละ item: {chunk_id, source_id, page, score, text_snapshot}
     )
-    model_provider: Optional[str] = Field(default=None)
-    model_name: Optional[str] = Field(default=None)  # เช่น "gemini-2.0-flash"
+    model_provider: str | None = Field(default=None)
+    model_name: str | None = Field(default=None)  # เช่น "gemini-2.0-flash"
     review_status: str = Field(nullable=False, default="pending")
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    request: Optional[GenerationRequest] = Relationship(back_populates="artifacts")
+    request: GenerationRequest | None = Relationship(back_populates="artifacts")
     # uselist=False ระบุชัดว่าเป็น one-to-one — SQLAlchemy เดาเองได้จาก
     # unique=True บน assignments.artifact_id อยู่แล้ว แต่เขียนไว้กันพลาด
     # ถ้าวันหลังมีคนถอด unique ออก จะได้ error ตรงจุดแทนที่จะเงียบๆ
     # กลายเป็น list
-    assignment: Optional["Assignment"] = Relationship(
+    assignment: Assignment | None = Relationship(
         back_populates="artifact",
         sa_relationship_kwargs={"uselist": False},
     )
@@ -223,7 +222,7 @@ class Assignment(SQLModel, table=True):
         {"schema": SCHEMA},
     )
 
-    id: Optional[int] = _pk()
+    id: int | None = _pk()
     # NULL ได้ ถ้าสร้างมือผ่าน CRUD ปกติ (ไม่ผ่าน AI approval flow)
     #
     # unique=True บังคับความสัมพันธ์ 1 artifact : 0-หรือ-1 assignment ตาม ERD
@@ -231,7 +230,7 @@ class Assignment(SQLModel, table=True):
     #
     # ไม่ชนกับเคส manual CRUD เพราะ Postgres ถือว่า NULL แต่ละตัว "ไม่เท่ากัน"
     # ในการเช็ค UNIQUE — จึงมีแถวที่ artifact_id IS NULL ได้ไม่จำกัด
-    artifact_id: Optional[int] = Field(
+    artifact_id: int | None = Field(
         default=None,
         sa_column=Column(
             BigInteger,
@@ -247,8 +246,8 @@ class Assignment(SQLModel, table=True):
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    artifact: Optional[GenerationArtifact] = Relationship(back_populates="assignment")
-    test_cases: list["TestCase"] = Relationship(
+    artifact: GenerationArtifact | None = Relationship(back_populates="assignment")
+    test_cases: list[TestCase] = Relationship(
         back_populates="assignment",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
@@ -265,7 +264,7 @@ class TestCase(SQLModel, table=True):
         {"schema": SCHEMA},
     )
 
-    id: Optional[int] = _pk()
+    id: int | None = _pk()
     assignment_id: int = Field(
         sa_column=Column(
             BigInteger,
@@ -280,4 +279,4 @@ class TestCase(SQLModel, table=True):
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    assignment: Optional[Assignment] = Relationship(back_populates="test_cases")
+    assignment: Assignment | None = Relationship(back_populates="test_cases")
