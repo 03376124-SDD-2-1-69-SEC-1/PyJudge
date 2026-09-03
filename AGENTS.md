@@ -124,7 +124,8 @@ a `typing.Protocol` defined in the module that needs it, never through a
 concrete client type directly.
 
 - The Protocol is the port. It lives next to the code that uses it
-  (e.g. `ai/client.py` defines the Protocol AND the interface's shape).
+  (e.g. `core/generation/repository.py` defines the Protocol and its interface;
+  `ai/client.py` provides an adapter that implements it).
 - Concrete implementations are adapters: a stub for tests/mocks, a real one
   for production. Both satisfy the same Protocol.
 - Callers (services, routes) type-hint against the Protocol only. They must
