@@ -14,6 +14,13 @@ class TopicNotFoundError(Exception):
     """Raised when a requested Topic does not exist."""
 
 
+class _Unset:
+    """Marks a PATCH field left out of the request body."""
+
+
+UNSET = _Unset()
+
+
 class TopicService:
     """Coordinates Topic rules through a repository seam."""
 
@@ -47,6 +54,22 @@ class TopicService:
         name, description = _normalize_values(name, description)
         self._ensure_name_available(name, excluding_topic_id=topic_id)
         topic = Topic(id=topic_id, name=name, description=description)
+        self._repository.save(topic)
+        return topic
+
+    def patch(
+        self,
+        *,
+        topic_id: str,
+        name: str | _Unset = UNSET,
+        description: str | None | _Unset = UNSET,
+    ) -> Topic:
+        current = self.get(topic_id)
+        new_name = current.name if name is UNSET else name
+        new_description = current.description if description is UNSET else description
+        new_name, new_description = _normalize_values(new_name, new_description)
+        self._ensure_name_available(new_name, excluding_topic_id=topic_id)
+        topic = Topic(id=topic_id, name=new_name, description=new_description)
         self._repository.save(topic)
         return topic
 

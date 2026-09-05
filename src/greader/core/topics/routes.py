@@ -3,8 +3,14 @@
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from greader.core.topics.models import Topic
-from greader.core.topics.schemas import TopicCreate, TopicReplace, TopicResponse
+from greader.core.topics.schemas import (
+    TopicCreate,
+    TopicPatch,
+    TopicReplace,
+    TopicResponse,
+)
 from greader.core.topics.service import (
+    UNSET,
     TopicNameConflictError,
     TopicNotFoundError,
     TopicService,
@@ -71,6 +77,30 @@ def replace_topic(
                 topic_id=topic_id,
                 name=payload.name,
                 description=payload.description,
+            )
+        )
+    except TopicNotFoundError:
+        _raise_not_found()
+    except TopicNameConflictError:
+        _raise_name_conflict()
+
+
+@router.patch("/{topic_id}", response_model=TopicResponse)
+def patch_topic(
+    request: Request,
+    topic_id: str,
+    payload: TopicPatch,
+) -> TopicResponse:
+    """Update only the fields present in the request body."""
+    fields_set = payload.model_fields_set
+    try:
+        return _response(
+            _service(request).patch(
+                topic_id=topic_id,
+                name=payload.name if "name" in fields_set else UNSET,
+                description=(
+                    payload.description if "description" in fields_set else UNSET
+                ),
             )
         )
     except TopicNotFoundError:
