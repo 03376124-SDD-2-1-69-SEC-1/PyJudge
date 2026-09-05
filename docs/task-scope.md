@@ -3,11 +3,13 @@
 Maps a TASK-ID to who owns it, which paths it may touch, and what "done" means.
 Read by `/grill-me`. Keep in sync with the team board.
 
+This is a single repo. "ai repo" in this table resolves to `src/greader/ai/`.
+
 | TASK-ID | Owner | May touch | Done when |
 |---|---|---|---|
 | OPS-* | พาย | anything | varies, see board |
-| CORE-01 | พาย + ฟิล์ม | `core/generation/schemas.py` (both repos, identical) | `core/generation/schemas.py` exists in both repos and is byte-for-byte identical |
-| CORE-02 | พาย | `core/generation/routes.py`, `ai/client.py` | mock endpoint callable from outside |
+| CORE-01 | พาย + ฟิล์ม | `src/greader/core/generation/schemas.py` | `core/generation/schemas.py` exists once in this repo. Done — merged in PR #3 |
+| CORE-02 | พาย | `core/generation/routes.py`, `ai/client.py` | mock endpoint callable from outside. Done — merged in PR #4 |
 | CORE-03 | พาย | `core/topics/`, `tests/` | merged to dev and runs |
 | CORE-04 | นัด | `core/assignments/`, `database/core/assignment_repository.py`, `tests/` | create, update, delete via API |
 | CORE-05 | นัด | `core/test_cases/`, `database/core/test_case_repository.py`, `tests/` | linked to an assignment, deleted with it |
@@ -27,6 +29,9 @@ Read by `/grill-me`. Keep in sync with the team board.
 | DES-02 | อุ้ม | ai repo: `tests/fixtures/pdfs/`, `docs/` | files present with a digital/scan table |
 | DES-03 | อุ้ม | `docs/test-scenarios.md` | a checklist someone can follow |
 | BUG-* | varies | whatever the fix needs, nothing more | the failing scenario passes |
+| OPS-08 | พาย | `docs/task-scope.md`, `AGENTS.md`, `docs/adr/`, `.gitignore` | the table matches the tree; every done-condition is checkable in one repo |
+| CORE-08 | พาย + ฟิล์ม | `core/generation/schemas.py`, `ai/client.py`, `tests/unit/ai/test_client.py`, `tests/integration/test_generation_api.py` | a citation identifies its source document; an approved draft has a stable handle; invalid input is rejected |
+| CORE-09 | พาย | `core/knowledge_documents/`, `database/core/knowledge_document_repository.py`, `tests/` | a citation's `document_id` resolves to the document's filename through Core |
 
 ## Off-limits regardless of task
 

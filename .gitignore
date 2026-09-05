@@ -31,8 +31,6 @@ data/
 *.db
 
 
-# Architecture decision records are local-only
-/docs/adr/
 .superpowers/
 
 setup-branch-protection.sh  
