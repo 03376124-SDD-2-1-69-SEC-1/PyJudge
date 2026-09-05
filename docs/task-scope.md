@@ -3,6 +3,8 @@
 Maps a TASK-ID to who owns it, which paths it may touch, and what "done" means.
 Read by `/grill-me`. Keep in sync with the team board.
 
+In this table, "ai repo" resolves to `src/greader/ai/`.
+
 | TASK-ID | Owner | May touch | Done when |
 |---|---|---|---|
 | OPS-* | พาย | anything | varies, see board |
@@ -17,7 +19,7 @@ Read by `/grill-me`. Keep in sync with the team board.
 | FE-02 | โปรแกรม | `web/templates/generate.html`, `core/generation/routes.py` | submit renders a draft from the mock |
 | FE-03 | โปรแกรม | `web/templates/review.html`, `core/assignments/routes.py` | citations shown, approve and reject work |
 | FE-04 | โปรแกรม | `web/templates/save.html`, `core/assignments/routes.py` | form matches the mockup |
-| AI-01 | ฟิล์ม | ai repo: `app/`, `database/` | insert and query a sample vector |
+| AI-01 | ฟิล์ม | ai repo: `app/`, `database/`; `tests/unit/ai/`; AI-01-specific files under `tests/integration/`, `tests/architecture/`; this AI-01 clarification in `docs/task-scope.md` | insert and query a sample vector |
 | AI-02 | ฟิล์ม | ai repo: `ingestion/` | text extracted per page from the test files |
 | AI-03 | พาย + ฟิล์ม | ai repo: `ingestion/chunking.py` | chunk boundaries match expectations on >=80% of test files |
 | AI-04 | ฟิล์ม | ai repo: `ingestion/`, `embeddings/` | one PDF ingested end to end, chunks and vectors present |
@@ -27,6 +29,9 @@ Read by `/grill-me`. Keep in sync with the team board.
 | DES-02 | อุ้ม | ai repo: `tests/fixtures/pdfs/`, `docs/` | files present with a digital/scan table |
 | DES-03 | อุ้ม | `docs/test-scenarios.md` | a checklist someone can follow |
 | BUG-* | varies | whatever the fix needs, nothing more | the failing scenario passes |
+
+AI-01 database adapters may live under `src/greader/ai/database/` and reuse the
+ORM tables from `src/greader/database/rag/tables.py`.
 
 ## Off-limits regardless of task
 
