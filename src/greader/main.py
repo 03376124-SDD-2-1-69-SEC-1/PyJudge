@@ -8,6 +8,14 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import Session
 
 from greader.ai.client import StubGenerationClient
+
+# === Import Assignment ===
+from greader.core.assignments.repository import (
+    AssignmentRepository,
+    InMemoryAssignmentRepository,
+)
+from greader.core.assignments.routes import router as assignment_router
+from greader.core.assignments.service import AssignmentService
 from greader.core.generation.repository import GenerationClient
 from greader.core.generation.routes import router as generation_router
 from greader.core.topics.repository import InMemoryTopicRepository, TopicRepository
@@ -26,6 +34,7 @@ _STATIC_DIR = _WEB_DIR / "static"
 def create_app(
     *,
     topic_repository: TopicRepository | None = None,
+    assignment_repository: AssignmentRepository | None = None,  # === เพิ่ม parameter  ===
     generation_client: GenerationClient | None = None,
 ) -> FastAPI:
     """Build an isolated application with server-owned in-memory state."""
@@ -39,9 +48,15 @@ def create_app(
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
     repository = topic_repository or InMemoryTopicRepository()
     application.state.topic_service = TopicService(repository)
+
+    # === Setup Assignment Service (แก้ไขจุดนี้) ===
+    assign_repo = assignment_repository or InMemoryAssignmentRepository()
+    application.state.assignment_service = AssignmentService(assign_repo)
+
     application.state.generation_client = generation_client or StubGenerationClient()
     application.state.templates = templates
     application.include_router(topic_router)
+    application.include_router(assignment_router)  # === เพิ่ม Mount Router ตรงนี้ ===
     application.include_router(generation_router)
 
     @application.get("/")
