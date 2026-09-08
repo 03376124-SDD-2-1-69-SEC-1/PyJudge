@@ -6,10 +6,10 @@
 # is the reason. Turning it into a merge gate also needs
 # require_code_owner_reviews = true in setup-branch-protection.sh.
 
-# Migrations and the schema they own
+# Migrations and the whole database layer they own — see AGENTS.md
+# § "Who may change database and locked files"
 /alembic/                       @Doonminus2
-/src/greader/database/core/tables.py   @Doonminus2
-/src/greader/database/rag/tables.py    @Doonminus2
+/src/greader/database/          @Doonminus2
 
 # Credentials and dependency pins
 /.env.example                   @Doonminus2
