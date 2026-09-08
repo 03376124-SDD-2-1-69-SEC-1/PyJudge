@@ -5,13 +5,19 @@ factory from the composition root. Importing this module does not read database
 credentials or create an engine.
 """
 
-from collections.abc import Callable, Mapping
-from contextlib import AbstractContextManager
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import AbstractContextManager, contextmanager
 from typing import Any
 
 from sqlalchemy import insert, literal, select
-from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
-from sqlmodel import Session
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import (
+    ArgumentError,
+    IntegrityError,
+    OperationalError,
+    SQLAlchemyError,
+)
+from sqlmodel import Session, create_engine
 
 from greader.ai.app.models import (
     ChunkSearchResult,
@@ -38,6 +44,18 @@ CHUNK_TABLE = KnowledgeChunkTable.__table__
 SessionFactory = Callable[[], AbstractContextManager[Session]]
 
 
+def create_postgres_repository(database_url: str) -> "PostgresVectorRepository":
+    """Configure the adapter without opening a database connection."""
+    try:
+        parsed_url = make_url(database_url)
+    except ArgumentError as exc:
+        raise RuntimeError("DATABASE_URL must use postgresql+psycopg://") from exc
+    if parsed_url.drivername != "postgresql+psycopg":
+        raise RuntimeError("DATABASE_URL must use postgresql+psycopg://")
+    engine = create_engine(parsed_url, echo=False)
+    return PostgresVectorRepository(lambda: Session(engine))
+
+
 class PostgresVectorRepository:
     """Persist and search vectors through synchronous SQLAlchemy sessions."""
 
@@ -50,7 +68,7 @@ class PostgresVectorRepository:
         chunks: tuple[NewKnowledgeChunk, ...],
     ) -> SourceCreationResult:
         """Insert one source and every chunk in one database transaction."""
-        with self._session_factory() as session:
+        with self._session() as session:
             try:
                 source_row = session.execute(_source_insert(source)).mappings().one()
                 source_id = source_row["id"]
@@ -87,7 +105,7 @@ class PostgresVectorRepository:
         statement = _search_statement(
             embedding, embedding_model=embedding_model, limit=limit
         )
-        with self._session_factory() as session:
+        with self._session() as session:
             try:
                 rows = session.execute(statement).mappings().all()
             except OperationalError as exc:
@@ -108,6 +126,17 @@ class PostgresVectorRepository:
             )
             for row in rows
         ]
+
+    @contextmanager
+    def _session(self) -> Iterator[Session]:
+        """Translate failures during session creation, rollback, and close too."""
+        try:
+            with self._session_factory() as session:
+                yield session
+        except OperationalError as exc:
+            raise VectorRepositoryUnavailableError("vector session failed") from exc
+        except SQLAlchemyError as exc:
+            raise VectorRepositoryError("vector session failed") from exc
 
 
 def _source_insert(source: NewKnowledgeSource):

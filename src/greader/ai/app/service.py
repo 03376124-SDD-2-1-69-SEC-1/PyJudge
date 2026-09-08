@@ -119,11 +119,11 @@ def _validate_embedding(embedding: Embedding, *, field_name: str) -> None:
             f"{field_name} must contain exactly {EMBEDDING_DIMENSION} values"
         )
     for value in embedding:
-        if (
-            not isinstance(value, (int, float))
-            or isinstance(value, bool)
-            or not isfinite(value)
-        ):
+        try:
+            finite = isfinite(value) if isinstance(value, (int, float)) else False
+        except OverflowError:
+            finite = False
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not finite:
             raise VectorValidationError(
                 f"{field_name} values must be numeric and finite"
             )

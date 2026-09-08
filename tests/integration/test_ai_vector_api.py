@@ -19,6 +19,7 @@ from greader.ai.app.repository import (
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
+from greader.ai.database import vector_repository as postgres_adapter
 
 MODEL_A = "model-a"
 MODEL_B = "model-b"
@@ -376,8 +377,10 @@ def test_production_factory_selects_postgres_without_connecting(monkeypatch) -> 
         "DATABASE_URL",
         "postgresql+psycopg://user:password@localhost/greader",
     )
-    monkeypatch.setattr(ai_main, "create_engine", fake_create_engine)
-    monkeypatch.setattr(ai_main, "PostgresVectorRepository", fake_postgres_repository)
+    monkeypatch.setattr(postgres_adapter, "create_engine", fake_create_engine)
+    monkeypatch.setattr(
+        postgres_adapter, "PostgresVectorRepository", fake_postgres_repository
+    )
 
     application = ai_main.create_production_app()
 

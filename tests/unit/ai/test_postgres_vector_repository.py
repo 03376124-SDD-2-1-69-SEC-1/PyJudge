@@ -296,3 +296,41 @@ def test_search_translates_database_failure() -> None:
         _repository(session).search(_embedding(), embedding_model=MODEL, limit=5)
 
     session.rollback.assert_called_once_with()
+
+
+@pytest.mark.parametrize("operation", ["create", "search"])
+@pytest.mark.parametrize("phase", ["open", "close", "rollback"])
+def test_session_lifecycle_errors_do_not_escape_port(
+    operation: str, phase: str
+) -> None:
+    error = OperationalError("private SQL", {}, Exception("offline"))
+    session = MagicMock()
+    session.execute.return_value = _result_for_one(_source_row())
+    session.execute.return_value.mappings.return_value.all.return_value = []
+    if phase == "rollback":
+        session.execute.side_effect = error
+        session.rollback.side_effect = error
+
+    @contextmanager
+    def factory():
+        if phase == "open":
+            raise error
+        yield session
+        if phase == "close":
+            raise error
+
+    repository = PostgresVectorRepository(factory)
+    with pytest.raises(VectorRepositoryUnavailableError):
+        if operation == "create":
+            repository.create_source_with_chunks(_source(), ())
+        else:
+            repository.search(_embedding(), embedding_model=MODEL, limit=1)
+
+
+def test_commit_failure_rolls_back_and_translates() -> None:
+    session = MagicMock()
+    session.execute.return_value = _result_for_one(_source_row())
+    session.commit.side_effect = OperationalError("COMMIT", {}, Exception("offline"))
+    with pytest.raises(VectorRepositoryUnavailableError):
+        _repository(session).create_source_with_chunks(_source(), ())
+    session.rollback.assert_called_once_with()
