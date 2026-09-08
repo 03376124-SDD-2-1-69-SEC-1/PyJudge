@@ -1,4 +1,8 @@
-"""PostgreSQL vector adapter tests using mocked synchronous sessions."""
+"""PostgreSQL vector adapter tests using mocked synchronous sessions.
+
+These tests verify mapping, transaction calls, and PostgreSQL query construction.
+They do not verify real PostgreSQL persistence or pgvector execution.
+"""
 
 from contextlib import contextmanager
 from unittest.mock import MagicMock
@@ -7,7 +11,14 @@ import pytest
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from greader.ai.app.models import NewKnowledgeChunk, NewKnowledgeSource
+from greader.ai.app.models import (
+    ChunkSearchResult,
+    KnowledgeChunk,
+    KnowledgeSource,
+    NewKnowledgeChunk,
+    NewKnowledgeSource,
+    SourceCreationResult,
+)
 from greader.ai.app.repository import (
     DuplicateChunkError,
     DuplicateSourceError,
@@ -106,16 +117,68 @@ def test_creates_source_and_chunks_in_one_commit() -> None:
         _source(), (_chunk(0), _chunk(1))
     )
 
-    assert result.source.id == 11
-    assert [chunk.id for chunk in result.chunks] == [21, 22]
-    assert {chunk.source_id for chunk in result.chunks} == {11}
+    assert result == SourceCreationResult(
+        source=KnowledgeSource(
+            id=11,
+            core_document_id=7,
+            r2_object_key="documents/7.pdf",
+            content_hash="source-hash",
+            status="pending",
+            embedding_model=MODEL,
+            embedding_dim=768,
+            metadata={"topic": "graphs"},
+        ),
+        chunks=(
+            KnowledgeChunk(
+                id=21,
+                source_id=11,
+                chunk_index=0,
+                page=1,
+                text="chunk 0",
+                token_count=2,
+                content_hash="chunk-0",
+                embedding_model=MODEL,
+                metadata={"content_type": "lesson"},
+                embedding=_embedding(),
+            ),
+            KnowledgeChunk(
+                id=22,
+                source_id=11,
+                chunk_index=1,
+                page=2,
+                text="chunk 1",
+                token_count=2,
+                content_hash="chunk-1",
+                embedding_model=MODEL,
+                metadata={"content_type": "lesson"},
+                embedding=_embedding(),
+            ),
+        ),
+    )
     assert session.execute.call_count == 3
     source_params = session.execute.call_args_list[0].args[0].compile().params
     first_chunk_params = session.execute.call_args_list[1].args[0].compile().params
-    assert source_params["core_document_id"] == 7
-    assert source_params["metadata"] == {"topic": "graphs"}
-    assert first_chunk_params["source_id"] == 11
-    assert first_chunk_params["embedding"] == list(_embedding())
+    assert source_params == {
+        "content_hash": "source-hash",
+        "core_document_id": 7,
+        "embedding_dim": 768,
+        "embedding_model": MODEL,
+        "metadata": {"topic": "graphs"},
+        "r2_object_key": "documents/7.pdf",
+        "status": "pending",
+    }
+    assert first_chunk_params == {
+        "chunk_index": 0,
+        "content_hash": "chunk-0",
+        "embedding": list(_embedding()),
+        "embedding_model": MODEL,
+        "metadata": {"content_type": "lesson"},
+        "page": 1,
+        "source_id": 11,
+        "text": "chunk 0",
+        "token_count": 2,
+    }
+    session.flush.assert_not_called()
     session.commit.assert_called_once_with()
     session.rollback.assert_not_called()
 
@@ -144,13 +207,30 @@ def test_translates_unique_constraints_and_rolls_back(
     session.commit.assert_not_called()
 
 
-def test_translates_unknown_database_write_failure_and_rolls_back() -> None:
+def test_chunk_database_failure_rolls_back_source_and_does_not_commit() -> None:
     session = MagicMock()
-    session.execute.side_effect = OperationalError("INSERT", {}, Exception("offline"))
+    session.execute.side_effect = [
+        _result_for_one(_source_row()),
+        OperationalError("INSERT", {}, Exception("offline")),
+    ]
 
     with pytest.raises(VectorRepositoryError, match="storage operation failed"):
+        _repository(session).create_source_with_chunks(_source(), (_chunk(),))
+
+    session.rollback.assert_called_once_with()
+    session.commit.assert_not_called()
+
+
+def test_translates_unrecognized_integrity_error_without_exposing_sqlalchemy() -> None:
+    session = MagicMock()
+    session.execute.side_effect = _integrity_error("unexpected_constraint")
+
+    with pytest.raises(
+        VectorRepositoryError, match="storage integrity constraint failed"
+    ) as raised:
         _repository(session).create_source_with_chunks(_source(), ())
 
+    assert not isinstance(raised.value, IntegrityError)
     session.rollback.assert_called_once_with()
     session.commit.assert_not_called()
 
@@ -171,16 +251,27 @@ def test_search_maps_results_and_builds_model_scoped_ordered_query() -> None:
 
     results = _repository(session).search(_embedding(), embedding_model=MODEL, limit=5)
 
-    assert results[0].chunk_id == 21
-    assert results[0].score == 0.75
+    assert results == [
+        ChunkSearchResult(
+            chunk_id=21,
+            source_id=11,
+            page=1,
+            text="chunk 0",
+            score=0.75,
+        )
+    ]
     statement = session.execute.call_args.args[0]
-    sql = str(statement.compile(dialect=postgresql.dialect()))
+    compiled = statement.compile(dialect=postgresql.dialect())
+    sql = str(compiled)
     assert "knowledge_chunks.embedding IS NOT NULL" in sql
     assert "knowledge_chunks.embedding_model =" in sql
     assert " <=> " in sql
     assert " AS score" in sql
     assert "ORDER BY score DESC, rag.knowledge_chunks.id ASC" in sql
     assert "LIMIT" in sql
+    assert MODEL in compiled.params.values()
+    assert 1.0 in compiled.params.values()
+    assert 5 in compiled.params.values()
 
 
 def test_search_returns_empty_list() -> None:
