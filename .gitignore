@@ -34,3 +34,5 @@ data/
 .superpowers/
 
 setup-branch-protection.sh  
+# neonctl writes local project context here
+.neon

@@ -80,8 +80,10 @@ one executable reference; prose in this file does not override it.
 
 ## Do not do these without a task saying so
 
-- Do not run `alembic upgrade`, `downgrade`, or `--autogenerate`. The database
-  is shared across the team; a downgrade destroys other people's work.
+- Do not run `alembic upgrade`, `downgrade`, or `--autogenerate` against the
+  shared database. It is shared across the team; a downgrade destroys other
+  people's work. The one exception is CI, which runs `alembic upgrade head`
+  against a Neon branch it creates and deletes within the same run.
 - Do not create or edit migration files.
 - Do not edit `.env`, `.env.example`, or anything holding credentials.
 - Do not add `<script>`, `javascript:` URLs, or inline handlers (`onclick`,
@@ -92,6 +94,19 @@ one executable reference; prose in this file does not override it.
   is a team rule to follow, not a tooling gate.
 
 If a task looks like it needs a schema change, stop and say so.
+
+## Who may change the locked files
+
+The paths under "Off-limits regardless of task" in `docs/task-scope.md` —
+`alembic/`, credentials, `database/*/tables.py`, `pyproject.toml` dependencies,
+CI config, `AGENTS.md` itself — belong to พาย (GitHub `Doonminus2`) and change
+only through an OPS task. Anyone else who needs one changed asks; they do not
+edit it and explain afterwards.
+
+`.github/CODEOWNERS` is what actually enforces this: a pull request touching
+those paths cannot merge without a review from the owner. This section is the
+reason, not the mechanism — if the two ever disagree, CODEOWNERS wins and this
+section is the thing that is out of date.
 
 ## Known trap: alembic autogenerate
 
@@ -150,8 +165,16 @@ uv run ruff format --check .   # `ruff format .` to fix
 ```
 
 `tests/unit/` domain + service · `tests/integration/` HTTP via ASGI transport ·
-`tests/architecture/` import direction and the no-JavaScript rule.
-Tests must never hit a real database or a real AI provider.
+`tests/architecture/` import direction and the no-JavaScript rule ·
+`tests/db/` database adapters against a real PostgreSQL.
+
+Tests must never hit the shared database or a real AI provider. `tests/db/` is
+the only exception, and only through a throwaway database: mark those tests
+`postgres`, read the DSN from the `postgres_url` fixture, and never from
+`DATABASE_URL`. CI supplies `POSTGRES_TEST_URL` by creating a Neon branch per
+run and deleting it afterwards. With that variable unset the marked tests skip
+themselves, so `uv run pytest` stays green with no database — one command
+everywhere. See `tests/conftest.py`.
 
 ## Definition of done
 

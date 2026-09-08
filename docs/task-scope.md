@@ -19,7 +19,7 @@ This is a single repo. "ai repo" in this table resolves to `src/greader/ai/`.
 | FE-02 | โปรแกรม | `web/templates/generate.html`, `core/generation/routes.py` | submit renders a draft from the mock |
 | FE-03 | โปรแกรม | `web/templates/review.html`, `core/assignments/routes.py` | citations shown, approve and reject work |
 | FE-04 | โปรแกรม | `web/templates/save.html`, `core/assignments/routes.py` | form matches the mockup |
-| AI-01 | ฟิล์ม | ai repo: `app/`, `database/` | insert and query a sample vector |
+| AI-01 | ฟิล์ม | `ai/` (domain and service, no ORM), `database/rag/vector_repository.py`, `tests/unit/ai/`, `tests/db/` | a vector inserted through the API comes back from a search, proven by a `postgres`-marked test against a real database |
 | AI-02 | ฟิล์ม | ai repo: `ingestion/` | text extracted per page from the test files |
 | AI-03 | พาย + ฟิล์ม | ai repo: `ingestion/chunking.py` | chunk boundaries match expectations on >=80% of test files |
 | AI-04 | ฟิล์ม | ai repo: `ingestion/`, `embeddings/` | one PDF ingested end to end, chunks and vectors present |
@@ -32,6 +32,7 @@ This is a single repo. "ai repo" in this table resolves to `src/greader/ai/`.
 | OPS-08 | พาย | `docs/task-scope.md`, `AGENTS.md`, `docs/adr/`, `.gitignore` | the table matches the tree; every done-condition is checkable in one repo |
 | CORE-08 | พาย + ฟิล์ม | `core/generation/schemas.py`, `ai/client.py`, `tests/unit/ai/test_client.py`, `tests/integration/test_generation_api.py` | a citation identifies its source document; an approved draft has a stable handle; invalid input is rejected |
 | CORE-09 | พาย | `core/knowledge_documents/`, `database/core/knowledge_document_repository.py`, `tests/` | a citation's `document_id` resolves to the document's filename through Core |
+| OPS-09 | พาย | `.github/`, `setup-branch-protection.sh`, `tests/conftest.py`, `tests/db/`, `pyproject.toml` pytest config, `.env.example`, `AGENTS.md`, `docs/task-scope.md` | CI runs `tests/db/` against a Neon branch it creates and deletes per run; the canary reports RUN, not SKIPPED |
 
 ## Off-limits regardless of task
 
