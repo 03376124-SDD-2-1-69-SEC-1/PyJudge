@@ -11,8 +11,8 @@ This is a single repo. "ai repo" in this table resolves to `src/greader/ai/`.
 | CORE-01 | พาย + ฟิล์ม | `src/greader/core/generation/schemas.py` | `core/generation/schemas.py` exists once in this repo. Done — merged in PR #3 |
 | CORE-02 | พาย | `core/generation/routes.py`, `ai/client.py` | mock endpoint callable from outside. Done — merged in PR #4 |
 | CORE-03 | พาย | `core/topics/`, `tests/` | merged to dev and runs |
-| CORE-04 | นัด | `core/assignments/`, `database/core/assignment_repository.py`, `tests/` | create, update, delete via API |
-| CORE-05 | นัด | `core/test_cases/`, `database/core/test_case_repository.py`, `tests/` | linked to an assignment, deleted with it |
+| CORE-04 | นัด | `core/assignments/`, `tests/` | create, update, delete via API |
+| CORE-05 | นัด | `core/test_cases/`, `tests/` | linked to an assignment, deleted with it |
 | CORE-06 | พาย | `database/storage.py`, config | file uploads to R2 through an endpoint |
 | CORE-07 | นัด + โปรแกรม | `core/assignments/`, `web/templates/`, `core/assignments/routes.py` | assignment saved from an approved draft |
 | FE-01 | โปรแกรม | `web/templates/base.html`, `web/static/css/input.css` | every page extends base |
@@ -33,6 +33,8 @@ This is a single repo. "ai repo" in this table resolves to `src/greader/ai/`.
 | CORE-08 | พาย + ฟิล์ม | `core/generation/schemas.py`, `ai/client.py`, `tests/unit/ai/test_client.py`, `tests/integration/test_generation_api.py` | a citation identifies its source document; an approved draft has a stable handle; invalid input is rejected |
 | CORE-09 | พาย | `core/knowledge_documents/`, `database/core/knowledge_document_repository.py`, `tests/` | a citation's `document_id` resolves to the document's filename through Core |
 | OPS-09 | พาย | `.github/`, `setup-branch-protection.sh`, `tests/conftest.py`, `tests/db/`, `pyproject.toml` pytest config, `.env.example`, `AGENTS.md`, `docs/task-scope.md` | CI runs `tests/db/` against a Neon branch it creates and deletes per run; the canary reports RUN, not SKIPPED |
+| CORE-10 | พาย | `database/core/assignment_repository.py`, `tests/db/` | `create_test_case`, `list_test_cases`, `update_test_case`, `delete_test_case` implemented on `SQLAssignmentRepository`; a `postgres`-marked test proves a test case round-trips through real Postgres |
+| OPS-10 | พาย | `.github/workflows/ci.yml`, `src/greader/r2_safety.py`, `scripts/ci_r2_cleanup.py`, `tests/r2/`, `tests/unit/test_r2_safety.py`, `tests/conftest.py`, `pyproject.toml`, `AGENTS.md`, `README.md` | `tests/r2/` runs in CI against the real `greader-ci` bucket, not skipped; presigned-URL fetch, multipart upload, and a conditional-write conflict are each proven against real R2 |
 
 ## Off-limits regardless of task
 

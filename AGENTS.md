@@ -95,18 +95,25 @@ one executable reference; prose in this file does not override it.
 
 If a task looks like it needs a schema change, stop and say so.
 
-## Who may change the locked files
+## Who may change database and locked files
 
-The paths under "Off-limits regardless of task" in `docs/task-scope.md` —
-`alembic/`, credentials, `database/*/tables.py`, `pyproject.toml` dependencies,
-CI config, `AGENTS.md` itself — belong to พาย (GitHub `Doonminus2`) and change
-only through an OPS task. Anyone else who needs one changed asks; they do not
-edit it and explain afterwards.
+All of `src/greader/database/` and `alembic/` belong to พาย (GitHub
+`Doonminus2`), in every case. A task whose description seems to need a
+`database/` or `alembic/` edit is not an exception — stop and ask พาย instead
+of editing it. `docs/task-scope.md` enforces this at the row level: it never
+grants a `database/` or `alembic/` path to a row owned by anyone else.
 
-`.github/CODEOWNERS` is what actually enforces this: a pull request touching
-those paths cannot merge without a review from the owner. This section is the
-reason, not the mechanism — if the two ever disagree, CODEOWNERS wins and this
-section is the thing that is out of date.
+A subset of that — the paths under "Off-limits regardless of task" in
+`docs/task-scope.md` (`alembic/`, credentials, `database/core/tables.py`,
+`database/rag/tables.py`, `pyproject.toml` dependencies, CI config, `AGENTS.md`
+itself) — is locked further still: those change only through an OPS task, and
+anyone else who needs one changed asks; they do not edit it and explain
+afterwards.
+
+`.github/CODEOWNERS` is what enforces that stricter subset: a pull request
+touching one of those paths cannot merge without a review from the owner. That
+file is the mechanism, `docs/task-scope.md`'s off-limits list is the reason —
+if the two ever disagree, CODEOWNERS wins and the list is what's out of date.
 
 ## Known trap: alembic autogenerate
 
@@ -199,9 +206,16 @@ everywhere. See `tests/conftest.py`.
 - unit test at the service/repository seam, integration test at the HTTP layer
 - architecture tests pass
 - `pytest`, `ruff check`, `ruff format --check` all pass
+- if the PR touches anything under `src/`, it also adds or modifies something
+  under `tests/` — a pre-existing suite staying green is not evidence the new
+  code works, only that it wasn't exercised
+- the PR description quotes the CI result for the PR's own head commit, not a
+  number from a local run
 
 ## Git
 
 Branch from `dev`, named `<type>/<TASK-ID>-<slug>` where type is `feat`, `fix`,
-`chore`, `docs`, or `refactor`. Pull requests target `dev` only and need one
-approval. Never commit directly to `main` or `dev`.
+`chore`, `docs`, or `refactor`. Pull requests target `dev`, not `main` — `main`
+is only this repo's default branch, so GitHub pre-fills it as the PR base;
+change the base to `dev` before opening, every time. PRs need one approval.
+Never commit directly to `main` or `dev`.
