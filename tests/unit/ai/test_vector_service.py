@@ -71,7 +71,7 @@ def test_rejects_wrong_vector_dimension(embedding: tuple[float, ...]) -> None:
         _service().search(embedding, embedding_model=MODEL, top_k=1)
 
 
-@pytest.mark.parametrize("invalid_value", [float("nan"), float("inf"), "1"])
+@pytest.mark.parametrize("invalid_value", [float("nan"), float("inf"), "1", 10**1000])
 def test_rejects_non_finite_or_non_numeric_values(invalid_value: object) -> None:
     embedding = (invalid_value, *(0.0 for _ in range(767)))
 

@@ -150,7 +150,12 @@ class InMemoryVectorRepository:
 
 
 def _cosine_similarity(left: Embedding, right: Embedding) -> float:
+    # Scale before squaring to avoid overflow or underflow for finite inputs.
+    left_scale = max(abs(value) for value in left)
+    right_scale = max(abs(value) for value in right)
+    left = tuple(value / left_scale for value in left)
+    right = tuple(value / right_scale for value in right)
     left_norm = sqrt(sum(value * value for value in left))
     right_norm = sqrt(sum(value * value for value in right))
     dot_product = sum(a * b for a, b in zip(left, right, strict=True))
-    return dot_product / (left_norm * right_norm)
+    return max(-1.0, min(1.0, dot_product / (left_norm * right_norm)))

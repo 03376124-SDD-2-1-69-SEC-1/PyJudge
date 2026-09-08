@@ -129,6 +129,15 @@ def test_search_returns_empty_list_when_nothing_matches() -> None:
     assert service.search(_embedding(), embedding_model=MODEL_A, top_k=10) == []
 
 
+@pytest.mark.parametrize("scale", [1e-300, 1e300])
+def test_cosine_avoids_float_overflow_and_underflow(scale: float) -> None:
+    service = VectorService(InMemoryVectorRepository())
+    vector = _embedding(scale, scale)
+    service.create_source_with_chunks(_source(1), (_chunk(0, vector),))
+    results = service.search(vector, embedding_model=MODEL_A, top_k=1)
+    assert results[0].score == pytest.approx(1.0)
+
+
 def test_duplicate_source_raises_contract_error() -> None:
     repository = InMemoryVectorRepository()
     repository.create_source_with_chunks(_source(1), ())

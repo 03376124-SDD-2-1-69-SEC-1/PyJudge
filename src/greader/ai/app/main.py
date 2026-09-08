@@ -3,14 +3,11 @@
 import os
 
 from fastapi import FastAPI
-from sqlalchemy.engine import make_url
-from sqlalchemy.exc import ArgumentError
-from sqlmodel import Session, create_engine
 
 from greader.ai.app.repository import VectorRepository
 from greader.ai.app.routes import router as vector_router
 from greader.ai.app.service import VectorService
-from greader.ai.database.vector_repository import PostgresVectorRepository
+from greader.ai.database.vector_repository import create_postgres_repository
 
 
 def create_app(*, repository: VectorRepository) -> FastAPI:
@@ -31,13 +28,5 @@ def create_production_app() -> FastAPI:
     if database_url is None:
         raise RuntimeError("DATABASE_URL is required")
 
-    try:
-        parsed_url = make_url(database_url)
-    except ArgumentError as exc:
-        raise RuntimeError("DATABASE_URL must use postgresql+psycopg://") from exc
-    if parsed_url.drivername != "postgresql+psycopg":
-        raise RuntimeError("DATABASE_URL must use postgresql+psycopg://")
-
-    engine = create_engine(parsed_url, echo=False)
-    repository = PostgresVectorRepository(lambda: Session(engine))
+    repository = create_postgres_repository(database_url)
     return create_app(repository=repository)
