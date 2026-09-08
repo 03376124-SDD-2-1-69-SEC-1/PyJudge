@@ -10,7 +10,7 @@ from contextlib import AbstractContextManager
 from typing import Any
 
 from sqlalchemy import insert, literal, select
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlmodel import Session
 
 from greader.ai.app.models import (
@@ -26,6 +26,7 @@ from greader.ai.app.repository import (
     DuplicateChunkError,
     DuplicateSourceError,
     VectorRepositoryError,
+    VectorRepositoryUnavailableError,
 )
 from greader.database.rag.tables import KnowledgeChunk as KnowledgeChunkTable
 from greader.database.rag.tables import KnowledgeSource as KnowledgeSourceTable
@@ -66,6 +67,11 @@ class PostgresVectorRepository:
             except IntegrityError as exc:
                 session.rollback()
                 raise _translate_integrity_error(exc) from exc
+            except OperationalError as exc:
+                session.rollback()
+                raise VectorRepositoryUnavailableError(
+                    "vector storage operation failed"
+                ) from exc
             except SQLAlchemyError as exc:
                 session.rollback()
                 raise VectorRepositoryError("vector storage operation failed") from exc
@@ -84,6 +90,11 @@ class PostgresVectorRepository:
         with self._session_factory() as session:
             try:
                 rows = session.execute(statement).mappings().all()
+            except OperationalError as exc:
+                session.rollback()
+                raise VectorRepositoryUnavailableError(
+                    "vector search operation failed"
+                ) from exc
             except SQLAlchemyError as exc:
                 session.rollback()
                 raise VectorRepositoryError("vector search operation failed") from exc

@@ -23,6 +23,7 @@ from greader.ai.app.repository import (
     DuplicateChunkError,
     DuplicateSourceError,
     VectorRepositoryError,
+    VectorRepositoryUnavailableError,
 )
 from greader.ai.database.vector_repository import PostgresVectorRepository
 
@@ -214,7 +215,9 @@ def test_chunk_database_failure_rolls_back_source_and_does_not_commit() -> None:
         OperationalError("INSERT", {}, Exception("offline")),
     ]
 
-    with pytest.raises(VectorRepositoryError, match="storage operation failed"):
+    with pytest.raises(
+        VectorRepositoryUnavailableError, match="storage operation failed"
+    ):
         _repository(session).create_source_with_chunks(_source(), (_chunk(),))
 
     session.rollback.assert_called_once_with()
@@ -287,7 +290,9 @@ def test_search_translates_database_failure() -> None:
     session = MagicMock()
     session.execute.side_effect = OperationalError("SELECT", {}, Exception("offline"))
 
-    with pytest.raises(VectorRepositoryError, match="search operation failed"):
+    with pytest.raises(
+        VectorRepositoryUnavailableError, match="search operation failed"
+    ):
         _repository(session).search(_embedding(), embedding_model=MODEL, limit=5)
 
     session.rollback.assert_called_once_with()
