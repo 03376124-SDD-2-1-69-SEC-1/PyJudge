@@ -27,6 +27,7 @@ build-backend = "uv_build"
 dev = [
     "anyio>=4.14.2",
     "httpx>=0.28.1",
+    "moto[s3]>=5.1.0",
     "pytest>=9.1.1",
     "pytest-anyio>=0.0.0",
     "pytest-cov>=7.1.0",
@@ -37,11 +38,13 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--strict-markers"
 filterwarnings = [
     "ignore::pytest.PytestCollectionWarning",
 ]
 markers = [
     "postgres: talks to a real database through POSTGRES_TEST_URL. Skipped when that variable is unset; see tests/conftest.py",
+    "r2: talks to a real R2 bucket through R2_TEST_*. Skipped when those variables are unset; see tests/conftest.py",
 ]
 
 [tool.coverage.run]

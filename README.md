@@ -160,6 +160,23 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
+Tests marked `postgres` or `r2` talk to real infrastructure and skip
+themselves locally unless the matching variables are exported. In CI they run
+against throwaway infrastructure created per run — see `AGENTS.md`. To run the
+`r2` tests locally against the dedicated `greader-ci` bucket, export:
+
+```bash
+export R2_TEST_ENDPOINT_URL=...
+export R2_TEST_ACCESS_KEY_ID=...
+export R2_TEST_SECRET_ACCESS_KEY=...
+export R2_TEST_BUCKET_NAME=greader-ci
+```
+
+CI reads these same four names from repo secrets/variables
+(`R2_TEST_ENDPOINT_URL`, `R2_TEST_ACCESS_KEY_ID`, `R2_TEST_SECRET_ACCESS_KEY`
+as secrets; `R2_TEST_BUCKET_NAME` as a variable) — see
+`.github/workflows/ci.yml`.
+
 Create a migration after changing database models:
 
 ```bash

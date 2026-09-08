@@ -45,6 +45,20 @@ jobs:
       R2_ACCESS_KEY_ID: ci-dummy-access-key
       R2_SECRET_ACCESS_KEY: ci-dummy-secret-key
 
+      # เทสที่มาร์ก `r2` ยิงใส่ bucket แยกต่างหาก `greader-ci` ผ่าน token ที่
+      # มีสิทธิ์แค่ bucket นี้ เทสพังยังไงก็แตะ bucket จริงไม่ได้ ค่าเหล่านี้
+      # ต้องไม่ใช่ค่าเดียวกับ R2_* ด้านบน (ดู tests/conftest.py ที่เช็คไว้)
+      #
+      # ต้องตั้งค่าไว้ที่ repo → Settings → Secrets and variables → Actions:
+      #   secret   R2_TEST_ENDPOINT_URL
+      #   secret   R2_TEST_ACCESS_KEY_ID
+      #   secret   R2_TEST_SECRET_ACCESS_KEY
+      #   variable R2_TEST_BUCKET_NAME
+      R2_TEST_ENDPOINT_URL: ${{ secrets.R2_TEST_ENDPOINT_URL }}
+      R2_TEST_ACCESS_KEY_ID: ${{ secrets.R2_TEST_ACCESS_KEY_ID }}
+      R2_TEST_SECRET_ACCESS_KEY: ${{ secrets.R2_TEST_SECRET_ACCESS_KEY }}
+      R2_TEST_BUCKET_NAME: ${{ vars.R2_TEST_BUCKET_NAME }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -66,6 +80,12 @@ jobs:
 
       - name: Ruff format check
         run: uv run ruff format --check .
+
+      # per-run key prefix กัน concurrent run ชนกันบน bucket greader-ci เดียวกัน
+      # ไม่มี secret ในนี้ ไม่ต้อง mask
+      - name: Export R2 test prefix
+        run: |
+          echo "R2_TEST_PREFIX=ci/${{ github.run_id }}-${{ github.run_attempt }}/" >> "$GITHUB_ENV"
 
       # กิ่งใช้แล้วทิ้ง copy-on-write จาก parent — ได้ schema, pgvector และ
       # HNSW index มาครบโดยไม่แตะข้อมูลที่ทีมใช้อยู่ --expires-at เป็นตาข่าย
@@ -118,3 +138,11 @@ jobs:
           npx -y neonctl branches delete "${{ steps.neon_branch.outputs.branch }}" \
             --project-id "${{ vars.NEON_PROJECT_ID }}" \
             || echo "::warning::could not delete the branch; it expires on its own"
+
+      # เหตุผลเดียวกับ step ลบ Neon branch ด้านบน — ลบไม่สำเร็จไม่ควรทำให้ run
+      # แดงและกลบสาเหตุจริง lifecycle rule บน bucket เป็นตาข่ายรับไว้อยู่แล้ว
+      - name: Delete R2 test objects
+        if: always() && env.R2_TEST_PREFIX != ''
+        run: |
+          uv run python scripts/ci_r2_cleanup.py \
+            || echo "::warning::could not delete R2 objects; lifecycle rule will collect them"
