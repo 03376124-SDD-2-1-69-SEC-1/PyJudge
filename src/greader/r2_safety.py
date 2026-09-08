@@ -12,6 +12,7 @@ from __future__ import annotations
 from urllib.parse import urlsplit
 
 SAFE_PREFIX_ROOTS = ("ci/", "local/")
+R2_HOST_SUFFIX = ".r2.cloudflarestorage.com"
 
 
 def assert_valid_r2_endpoint(endpoint: str) -> None:
@@ -26,6 +27,16 @@ def assert_valid_r2_endpoint(endpoint: str) -> None:
             "R2 endpoint must not include a path — boto3 appends the bucket "
             "name itself, so a trailing path segment doubles it up"
         )
+    # host เช็คทีหลัง path เพราะ "https://" เปล่าๆ ก็ผ่าน startswith/strip/path
+    # มาได้ — ต้องเช็ค host ไม่ว่างและมี account-id label ก่อนต่อท้าย suffix
+    host = urlsplit(endpoint).netloc
+    if not host:
+        raise ValueError("R2 endpoint is missing a host")
+    if not host.endswith(R2_HOST_SUFFIX):
+        raise ValueError(f"R2 endpoint host must end with {R2_HOST_SUFFIX}")
+    account_id = host[: -len(R2_HOST_SUFFIX)]
+    if not account_id:
+        raise ValueError("R2 endpoint is missing the account ID")
 
 
 def assert_safe_prefix(prefix: str) -> None:
