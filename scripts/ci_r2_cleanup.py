@@ -6,8 +6,10 @@ bucket `greader-ci` (ลบของเก่ากว่า 1 วัน) เป
 ไม่ได้รัน (runner ถูก kill กลางคัน) — เหมือนกับที่ `--expires-at` รับ Neon branch
 
 ห้ามแก้ guard ของ prefix เด็ดขาด: prefix ผิดพลาด (ว่าง, "/", หรือไม่ขึ้นต้น
-ด้วย "ci/") ต้องทำให้ script exit ไม่ใช่ 0 ทันที ไม่งั้น bug เล็ก ๆ ในตัวแปร
-environment จะกลายเป็นการลบทั้ง bucket
+ด้วย "ci/" หรือ "local/") ต้องทำให้ script exit ไม่ใช่ 0 ทันที ไม่งั้น bug เล็ก ๆ
+ในตัวแปร environment จะกลายเป็นการลบทั้ง bucket guard เดียวกันนี้ (และการเช็ค
+endpoint) อยู่ใน src/greader/r2_safety.py ใช้ร่วมกับ tests/conftest.py — ที่นั่น
+เป็นอีกจุดที่ลบ object จริงเหมือนกัน
 """
 
 from __future__ import annotations
@@ -17,6 +19,8 @@ import sys
 
 import boto3
 from botocore.config import Config
+
+from greader.r2_safety import assert_safe_prefix, assert_valid_r2_endpoint
 
 REQUIRED_VARS = (
     "R2_TEST_ENDPOINT_URL",
@@ -28,24 +32,27 @@ REQUIRED_VARS = (
 DELETE_BATCH_SIZE = 1000
 
 
-def _validated_prefix(prefix: str) -> str:
-    if not prefix or prefix == "/" or not prefix.startswith("ci/"):
-        sys.exit(f"refusing to clean up suspicious prefix: {prefix!r}")
-    if len(prefix) <= len("ci/"):
-        sys.exit(f"refusing to clean up suspicious prefix: {prefix!r}")
-    return prefix
-
-
 def main() -> None:
     missing = [name for name in REQUIRED_VARS if not os.environ.get(name)]
     if missing:
         sys.exit(f"missing required environment variables: {', '.join(missing)}")
 
-    prefix = _validated_prefix(os.environ["R2_TEST_PREFIX"])
+    endpoint = os.environ["R2_TEST_ENDPOINT_URL"]
+    try:
+        assert_valid_r2_endpoint(endpoint)
+    except ValueError as error:
+        sys.exit(str(error))
+
+    prefix = os.environ["R2_TEST_PREFIX"]
+    try:
+        assert_safe_prefix(prefix)
+    except ValueError as error:
+        sys.exit(str(error))
+
     bucket = os.environ["R2_TEST_BUCKET_NAME"]
     client = boto3.client(
         "s3",
-        endpoint_url=os.environ["R2_TEST_ENDPOINT_URL"],
+        endpoint_url=endpoint,
         aws_access_key_id=os.environ["R2_TEST_ACCESS_KEY_ID"],
         aws_secret_access_key=os.environ["R2_TEST_SECRET_ACCESS_KEY"],
         config=Config(signature_version="s3v4"),

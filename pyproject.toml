@@ -27,7 +27,6 @@ build-backend = "uv_build"
 dev = [
     "anyio>=4.14.2",
     "httpx>=0.28.1",
-    "moto[s3]>=5.1.0",
     "pytest>=9.1.1",
     "pytest-anyio>=0.0.0",
     "pytest-cov>=7.1.0",

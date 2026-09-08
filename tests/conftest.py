@@ -22,6 +22,8 @@ from urllib.parse import urlsplit
 import boto3
 import pytest
 
+from greader.r2_safety import assert_safe_prefix, assert_valid_r2_endpoint
+
 TEST_URL_VAR = "POSTGRES_TEST_URL"
 SHARED_URL_VARS = ("DATABASE_URL", "DATABASE_URL_UNPOOLED")
 REQUIRED_DRIVER = "postgresql+psycopg"
@@ -116,9 +118,14 @@ def r2_test_bucket() -> tuple:
             "write and delete objects; point it at the dedicated greader-ci "
             "bucket instead."
         )
+    endpoint = os.environ["R2_TEST_ENDPOINT_URL"]
+    try:
+        assert_valid_r2_endpoint(endpoint)
+    except ValueError as error:
+        pytest.fail(f"R2_TEST_ENDPOINT_URL is invalid: {error}")
     client = boto3.client(
         "s3",
-        endpoint_url=os.environ["R2_TEST_ENDPOINT_URL"],
+        endpoint_url=endpoint,
         aws_access_key_id=os.environ["R2_TEST_ACCESS_KEY_ID"],
         aws_secret_access_key=os.environ["R2_TEST_SECRET_ACCESS_KEY"],
         region_name="auto",
@@ -138,13 +145,18 @@ def r2_test_prefix(r2_test_bucket: tuple):
     client, bucket = r2_test_bucket
     base = os.environ.get(R2_TEST_PREFIX_VAR, "").strip()
     if not base:
-        base = f"ci/local-{uuid.uuid4().hex}/"
+        base = f"local/{uuid.uuid4().hex}/"
     if not base.endswith("/"):
         base += "/"
     prefix = f"{base}{uuid.uuid4().hex}/"
+    try:
+        assert_safe_prefix(prefix)
+    except ValueError as error:
+        pytest.fail(f"{R2_TEST_PREFIX_VAR} produced an unsafe prefix: {error}")
 
     yield prefix
 
+    assert_safe_prefix(prefix)
     paginator = client.get_paginator("list_objects_v2")
     keys = [
         {"Key": entry["Key"]}
