@@ -18,30 +18,19 @@ jobs:
     name: Lint & Test
     runs-on: ubuntu-latest
 
-    # ยังไม่เปิดใช้งาน — คอมเมนต์ไว้เผื่ออนาคต
-    # ตอนนี้ tests/integration ใช้ ASGITransport + InMemoryRepository ล้วน
-    # ไม่มีเทสไหนต่อ Postgres จริง จึงยังไม่ต้องเปิด service นี้
-    # เมื่อไหร่ที่มี database adapter จริง (session.py / tables.py) และมี
-    # integration test ที่ต้องต่อ DB จริง ค่อยลบ comment ออกทั้งบล็อกนี้
-    # แล้วปรับ DATABASE_URL ด้านล่างให้ตรงกับ user/pass/db ที่ตั้งไว้ที่นี่
+    # เทสที่ต่อ DB จริงยิงใส่ Neon branch ที่สร้างใหม่ทุก run แล้วลบทิ้ง
+    # (ดูขั้นตอน "Create ephemeral Neon branch" ด้านล่าง) ไม่ใช่ service
+    # container และไม่ใช่ Neon ที่ทีมแชร์กัน — เทสพวกนี้เขียนและลบข้อมูลจริง
     #
-    # services:
-    #   postgres:
-    #     image: pgvector/pgvector:pg16
-    #     env:
-    #       POSTGRES_USER: user
-    #       POSTGRES_PASSWORD: pass
-    #       POSTGRES_DB: greader_test
-    #     ports:
-    #       - 5432:5432
-    #     options: >-
-    #       --health-cmd pg_isready
-    #       --health-interval 10s
-    #       --health-timeout 5s
-    #       --health-retries 5
+    # ต้องตั้งค่าไว้ที่ repo → Settings → Secrets and variables → Actions:
+    #   secret   NEON_API_KEY        Neon Console → Account settings → API keys
+    #   variable NEON_PROJECT_ID     Neon Console → Project → Settings → General
+    #   variable NEON_PARENT_BRANCH  (ไม่ใส่ก็ได้ default `production`)
 
     # ค่า dummy สำหรับ config/settings ที่ต้องมี env ตอน import แอป
-    # ทดสอบ unit/architecture ไม่ได้ต่อ DB จริง จึงใส่ค่าปลอมพอให้ import ผ่าน
+    # unit/architecture ไม่ต่อ DB จริง จึงใส่ค่าปลอมพอให้ import ผ่าน
+    # ห้ามชี้ค่าพวกนี้ไปที่ Neon จริง — tests/conftest.py จะ fail ถ้า
+    # POSTGRES_TEST_URL ชี้ compute เดียวกับ DATABASE_URL
     env:
       APP_ENV: test
       APP_PORT: 8000
@@ -78,5 +67,54 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check .
 
+      # กิ่งใช้แล้วทิ้ง copy-on-write จาก parent — ได้ schema, pgvector และ
+      # HNSW index มาครบโดยไม่แตะข้อมูลที่ทีมใช้อยู่ --expires-at เป็นตาข่าย
+      # กันลืม เผื่อขั้นตอนลบไม่ได้รัน (runner ถูก kill กลางคัน)
+      - name: Create ephemeral Neon branch
+        id: neon_branch
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          branch="ci-${{ github.run_id }}-${{ github.run_attempt }}"
+          npx -y neonctl branches create \
+            --project-id "${{ vars.NEON_PROJECT_ID }}" \
+            --name "$branch" \
+            --parent "${{ vars.NEON_PARENT_BRANCH || 'production' }}" \
+            --expires-at "$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)"
+          # ตั้ง output หลังสร้างสำเร็จเท่านั้น ขั้นตอนลบจะได้ไม่ไปไล่ลบกิ่งที่ไม่เคยเกิด
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      # neonctl พิมพ์ DSN มาเป็น postgresql:// เปล่า ๆ ซึ่ง SQLAlchemy จะไปหา
+      # psycopg2 ที่โปรเจกต์ไม่ได้ลง แล้วล้มด้วย NoSuchModuleError จึงต้องเติม
+      # +psycopg เอง เก็บไว้ใน POSTGRES_TEST_URL ตัวเดียว ไม่ทับ DATABASE_URL
+      - name: Export branch connection string
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          raw="$(npx -y neonctl connection-string "${{ steps.neon_branch.outputs.branch }}" \
+            --project-id "${{ vars.NEON_PROJECT_ID }}")"
+          echo "::add-mask::$raw"
+          dsn="$(printf '%s' "$raw" | sed -E 's#^postgresql://#postgresql+psycopg://#')"
+          echo "::add-mask::$dsn"
+          echo "POSTGRES_TEST_URL=$dsn" >> "$GITHUB_ENV"
+
+      # รันบนกิ่งใช้แล้วทิ้งเท่านั้น ไม่ใช่ Neon ที่แชร์ — ทำให้ PR ที่เพิ่ม
+      # migration ใหม่ถูกพิสูจน์ว่ารันผ่านบน schema จริงก่อนเข้า dev
+      - name: Apply migrations to the branch
+        run: DATABASE_URL_UNPOOLED="$POSTGRES_TEST_URL" uv run alembic upgrade head
+
       - name: Run tests
         run: uv run pytest -q
+
+      - name: Delete ephemeral Neon branch
+        if: always() && steps.neon_branch.outputs.branch != ''
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          # ลบไม่สำเร็จไม่ควรทำให้ run แดงและกลบสาเหตุจริงที่อยู่ก่อนหน้า
+          # --expires-at ตอนสร้างเป็นตาข่ายรับไว้อยู่แล้ว
+          npx -y neonctl branches delete "${{ steps.neon_branch.outputs.branch }}" \
+            --project-id "${{ vars.NEON_PROJECT_ID }}" \
+            || echo "::warning::could not delete the branch; it expires on its own"

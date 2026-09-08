@@ -40,6 +40,9 @@ testpaths = ["tests"]
 filterwarnings = [
     "ignore::pytest.PytestCollectionWarning",
 ]
+markers = [
+    "postgres: talks to a real database through POSTGRES_TEST_URL. Skipped when that variable is unset; see tests/conftest.py",
+]
 
 [tool.coverage.run]
 source = ["greader"]
