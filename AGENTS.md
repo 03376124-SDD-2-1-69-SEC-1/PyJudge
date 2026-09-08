@@ -13,7 +13,7 @@ setup and background live in `README.md` and `docs/adr/`.
 | `core/topics`             | Working. **The reference slice — copy its shape.**  | shared           |
 | `core/assignments`        | Placeholder (docstrings only)                       | Assignment owner |
 | `database/`               | **Done.** 8 tables live on Neon, migrations applied | DB owner         |
-| `ai/`                     | Not started                                         | AI owner         |
+| `ai/`                     | In progress                                         | AI owner         |
 | `web/templates/base.html` | Shared layout                                       | Design           |
 
 Do not implement another area's placeholder unless the task says to.
