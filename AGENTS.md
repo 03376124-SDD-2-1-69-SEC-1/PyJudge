@@ -166,14 +166,29 @@ uv run ruff format --check .   # `ruff format .` to fix
 
 `tests/unit/` domain + service · `tests/integration/` HTTP via ASGI transport ·
 `tests/architecture/` import direction and the no-JavaScript rule ·
-`tests/db/` database adapters against a real PostgreSQL.
+`tests/db/` database adapters against a real PostgreSQL · `tests/r2/` object
+storage behaviour against a real R2 bucket.
 
-Tests must never hit the shared database or a real AI provider. `tests/db/` is
-the only exception, and only through a throwaway database: mark those tests
-`postgres`, read the DSN from the `postgres_url` fixture, and never from
-`DATABASE_URL`. CI supplies `POSTGRES_TEST_URL` by creating a Neon branch per
-run and deleting it afterwards. With that variable unset the marked tests skip
-themselves, so `uv run pytest` stays green with no database — one command
+Tests must never hit the shared database, the real R2 bucket, or a real AI
+provider. `tests/db/` and `tests/r2/` are the exceptions, and only through
+throwaway infrastructure:
+
+- `tests/db/` — mark tests `postgres`, read the DSN from the `postgres_url`
+  fixture, and never from `DATABASE_URL`. CI supplies `POSTGRES_TEST_URL` by
+  creating a Neon branch per run and deleting it afterwards.
+- `tests/r2/` — mark tests `r2`, read the client and bucket from the
+  `r2_test_bucket` fixture and a unique key from `r2_test_prefix`, and never
+  from `R2_BUCKET_NAME`/`R2_ENDPOINT_URL`/etc. Reserve this marker for
+  behaviour `moto` cannot faithfully reproduce (presigned URLs actually
+  fetched, multipart upload, conditional-write conflicts) — everything else
+  (upload-then-list) stays on `moto` or the existing stub. CI supplies
+  `R2_TEST_ENDPOINT_URL`, `R2_TEST_ACCESS_KEY_ID`, `R2_TEST_SECRET_ACCESS_KEY`
+  (secrets) and `R2_TEST_BUCKET_NAME` (variable), pointing at a dedicated
+  `greader-ci` bucket, plus a per-run `R2_TEST_PREFIX` cleaned up by
+  `scripts/ci_r2_cleanup.py` after the run.
+
+With those variables unset the marked tests skip themselves, so
+`uv run pytest` stays green with no database or bucket — one command
 everywhere. See `tests/conftest.py`.
 
 ## Definition of done
