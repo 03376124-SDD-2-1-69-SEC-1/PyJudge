@@ -216,9 +216,9 @@ sgreader/
 
 ## เอกสารอ้างอิงโครงสร้างข้อมูล
 
-เอกสารอ้างอิงโครงสร้าง database layer ของโปรเจกต์ — ใช้คู่กับ
-`HANDOFF-data-modeling.md` (ไฟล์นั้นเก็บ *เหตุผล* ที่ตัดสินใจ ไฟล์นี้เก็บ
-*สถานะปัจจุบัน* ของโค้ด)
+เอกสารอ้างอิงโครงสร้าง database layer ของโปรเจกต์ — เก็บ *สถานะปัจจุบัน*
+ของโค้ด ส่วนใครแก้ไขได้บ้าง ดู `AGENTS.md` หัวข้อ "Who may change database
+and locked files"
 
 ### 1. Stack ที่ใช้จริง
 
@@ -277,14 +277,15 @@ src/greader/
 │       ├── service.py
 │       └── routes.py
 │
-├── database/                    ← ที่เดียวที่ import ORM ได้
+├── database/                    ← ของ tech lead คนเดียว ที่เดียวที่ import ORM ได้
+│   │                              (ดู AGENTS.md หัวข้อ "Who may change database and locked files")
 │   ├── __init__.py              import tables ทั้ง 2 ฝั่ง (สำคัญกับ alembic)
 │   ├── session.py               engine + get_session (sync)
 │   ├── README.md
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── tables.py            ✅ SQLModel — schema `core`
-│   │   └── assignment_repository.py   ⏳ adapter (รอ Protocol จาก teammate)
+│   │   └── assignment_repository.py   ⏳ adapter ของ tech lead (รอ Protocol จาก teammate)
 │   └── rag/
 │       ├── __init__.py
 │       └── tables.py            ✅ SQLModel — schema `rag`
@@ -305,7 +306,7 @@ alembic/                         ← root ตาม convention
 core/assignments/models.py      (dataclass)
 core/assignments/repository.py  (Protocol)
             ↑ implement โดย ↓
-database/core/assignment_repository.py   ← adapter อยู่ตรงนี้เท่านั้น
+database/core/assignment_repository.py   ← adapter ของ tech lead อยู่ตรงนี้เท่านั้น
             ↓ ใช้ ↓
 database/core/tables.py         (SQLModel)
 ```
@@ -479,9 +480,10 @@ USING hnsw (embedding vector_cosine_ops);
 **5.1 ใช้ DB ตัวเดียวกัน — สิ่งที่ต้องตกลงเพิ่ม.** ทีม 2 คนใช้ database
 เดียวกันไม่ผิดสำหรับ MVP แต่มี 3 เคสที่จะเจอแน่ๆ ถ้าไม่คุยกันก่อน:
 
-1. **`alembic downgrade` กระทบอีกคนทันที** — handoff ระบุว่า teammate
-   ไม่แตะ migration อยู่แล้ว ดังนั้นคนรัน downgrade จะมีแค่เราคนเดียว —
-   แต่ต้องบอกก่อนรัน ไม่งั้นแอปฝั่ง teammate จะพังกลางคันโดยเขาไม่รู้สาเหตุ
+1. **`alembic downgrade` กระทบอีกคนทันที** — `alembic/` และ `database/` เป็นของ
+   tech lead คนเดียว (AGENTS.md หัวข้อ "Who may change database and locked
+   files") ดังนั้นคนรัน downgrade จะมีแค่เราคนเดียว — แต่ต้องบอกก่อนรัน
+   ไม่งั้นแอปฝั่ง teammate จะพังกลางคันโดยเขาไม่รู้สาเหตุ
 2. **Test data ปนกัน** — ถ้า teammate เขียน CRUD แล้วลอง insert/delete
    assignment ข้อมูลจะปนกับของเรา ทางแก้ง่ายสุดคือตกลง convention เช่น
    ใส่ prefix ในชื่อ title ตอนเทส หรือใช้ Neon branch แยกเฉพาะตอนรัน test

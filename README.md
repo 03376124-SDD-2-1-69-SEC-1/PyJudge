@@ -201,9 +201,9 @@ tests/                  # Unit, integration, and architecture tests
 
 ## Data Model Reference
 
-Reference documentation for the project's database layer — pairs with
-`HANDOFF-data-modeling.md` (that file holds the *reasoning* behind decisions;
-this one holds the *current state* of the code).
+Reference documentation for the project's database layer — the *current
+state* of the code. For who may change it, see `AGENTS.md` § "Who may change
+database and locked files".
 
 ### 1. Actual stack
 
@@ -262,14 +262,15 @@ src/greader/
 │       ├── service.py
 │       └── routes.py
 │
-├── database/                    ← the only place allowed to import an ORM
+├── database/                    ← tech lead only; the only place allowed to import an ORM
+│   │                              (see AGENTS.md § "Who may change database and locked files")
 │   ├── __init__.py              imports tables from both sides (matters for alembic)
 │   ├── session.py               engine + get_session (sync)
 │   ├── README.md
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── tables.py            ✅ SQLModel — schema `core`
-│   │   └── assignment_repository.py   ⏳ adapter (waiting on teammate's Protocol)
+│   │   └── assignment_repository.py   ⏳ tech lead's adapter (waiting on teammate's Protocol)
 │   └── rag/
 │       ├── __init__.py
 │       └── tables.py            ✅ SQLModel — schema `rag`
@@ -290,7 +291,7 @@ Hard rule — import direction:
 core/assignments/models.py      (dataclass)
 core/assignments/repository.py  (Protocol)
             ↑ implemented by ↓
-database/core/assignment_repository.py   ← adapter lives here, and only here
+database/core/assignment_repository.py   ← tech lead's adapter lives here, and only here
             ↓ uses ↓
 database/core/tables.py         (SQLModel)
 ```
@@ -467,10 +468,11 @@ source file has been deleted.
 sharing one database is fine for an MVP, but three cases will come up if they
 aren't discussed beforehand:
 
-1. **`alembic downgrade` affects the other person immediately.** The handoff
-   already says the teammate doesn't touch migrations, so only one person runs
-   downgrade — but they must announce it first, or the teammate's app breaks
-   mid-session for no visible reason.
+1. **`alembic downgrade` affects the other person immediately.** `alembic/`
+   and `database/` belong to the tech lead alone (AGENTS.md § "Who may change
+   database and locked files"), so only one person runs downgrade — but they
+   must announce it first, or the teammate's app breaks mid-session for no
+   visible reason.
 2. **Test data collides.** If the teammate writes CRUD and inserts/deletes
    test assignments, that data mixes with ours. Easiest fix: agree a
    convention (e.g. a title prefix for test data), or use a separate Neon
