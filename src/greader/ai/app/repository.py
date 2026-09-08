@@ -27,6 +27,10 @@ class VectorRepositoryError(Exception):
     """Base error for all adapter failures exposed through this port."""
 
 
+class VectorRepositoryUnavailableError(VectorRepositoryError):
+    """Raised when the backing vector store is unavailable."""
+
+
 class DuplicateSourceError(VectorRepositoryError):
     """Raised when a source repeats the UNIQUE ``core_document_id`` value."""
 
