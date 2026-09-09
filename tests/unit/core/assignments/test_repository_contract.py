@@ -132,4 +132,3 @@ def test_test_case_belongs_to_its_parent_by_containment_alone(
     assert fetched is not None
     (test_case,) = fetched.test_cases
     assert test_case.input_data == "in"
-    assert not hasattr(test_case, "assignment_id")

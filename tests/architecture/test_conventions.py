@@ -153,6 +153,49 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
     )
 
 
+ALLOWED_ID_SUFFIX_FIELDS = {"artifact_id"}
+
+
+def _dataclass_field_names(tree: ast.Module) -> list[tuple[str, str, int]]:
+    fields = []
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for item in node.body:
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                fields.append((node.name, item.target.id, item.lineno))
+    return fields
+
+
+def test_domain_models_hold_no_table_only_fields() -> None:
+    violations = []
+    for source_file in sorted(CORE_ROOT.glob("*/models.py")):
+        tree = _parse(source_file)
+        for class_name, field_name, lineno in _dataclass_field_names(tree):
+            if field_name.endswith("_at"):
+                violations.append(
+                    f"{source_file}:{lineno}: {class_name}.{field_name} "
+                    "(looks like a persistence timestamp)"
+                )
+            elif (
+                field_name.endswith("_id")
+                and field_name not in ALLOWED_ID_SUFFIX_FIELDS
+            ):
+                violations.append(
+                    f"{source_file}:{lineno}: {class_name}.{field_name} "
+                    "(looks like a foreign-key column)"
+                )
+
+    assert not violations, (
+        "AGENTS.md 'Layering' -> models.py: the domain layer holds business "
+        "concepts only and does not carry fields that exist to satisfy a "
+        "table (see CORE-11). No field may end in `_at`; a field ending in "
+        "`_id` must be allowlisted in ALLOWED_ID_SUFFIX_FIELDS if it is a "
+        "genuinely nullable domain link rather than a foreign key mirrored "
+        "from the table. Violations:\n" + "\n".join(violations)
+    )
+
+
 def test_http_client_tests_live_under_integration() -> None:
     violations = []
     for source_file in sorted(TESTS_ROOT.rglob("*.py")):
