@@ -1,14 +1,21 @@
-"""FastAPI adapter for the Assignment API."""
+"""FastAPI adapter for the Assignment API, including its TestCase sub-resource."""
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from greader.core.assignments.models import Assignment
+from greader.core.assignments.models import Assignment, TestCase
 from greader.core.assignments.schemas import (
     AssignmentCreate,
     AssignmentResponse,
     AssignmentUpdate,
+    TestCaseCreate,
+    TestCaseResponse,
+    TestCaseUpdate,
 )
-from greader.core.assignments.service import AssignmentNotFoundError, AssignmentService
+from greader.core.assignments.service import (
+    AssignmentNotFoundError,
+    AssignmentService,
+    TestCaseNotFoundError,
+)
 
 router = APIRouter(prefix="/api/v1/assignments", tags=["Assignments"])
 
@@ -30,13 +37,36 @@ def _response(assignment: Assignment) -> AssignmentResponse:
     )
 
 
-def _raise_not_found() -> None:
+def _test_case_response(test_case: TestCase) -> TestCaseResponse:
+    """Convert a domain TestCase into its HTTP response schema."""
+    return TestCaseResponse(
+        id=test_case.id,
+        assignment_id=test_case.assignment_id,
+        input_data=test_case.input_data,
+        expected_output=test_case.expected_output,
+        is_hidden=test_case.is_hidden,
+        order_index=test_case.order_index,
+    )
+
+
+def _raise_assignment_not_found() -> None:
     """Raise the stable HTTP representation of a missing Assignment."""
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail={
             "code": "assignment_not_found",
             "message": "Assignment not found",
+        },
+    )
+
+
+def _raise_test_case_not_found() -> None:
+    """Raise the stable HTTP representation of a missing TestCase."""
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={
+            "code": "test_case_not_found",
+            "message": "Test case not found",
         },
     )
 
@@ -55,7 +85,7 @@ def get_assignment(assignment_id: int, request: Request) -> AssignmentResponse:
     try:
         return _response(service.get(assignment_id))
     except AssignmentNotFoundError:
-        _raise_not_found()
+        _raise_assignment_not_found()
 
 
 @router.post("", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
@@ -93,7 +123,7 @@ def update_assignment(
             )
         )
     except AssignmentNotFoundError:
-        _raise_not_found()
+        _raise_assignment_not_found()
 
 
 @router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -102,4 +132,104 @@ def delete_assignment(assignment_id: int, request: Request) -> None:
     service = get_service(request)
     deleted = service.delete(assignment_id)
     if not deleted:
-        _raise_not_found()
+        _raise_assignment_not_found()
+
+
+@router.post(
+    "/{assignment_id}/test-cases",
+    response_model=TestCaseResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_test_case(
+    assignment_id: int, payload: TestCaseCreate, request: Request
+) -> TestCaseResponse:
+    """Create a TestCase on an Assignment."""
+    service = get_service(request)
+    try:
+        return _test_case_response(
+            service.add_test_case(
+                assignment_id=assignment_id,
+                input_data=payload.input_data,
+                expected_output=payload.expected_output,
+                is_hidden=payload.is_hidden,
+                order_index=payload.order_index,
+            )
+        )
+    except AssignmentNotFoundError:
+        _raise_assignment_not_found()
+
+
+@router.get("/{assignment_id}/test-cases", response_model=list[TestCaseResponse])
+def list_test_cases(assignment_id: int, request: Request) -> list[TestCaseResponse]:
+    """List every TestCase belonging to an Assignment."""
+    service = get_service(request)
+    try:
+        return [
+            _test_case_response(tc) for tc in service.list_test_cases(assignment_id)
+        ]
+    except AssignmentNotFoundError:
+        _raise_assignment_not_found()
+
+
+@router.get(
+    "/{assignment_id}/test-cases/{test_case_id}", response_model=TestCaseResponse
+)
+def get_test_case(
+    assignment_id: int, test_case_id: int, request: Request
+) -> TestCaseResponse:
+    """Get one TestCase belonging to an Assignment."""
+    service = get_service(request)
+    try:
+        return _test_case_response(
+            service.get_test_case(assignment_id, test_case_id)
+        )
+    except AssignmentNotFoundError:
+        _raise_assignment_not_found()
+    except TestCaseNotFoundError:
+        _raise_test_case_not_found()
+
+
+@router.put(
+    "/{assignment_id}/test-cases/{test_case_id}", response_model=TestCaseResponse
+)
+def update_test_case(
+    assignment_id: int,
+    test_case_id: int,
+    payload: TestCaseUpdate,
+    request: Request,
+) -> TestCaseResponse:
+    """Update supplied TestCase fields and retain omitted values."""
+    service = get_service(request)
+    try:
+        return _test_case_response(
+            service.update_test_case(
+                assignment_id=assignment_id,
+                test_case_id=test_case_id,
+                input_data=payload.input_data,
+                expected_output=payload.expected_output,
+                is_hidden=payload.is_hidden,
+                order_index=payload.order_index,
+            )
+        )
+    except AssignmentNotFoundError:
+        _raise_assignment_not_found()
+    except TestCaseNotFoundError:
+        _raise_test_case_not_found()
+
+
+@router.delete(
+    "/{assignment_id}/test-cases/{test_case_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_test_case(
+    assignment_id: int, test_case_id: int, request: Request
+) -> None:
+    """Delete a TestCase belonging to an Assignment."""
+    service = get_service(request)
+    try:
+        deleted = service.delete_test_case(assignment_id, test_case_id)
+    except AssignmentNotFoundError:
+        _raise_assignment_not_found()
+        return
+    if not deleted:
+        _raise_test_case_not_found()

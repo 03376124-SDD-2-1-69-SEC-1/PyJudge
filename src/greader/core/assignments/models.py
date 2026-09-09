@@ -1,4 +1,6 @@
-from dataclasses import dataclass
+"""Domain representation of an Assignment and its embedded TestCases."""
+
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
@@ -18,14 +20,19 @@ class TestCase:
 
 @dataclass(frozen=True, slots=True)
 class Assignment:
-    """Domain representation of a programming Assignment."""
+    """Domain representation of a programming Assignment.
+
+    Test cases are generated, reviewed, and approved together with their
+    Assignment, so they live on this aggregate rather than as a separate
+    root — see docs/task-scope.md for the CORE-04/CORE-05 integration.
+    """
 
     id: int | None
     title: str
     problem_statement: str
     difficulty: str
-    metadata: dict[str, object]
+    metadata: dict[str, object] = field(default_factory=dict)
     artifact_id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
-    test_cases: list[TestCase] | None = None
+    test_cases: list[TestCase] = field(default_factory=list)

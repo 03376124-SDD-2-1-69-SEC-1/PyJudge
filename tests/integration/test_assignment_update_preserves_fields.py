@@ -39,12 +39,6 @@ async def client():
         yield test_client
 
 
-@pytest.mark.xfail(
-    reason="Assignments CRUD (CORE-04) not merged to dev yet -- flips to an "
-    "unexpected pass, and this must be un-xfailed, the moment it lands with "
-    "the merge-on-update fix.",
-    strict=True,
-)
 @pytest.mark.anyio
 async def test_title_only_update_preserves_test_cases_and_artifact_id(
     client: AsyncClient,

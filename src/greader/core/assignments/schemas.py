@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class AssignmentCreate(BaseModel):
@@ -33,7 +33,31 @@ class AssignmentResponse(BaseModel):
     metadata: dict[str, object] = Field(default_factory=dict)
     artifact_id: int | None = None
 
-    @field_validator("metadata", mode="before")
-    def ensure_metadata_dict(cls, v: object) -> dict[str, object]:
-        """Normalize invalid or absent metadata values to an empty mapping."""
-        return v if isinstance(v, dict) else {}
+
+class TestCaseCreate(BaseModel):
+    """Fields required to create a TestCase on an Assignment."""
+
+    input_data: str = Field(..., min_length=1)
+    expected_output: str = Field(..., min_length=1)
+    is_hidden: bool = False
+    order_index: int = 0
+
+
+class TestCaseUpdate(BaseModel):
+    """Optional replacement fields for an existing TestCase."""
+
+    input_data: str | None = Field(default=None, min_length=1)
+    expected_output: str | None = Field(default=None, min_length=1)
+    is_hidden: bool | None = None
+    order_index: int | None = None
+
+
+class TestCaseResponse(BaseModel):
+    """Public representation of a TestCase returned by the API."""
+
+    id: int
+    assignment_id: int
+    input_data: str
+    expected_output: str
+    is_hidden: bool
+    order_index: int
