@@ -33,7 +33,7 @@ async def _create_assignment(client: AsyncClient) -> int:
     return response.json()["id"]
 
 
-def test_case_payload() -> dict[str, object]:
+def valid_test_case_payload() -> dict[str, object]:
     """Return a valid test case request body."""
     return {
         "input_data": "1 2",
@@ -49,7 +49,7 @@ async def test_create_test_case(client: AsyncClient) -> None:
 
     response = await client.post(
         f"/api/v1/assignments/{assignment_id}/test-cases",
-        json=test_case_payload(),
+        json=valid_test_case_payload(),
     )
 
     assert response.status_code == 201
@@ -63,7 +63,7 @@ async def test_create_test_case_on_missing_assignment_returns_stable_error(
     client: AsyncClient,
 ) -> None:
     response = await client.post(
-        "/api/v1/assignments/99999/test-cases", json=test_case_payload()
+        "/api/v1/assignments/99999/test-cases", json=valid_test_case_payload()
     )
 
     assert response.status_code == 404
@@ -74,7 +74,8 @@ async def test_create_test_case_on_missing_assignment_returns_stable_error(
 async def test_list_test_cases(client: AsyncClient) -> None:
     assignment_id = await _create_assignment(client)
     await client.post(
-        f"/api/v1/assignments/{assignment_id}/test-cases", json=test_case_payload()
+        f"/api/v1/assignments/{assignment_id}/test-cases",
+        json=valid_test_case_payload(),
     )
 
     response = await client.get(f"/api/v1/assignments/{assignment_id}/test-cases")
@@ -87,7 +88,8 @@ async def test_list_test_cases(client: AsyncClient) -> None:
 async def test_get_test_case(client: AsyncClient) -> None:
     assignment_id = await _create_assignment(client)
     created = await client.post(
-        f"/api/v1/assignments/{assignment_id}/test-cases", json=test_case_payload()
+        f"/api/v1/assignments/{assignment_id}/test-cases",
+        json=valid_test_case_payload(),
     )
     test_case_id = created.json()["id"]
 
@@ -103,9 +105,7 @@ async def test_get_test_case(client: AsyncClient) -> None:
 async def test_get_missing_test_case_returns_stable_error(client: AsyncClient) -> None:
     assignment_id = await _create_assignment(client)
 
-    response = await client.get(
-        f"/api/v1/assignments/{assignment_id}/test-cases/99999"
-    )
+    response = await client.get(f"/api/v1/assignments/{assignment_id}/test-cases/99999")
 
     assert response.status_code == 404
     assert response.json()["detail"]["code"] == "test_case_not_found"
@@ -115,7 +115,8 @@ async def test_get_missing_test_case_returns_stable_error(client: AsyncClient) -
 async def test_update_test_case(client: AsyncClient) -> None:
     assignment_id = await _create_assignment(client)
     created = await client.post(
-        f"/api/v1/assignments/{assignment_id}/test-cases", json=test_case_payload()
+        f"/api/v1/assignments/{assignment_id}/test-cases",
+        json=valid_test_case_payload(),
     )
     test_case_id = created.json()["id"]
 
@@ -139,7 +140,8 @@ async def test_update_test_case_title_only_preserves_other_fields(
 ) -> None:
     assignment_id = await _create_assignment(client)
     created = await client.post(
-        f"/api/v1/assignments/{assignment_id}/test-cases", json=test_case_payload()
+        f"/api/v1/assignments/{assignment_id}/test-cases",
+        json=valid_test_case_payload(),
     )
     test_case_id = created.json()["id"]
 
@@ -159,7 +161,8 @@ async def test_update_test_case_title_only_preserves_other_fields(
 async def test_delete_test_case(client: AsyncClient) -> None:
     assignment_id = await _create_assignment(client)
     created = await client.post(
-        f"/api/v1/assignments/{assignment_id}/test-cases", json=test_case_payload()
+        f"/api/v1/assignments/{assignment_id}/test-cases",
+        json=valid_test_case_payload(),
     )
     test_case_id = created.json()["id"]
 

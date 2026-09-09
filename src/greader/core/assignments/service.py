@@ -1,5 +1,7 @@
 """Assignment use cases independent from HTTP and database technology."""
 
+from __future__ import annotations
+
 from greader.core.assignments.models import Assignment, TestCase
 from greader.core.assignments.repository import AssignmentRepository
 
@@ -130,7 +132,9 @@ class AssignmentService:
             expected_output=expected_output
             if expected_output is not None
             else existing_test_case.expected_output,
-            is_hidden=is_hidden if is_hidden is not None else existing_test_case.is_hidden,
+            is_hidden=is_hidden
+            if is_hidden is not None
+            else existing_test_case.is_hidden,
             order_index=order_index
             if order_index is not None
             else existing_test_case.order_index,

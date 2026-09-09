@@ -180,9 +180,7 @@ def get_test_case(
     """Get one TestCase belonging to an Assignment."""
     service = get_service(request)
     try:
-        return _test_case_response(
-            service.get_test_case(assignment_id, test_case_id)
-        )
+        return _test_case_response(service.get_test_case(assignment_id, test_case_id))
     except AssignmentNotFoundError:
         _raise_assignment_not_found()
     except TestCaseNotFoundError:
@@ -221,9 +219,7 @@ def update_test_case(
     "/{assignment_id}/test-cases/{test_case_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_test_case(
-    assignment_id: int, test_case_id: int, request: Request
-) -> None:
+def delete_test_case(assignment_id: int, test_case_id: int, request: Request) -> None:
     """Delete a TestCase belonging to an Assignment."""
     service = get_service(request)
     try:
