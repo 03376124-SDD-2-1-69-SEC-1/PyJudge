@@ -18,7 +18,6 @@ def test_title_only_update_preserves_artifact_and_test_cases() -> None:
             test_cases=[
                 TestCase(
                     id=1,
-                    assignment_id=1,
                     input_data="1",
                     expected_output="1",
                 )

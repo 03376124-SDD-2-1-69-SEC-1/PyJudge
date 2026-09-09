@@ -55,7 +55,7 @@ async def test_create_test_case(client: AsyncClient) -> None:
     assert response.status_code == 201
     body = response.json()
     assert body["input_data"] == "1 2"
-    assert body["assignment_id"] == assignment_id
+    assert "assignment_id" not in body
 
 
 @pytest.mark.anyio

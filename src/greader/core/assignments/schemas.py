@@ -56,7 +56,6 @@ class TestCaseResponse(BaseModel):
     """Public representation of a TestCase returned by the API."""
 
     id: int
-    assignment_id: int
     input_data: str
     expected_output: str
     is_hidden: bool

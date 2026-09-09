@@ -1,21 +1,17 @@
 """Domain representation of an Assignment and its embedded TestCases."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
 
 
 @dataclass(frozen=True, slots=True)
 class TestCase:
     """A single executable test case belonging to an Assignment."""
 
-    assignment_id: int
     input_data: str
     expected_output: str
     id: int | None = None
     is_hidden: bool = False
     order_index: int = 0
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +33,4 @@ class Assignment:
     id: int | None = None
     metadata: dict[str, object] = field(default_factory=dict)
     artifact_id: int | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
     test_cases: list[TestCase] = field(default_factory=list)

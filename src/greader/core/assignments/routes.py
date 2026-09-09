@@ -41,7 +41,6 @@ def _test_case_response(test_case: TestCase) -> TestCaseResponse:
     """Convert a domain TestCase into its HTTP response schema."""
     return TestCaseResponse(
         id=test_case.id,
-        assignment_id=test_case.assignment_id,
         input_data=test_case.input_data,
         expected_output=test_case.expected_output,
         is_hidden=test_case.is_hidden,
