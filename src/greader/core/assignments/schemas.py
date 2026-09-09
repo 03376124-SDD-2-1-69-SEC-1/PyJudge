@@ -1,12 +1,11 @@
 """Assignment HTTP-contract schemas.
 
-Owner: Assignment teammate.
 Keep transport validation separate from the domain model.
 """
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AssignmentCreate(BaseModel):
@@ -32,7 +31,3 @@ class AssignmentResponse(BaseModel):
     artifact_id: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
-
-    @field_validator("metadata", mode="before")
-    def ensure_metadata_dict(cls, v: Any) -> dict[str, Any]:
-        return v if isinstance(v, dict) else {}
