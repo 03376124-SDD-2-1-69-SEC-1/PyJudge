@@ -20,6 +20,7 @@ from greader.core.assignments.routes import router as assignment_router
 from greader.core.assignments.service import AssignmentService
 from greader.core.generation.repository import GenerationClient
 from greader.core.generation.routes import router as generation_router
+from greader.core.test_cases.routes import router as test_cases_router
 from greader.core.topics.repository import InMemoryTopicRepository, TopicRepository
 from greader.core.topics.routes import router as topic_router
 from greader.core.topics.service import TopicService
@@ -116,3 +117,5 @@ def create_app(
 
 
 app = create_app()
+
+app.include_router(test_cases_router)

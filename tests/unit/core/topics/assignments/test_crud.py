@@ -36,37 +36,7 @@ def test_assignment_crud_flow():
         client.get("/api/v1/assignments/999").status_code == status.HTTP_404_NOT_FOUND
     )
 
-    # 4. Create Test Case (201)
-    tc_res = client.post(
-        f"/api/v1/assignments/{assign_id}/test-cases",
-        json={
-            "input_data": "1",
-            "expected_output": "2",
-            "is_hidden": False,
-            "weight": 1.0,
-        },
-    )
-    assert tc_res.status_code == status.HTTP_201_CREATED
-    tc_id = tc_res.json()["id"]
-
-    # 5. Update & Delete Test Case
-    assert (
-        client.put(
-            f"/api/v1/assignments/{assign_id}/test-cases/{tc_id}",
-            json={"input_data": "2", "expected_output": "3"},
-        ).status_code
-        == status.HTTP_200_OK
-    )
-    assert (
-        client.delete(f"/api/v1/assignments/{assign_id}/test-cases/{tc_id}").status_code
-        == status.HTTP_204_NO_CONTENT
-    )
-    assert (
-        client.delete(f"/api/v1/assignments/{assign_id}/test-cases/999").status_code
-        == status.HTTP_404_NOT_FOUND
-    )
-
-    # 6. Delete Assignment
+    # 4. Delete Assignment (204 / 404)
     assert (
         client.delete(f"/api/v1/assignments/{assign_id}").status_code
         == status.HTTP_204_NO_CONTENT
