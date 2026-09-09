@@ -1,22 +1,34 @@
+"""Lazy synchronous database infrastructure."""
+
 import os
 from collections.abc import Generator
+from functools import lru_cache
 
 from dotenv import load_dotenv
+from sqlalchemy.engine import Engine, make_url
+from sqlalchemy.exc import ArgumentError
 from sqlmodel import Session, create_engine
 
-load_dotenv()
 
-# Neon pooled connection. Set in .env:
-#   DATABASE_URL=postgresql+psycopg://user:pass@host/db?sslmode=require
-# Must use the +psycopg driver tag: only psycopg (v3) is a project dependency,
-# and SQLAlchemy defaults a bare "postgresql://" URL to psycopg2.
-DATABASE_URL = os.environ["DATABASE_URL"]
-
-engine = create_engine(DATABASE_URL, echo=False)
+@lru_cache(maxsize=1)
+def get_engine() -> Engine:
+    """Configure the production engine only when a database session is needed."""
+    load_dotenv()
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is required")
+    try:
+        url = make_url(database_url)
+    except ArgumentError as exc:
+        raise RuntimeError("DATABASE_URL must use postgresql+psycopg://") from exc
+    if url.drivername != "postgresql+psycopg":
+        raise RuntimeError("DATABASE_URL must use postgresql+psycopg://")
+    return create_engine(url, echo=False)
 
 
 def get_session() -> Generator[Session, None, None]:
-    with Session(engine) as session:
+    """Open a session on demand without eager engine creation."""
+    with Session(get_engine()) as session:
         yield session
 
 

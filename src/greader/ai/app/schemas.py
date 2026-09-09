@@ -24,11 +24,10 @@ class KnowledgeSourceCreate(BaseModel):
     core_document_id: StrictInt
     r2_object_key: str
     content_hash: str
-    status: str = "pending"
     embedding_model: str | None = None
     embedding_dim: StrictInt | None = None
     metadata: dict[str, object] = Field(default_factory=dict)
-    chunks: list[KnowledgeChunkCreate]
+    chunks: list[KnowledgeChunkCreate] = Field(min_length=1)
 
 
 class KnowledgeSourceResponse(BaseModel):

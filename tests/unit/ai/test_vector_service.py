@@ -1,6 +1,7 @@
 """Business validation tests for vector storage and search."""
 
 from dataclasses import replace
+from unittest.mock import Mock
 
 import pytest
 
@@ -57,6 +58,21 @@ def test_create_source_with_chunks_returns_database_shaped_ids() -> None:
     assert result.source.id == 1
     assert [chunk.id for chunk in result.chunks] == [1, 2]
     assert {chunk.source_id for chunk in result.chunks} == {result.source.id}
+
+
+def test_empty_chunks_are_rejected_before_repository_call() -> None:
+    repository = Mock()
+    with pytest.raises(VectorValidationError, match="at least one chunk"):
+        VectorService(repository).create_source_with_chunks(_source(), ())
+    repository.create_source_with_chunks.assert_not_called()
+
+
+def test_empty_chunks_do_not_consume_core_document_id() -> None:
+    service = _service()
+    with pytest.raises(VectorValidationError):
+        service.create_source_with_chunks(_source(), ())
+    result = service.create_source_with_chunks(_source(), (_chunk(),))
+    assert result.source.core_document_id == 1
 
 
 @pytest.mark.parametrize(

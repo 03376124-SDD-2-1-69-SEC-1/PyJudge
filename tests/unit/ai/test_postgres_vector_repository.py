@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
 from greader.ai.app.models import (
     ChunkSearchResult,
@@ -25,7 +25,7 @@ from greader.ai.app.repository import (
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
-from greader.ai.database.vector_repository import PostgresVectorRepository
+from greader.database.rag.vector_repository import PostgresVectorRepository
 
 MODEL = "model-a"
 
@@ -92,6 +92,12 @@ def _result_for_one(row: dict[str, object]) -> MagicMock:
     return result
 
 
+def _result_for_many(rows: list[dict[str, object]]) -> MagicMock:
+    result = MagicMock()
+    result.mappings.return_value.all.return_value = rows
+    return result
+
+
 def _repository(session: MagicMock) -> PostgresVectorRepository:
     @contextmanager
     def session_factory():
@@ -110,8 +116,7 @@ def test_creates_source_and_chunks_in_one_commit() -> None:
     session = MagicMock()
     session.execute.side_effect = [
         _result_for_one(_source_row()),
-        _result_for_one(_chunk_row(0)),
-        _result_for_one(_chunk_row(1)),
+        _result_for_many([_chunk_row(1), _chunk_row(0)]),
     ]
 
     result = _repository(session).create_source_with_chunks(
@@ -156,7 +161,7 @@ def test_creates_source_and_chunks_in_one_commit() -> None:
             ),
         ),
     )
-    assert session.execute.call_count == 3
+    assert session.execute.call_count == 2
     source_params = session.execute.call_args_list[0].args[0].compile().params
     first_chunk_params = session.execute.call_args_list[1].args[0].compile().params
     assert source_params == {
@@ -168,20 +173,56 @@ def test_creates_source_and_chunks_in_one_commit() -> None:
         "r2_object_key": "documents/7.pdf",
         "status": "pending",
     }
-    assert first_chunk_params == {
-        "chunk_index": 0,
-        "content_hash": "chunk-0",
-        "embedding": list(_embedding()),
-        "embedding_model": MODEL,
-        "metadata": {"content_type": "lesson"},
-        "page": 1,
-        "source_id": 11,
-        "text": "chunk 0",
-        "token_count": 2,
-    }
+    for index in (0, 1):
+        expected = _chunk_row(index)
+        expected.pop("id")
+        assert {
+            key.removesuffix(f"_m{index}"): value
+            for key, value in first_chunk_params.items()
+            if key.endswith(f"_m{index}")
+        } == expected
     session.flush.assert_not_called()
     session.commit.assert_called_once_with()
     session.rollback.assert_not_called()
+
+
+def test_batch_preserves_input_order_independent_of_index_and_returning_order():
+    session = MagicMock()
+    session.execute.side_effect = [
+        _result_for_one(_source_row()),
+        _result_for_many([_chunk_row(0), _chunk_row(2), _chunk_row(1)]),
+    ]
+    result = _repository(session).create_source_with_chunks(
+        _source(), (_chunk(2), _chunk(0), _chunk(1))
+    )
+    assert [chunk.content_hash for chunk in result.chunks] == [
+        "chunk-2",
+        "chunk-0",
+        "chunk-1",
+    ]
+    assert [chunk.id for chunk in result.chunks] == [23, 21, 22]
+    assert session.execute.call_count == 2
+
+
+def test_two_thousand_chunks_use_one_batch_statement():
+    session = MagicMock()
+    session.execute.side_effect = [
+        _result_for_one(_source_row()),
+        _result_for_many([_chunk_row(index) for index in reversed(range(2000))]),
+    ]
+    chunks = tuple(_chunk(index) for index in range(2000))
+    result = _repository(session).create_source_with_chunks(_source(), chunks)
+    assert len(result.chunks) == 2000
+    assert [chunk.content_hash for chunk in result.chunks] == [
+        chunk.content_hash for chunk in chunks
+    ]
+    assert session.execute.call_count == 2
+    statement = session.execute.call_args.args[0]
+    compiled = statement.compile(dialect=postgresql.dialect())
+    assert str(compiled).count("INSERT INTO") == 1
+    assert "RETURNING" in str(compiled)
+    assert compiled.params["content_hash_m1999"] == "chunk-1999"
+    session.commit.assert_called_once_with()
 
 
 @pytest.mark.parametrize(
@@ -247,7 +288,7 @@ def test_search_maps_results_and_builds_model_scoped_ordered_query() -> None:
             "source_id": 11,
             "page": 1,
             "text": "chunk 0",
-            "score": 0.75,
+            "distance": 0.25,
         }
     ]
     session.execute.return_value = search_result
@@ -269,12 +310,30 @@ def test_search_maps_results_and_builds_model_scoped_ordered_query() -> None:
     assert "knowledge_chunks.embedding IS NOT NULL" in sql
     assert "knowledge_chunks.embedding_model =" in sql
     assert " <=> " in sql
-    assert " AS score" in sql
-    assert "ORDER BY score DESC, rag.knowledge_chunks.id ASC" in sql
+    assert " AS distance" in sql
+    assert "ORDER BY distance ASC, rag.knowledge_chunks.id ASC" in sql
+    assert "DESC" not in sql
+    assert " - " not in sql
     assert "LIMIT" in sql
     assert MODEL in compiled.params.values()
-    assert 1.0 in compiled.params.values()
+    assert list(_embedding()) in compiled.params.values()
     assert 5 in compiled.params.values()
+
+
+@pytest.mark.parametrize("distance", [0.0, 0.25, 1.0, 2.0])
+def test_search_converts_cosine_distance_to_similarity(distance: float) -> None:
+    session = MagicMock()
+    session.execute.return_value.mappings.return_value.all.return_value = [
+        {
+            "chunk_id": 1,
+            "source_id": 2,
+            "page": None,
+            "text": "text",
+            "distance": distance,
+        }
+    ]
+    results = _repository(session).search(_embedding(), embedding_model=MODEL, limit=1)
+    assert results[0].score == pytest.approx(1.0 - distance)
 
 
 def test_search_returns_empty_list() -> None:
@@ -333,4 +392,27 @@ def test_commit_failure_rolls_back_and_translates() -> None:
     session.commit.side_effect = OperationalError("COMMIT", {}, Exception("offline"))
     with pytest.raises(VectorRepositoryUnavailableError):
         _repository(session).create_source_with_chunks(_source(), ())
+    session.rollback.assert_called_once_with()
+
+
+@pytest.mark.parametrize("operation", ["create", "search"])
+@pytest.mark.parametrize("unexpected", [RuntimeError("bug"), TypeError("bug")])
+def test_unexpected_exceptions_are_not_mislabeled_unavailable(operation, unexpected):
+    session = MagicMock()
+    session.execute.side_effect = unexpected
+    repository = _repository(session)
+    with pytest.raises(type(unexpected)) as raised:
+        if operation == "create":
+            repository.create_source_with_chunks(_source(), (_chunk(),))
+        else:
+            repository.search(_embedding(), embedding_model=MODEL, limit=1)
+    assert raised.value is unexpected
+
+
+def test_sql_programming_error_is_not_mislabeled_unavailable():
+    session = MagicMock()
+    session.execute.side_effect = ProgrammingError("private SQL", {}, Exception("bug"))
+    with pytest.raises(VectorRepositoryError) as raised:
+        _repository(session).search(_embedding(), embedding_model=MODEL, limit=1)
+    assert not isinstance(raised.value, VectorRepositoryUnavailableError)
     session.rollback.assert_called_once_with()

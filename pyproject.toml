@@ -37,8 +37,13 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--strict-markers"
 filterwarnings = [
     "ignore::pytest.PytestCollectionWarning",
+]
+markers = [
+    "postgres: talks to a real database through POSTGRES_TEST_URL. Skipped when that variable is unset; see tests/conftest.py",
+    "r2: talks to a real R2 bucket through R2_TEST_*. Skipped when those variables are unset; see tests/conftest.py",
 ]
 
 [tool.coverage.run]

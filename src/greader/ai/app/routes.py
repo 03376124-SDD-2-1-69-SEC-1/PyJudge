@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/v1", tags=["vector-storage"])
 
 _APPLICATION_ERROR_RESPONSES = {
     409: {"model": ApplicationErrorResponse},
+    422: {"model": ApplicationErrorResponse},
     503: {"model": ApplicationErrorResponse},
 }
 
@@ -109,7 +110,6 @@ def create_knowledge_source(
         core_document_id=payload.core_document_id,
         r2_object_key=payload.r2_object_key,
         content_hash=payload.content_hash,
-        status=payload.status,
         embedding_model=payload.embedding_model,
         embedding_dim=payload.embedding_dim,
         metadata=payload.metadata,
@@ -152,7 +152,10 @@ def create_knowledge_source(
 @router.post(
     "/knowledge-chunks/search",
     response_model=list[ChunkSearchResultResponse],
-    responses={503: {"model": ApplicationErrorResponse}},
+    responses={
+        422: {"model": ApplicationErrorResponse},
+        503: {"model": ApplicationErrorResponse},
+    },
 )
 def search_knowledge_chunks(
     request: Request, payload: ChunkSearchRequest

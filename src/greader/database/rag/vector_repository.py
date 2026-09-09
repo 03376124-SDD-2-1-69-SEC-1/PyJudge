@@ -9,15 +9,13 @@ from collections.abc import Callable, Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from typing import Any
 
-from sqlalchemy import insert, literal, select
-from sqlalchemy.engine import make_url
+from sqlalchemy import insert, select
 from sqlalchemy.exc import (
-    ArgumentError,
     IntegrityError,
     OperationalError,
     SQLAlchemyError,
 )
-from sqlmodel import Session, create_engine
+from sqlmodel import Session
 
 from greader.ai.app.models import (
     ChunkSearchResult,
@@ -44,18 +42,6 @@ CHUNK_TABLE = KnowledgeChunkTable.__table__
 SessionFactory = Callable[[], AbstractContextManager[Session]]
 
 
-def create_postgres_repository(database_url: str) -> "PostgresVectorRepository":
-    """Configure the adapter without opening a database connection."""
-    try:
-        parsed_url = make_url(database_url)
-    except ArgumentError as exc:
-        raise RuntimeError("DATABASE_URL must use postgresql+psycopg://") from exc
-    if parsed_url.drivername != "postgresql+psycopg":
-        raise RuntimeError("DATABASE_URL must use postgresql+psycopg://")
-    engine = create_engine(parsed_url, echo=False)
-    return PostgresVectorRepository(lambda: Session(engine))
-
-
 class PostgresVectorRepository:
     """Persist and search vectors through synchronous SQLAlchemy sessions."""
 
@@ -72,13 +58,20 @@ class PostgresVectorRepository:
             try:
                 source_row = session.execute(_source_insert(source)).mappings().one()
                 source_id = source_row["id"]
-                chunk_rows = tuple(
-                    session.execute(_chunk_insert(source_id, chunk)).mappings().one()
-                    for chunk in chunks
+                chunk_rows = (
+                    session.execute(_chunks_insert(source_id, chunks)).mappings().all()
+                    if chunks
+                    else []
                 )
+                # RETURNING does not promise input order. The source/hash pair
+                # is unique, so correlate by hash before constructing the result.
+                rows_by_hash = {row["content_hash"]: row for row in chunk_rows}
                 result = SourceCreationResult(
                     source=_source_from_row(source_row),
-                    chunks=tuple(_chunk_from_row(row) for row in chunk_rows),
+                    chunks=tuple(
+                        _chunk_from_row(rows_by_hash[chunk.content_hash])
+                        for chunk in chunks
+                    ),
                 )
                 session.commit()
                 return result
@@ -122,7 +115,7 @@ class PostgresVectorRepository:
                 source_id=row["source_id"],
                 page=row["page"],
                 text=row["text"],
-                score=float(row["score"]),
+                score=1.0 - float(row["distance"]),
             )
             for row in rows
         ]
@@ -155,40 +148,48 @@ def _source_insert(source: NewKnowledgeSource):
     )
 
 
-def _chunk_insert(source_id: int, chunk: NewKnowledgeChunk):
+def _chunks_insert(source_id: int, chunks: tuple[NewKnowledgeChunk, ...]):
     return (
         insert(CHUNK_TABLE)
         .values(
-            source_id=source_id,
-            chunk_index=chunk.chunk_index,
-            page=chunk.page,
-            text=chunk.text,
-            token_count=chunk.token_count,
-            content_hash=chunk.content_hash,
-            embedding_model=chunk.embedding_model,
-            metadata=dict(chunk.metadata),
-            embedding=list(chunk.embedding) if chunk.embedding is not None else None,
+            [
+                {
+                    "source_id": source_id,
+                    "chunk_index": chunk.chunk_index,
+                    "page": chunk.page,
+                    "text": chunk.text,
+                    "token_count": chunk.token_count,
+                    "content_hash": chunk.content_hash,
+                    "embedding_model": chunk.embedding_model,
+                    "metadata": dict(chunk.metadata),
+                    "embedding": (
+                        list(chunk.embedding) if chunk.embedding is not None else None
+                    ),
+                }
+                for chunk in chunks
+            ]
         )
         .returning(*CHUNK_TABLE.c)
     )
 
 
 def _search_statement(embedding: Embedding, *, embedding_model: str, limit: int):
-    cosine_distance = CHUNK_TABLE.c.embedding.cosine_distance(list(embedding))
-    score = (literal(1.0) - cosine_distance).label("score")
+    distance = CHUNK_TABLE.c.embedding.cosine_distance(list(embedding)).label(
+        "distance"
+    )
     return (
         select(
             CHUNK_TABLE.c.id.label("chunk_id"),
             CHUNK_TABLE.c.source_id,
             CHUNK_TABLE.c.page,
             CHUNK_TABLE.c.text,
-            score,
+            distance,
         )
         .where(
             CHUNK_TABLE.c.embedding.is_not(None),
             CHUNK_TABLE.c.embedding_model == embedding_model,
         )
-        .order_by(score.desc(), CHUNK_TABLE.c.id.asc())
+        .order_by(distance.asc(), CHUNK_TABLE.c.id.asc())
         .limit(limit)
     )
 

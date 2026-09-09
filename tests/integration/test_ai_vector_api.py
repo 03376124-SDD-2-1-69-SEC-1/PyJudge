@@ -1,4 +1,4 @@
-"""HTTP integration tests for the standalone AI vector API."""
+"""HTTP integration tests for vector endpoints in the main application."""
 
 import importlib
 from collections.abc import AsyncIterator
@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.ai.app import main as ai_main
+from greader import main as ai_main
 from greader.ai.app.models import (
     ChunkSearchResult,
     Embedding,
@@ -19,7 +19,6 @@ from greader.ai.app.repository import (
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
-from greader.ai.database import vector_repository as postgres_adapter
 
 MODEL_A = "model-a"
 MODEL_B = "model-b"
@@ -70,7 +69,7 @@ def _search_payload(*, model: str = MODEL_A, top_k: int = 10) -> dict[str, objec
 
 @pytest.fixture()
 async def client() -> AsyncIterator[AsyncClient]:
-    application = ai_main.create_app(repository=InMemoryVectorRepository())
+    application = ai_main.create_app(vector_repository=InMemoryVectorRepository())
     transport = ASGITransport(app=application)
     async with AsyncClient(
         transport=transport,
@@ -129,6 +128,19 @@ async def test_search_returns_only_committed_result_fields(
 
 
 @pytest.mark.anyio
+async def test_client_cannot_set_source_status(client: AsyncClient) -> None:
+    payload = _source_payload()
+    payload["status"] = "ready"
+    response = await client.post("/api/v1/knowledge-sources", json=payload)
+    assert response.status_code == 201
+    assert response.json()["source"]["status"] == "pending"
+    document = (await client.get("/openapi.json")).json()
+    schemas = document["components"]["schemas"]
+    assert "status" not in schemas["KnowledgeSourceCreate"]["properties"]
+    assert "status" in schemas["KnowledgeSourceResponse"]["properties"]
+
+
+@pytest.mark.anyio
 async def test_search_returns_empty_list(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/knowledge-chunks/search", json=_search_payload()
@@ -136,6 +148,18 @@ async def test_search_returns_empty_list(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+@pytest.mark.anyio
+async def test_empty_chunks_leave_document_available_for_ingestion(
+    client: AsyncClient,
+) -> None:
+    empty = _source_payload(chunk_hashes=())
+    response = await client.post("/api/v1/knowledge-sources", json=empty)
+    assert response.status_code == 422
+    created = await client.post("/api/v1/knowledge-sources", json=_source_payload())
+    assert created.status_code == 201
+    assert created.json()["source"]["core_document_id"] == empty["core_document_id"]
 
 
 @pytest.mark.anyio
@@ -176,7 +200,7 @@ async def test_service_vector_validation_uses_stable_error_shape(
 
 
 @pytest.mark.anyio
-async def test_request_structure_validation_keeps_fastapi_error_shape(
+async def test_request_structure_validation_uses_application_error_shape(
     client: AsyncClient,
 ) -> None:
     payload = _search_payload()
@@ -185,7 +209,8 @@ async def test_request_structure_validation_keeps_fastapi_error_shape(
     response = await client.post("/api/v1/knowledge-chunks/search", json=payload)
 
     assert response.status_code == 422
-    assert isinstance(response.json()["detail"], list)
+    assert response.json()["detail"]["code"] == "request_validation_error"
+    assert isinstance(response.json()["detail"]["message"], str)
 
 
 @pytest.mark.anyio
@@ -198,7 +223,7 @@ async def test_boolean_vector_value_is_a_request_structure_error(
     response = await client.post("/api/v1/knowledge-chunks/search", json=payload)
 
     assert response.status_code == 422
-    assert isinstance(response.json()["detail"], list)
+    assert response.json()["detail"]["code"] == "request_validation_error"
 
 
 @pytest.mark.anyio
@@ -249,7 +274,7 @@ async def test_duplicate_chunks_are_atomic_and_return_conflict(
 
 
 class _FailingRepository:
-    def __init__(self, error_type: type[VectorRepositoryError]) -> None:
+    def __init__(self, error_type: type[Exception]) -> None:
         self._error_type = error_type
 
     def create_source_with_chunks(
@@ -281,7 +306,7 @@ async def test_repository_unavailable_returns_safe_503(
     path: str, payload: dict[str, object]
 ) -> None:
     application = ai_main.create_app(
-        repository=_FailingRepository(VectorRepositoryUnavailableError)
+        vector_repository=_FailingRepository(VectorRepositoryUnavailableError)
     )
     transport = ASGITransport(app=application)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -298,15 +323,23 @@ async def test_repository_unavailable_returns_safe_503(
 
 
 @pytest.mark.anyio
-async def test_other_repository_errors_remain_safe_internal_errors() -> None:
-    application = ai_main.create_app(
-        repository=_FailingRepository(VectorRepositoryError)
-    )
+@pytest.mark.parametrize(
+    "error_type", [VectorRepositoryError, RuntimeError, ValueError]
+)
+@pytest.mark.parametrize(
+    ("path", "payload"),
+    [
+        ("/api/v1/knowledge-sources", _source_payload()),
+        ("/api/v1/knowledge-chunks/search", _search_payload()),
+    ],
+)
+async def test_other_repository_errors_remain_safe_internal_errors(
+    error_type, path, payload
+) -> None:
+    application = ai_main.create_app(vector_repository=_FailingRepository(error_type))
     transport = ASGITransport(app=application, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post(
-            "/api/v1/knowledge-chunks/search", json=_search_payload()
-        )
+        response = await client.post(path, json=payload)
 
     assert response.status_code == 500
     assert response.text == "Internal Server Error"
@@ -321,6 +354,8 @@ async def test_openapi_registers_vector_endpoints_and_schemas(
 
     assert response.status_code == 200
     document = response.json()
+    assert (await client.get("/docs")).status_code == 200
+    assert "/api/v1/topics" in document["paths"]
     assert set(document["paths"]["/api/v1/knowledge-sources"]) == {"post"}
     assert set(document["paths"]["/api/v1/knowledge-chunks/search"]) == {"post"}
     schemas = document["components"]["schemas"]
@@ -335,56 +370,6 @@ def test_import_and_test_app_construction_need_no_credentials(monkeypatch) -> No
     monkeypatch.delenv("DATABASE_URL", raising=False)
 
     reloaded = importlib.reload(ai_main)
-    application = reloaded.create_app(repository=InMemoryVectorRepository())
+    application = reloaded.create_app(vector_repository=InMemoryVectorRepository())
 
     assert application.state.vector_service is not None
-
-
-@pytest.mark.parametrize(
-    "database_url",
-    ["postgresql://user:password@localhost/greader", "sqlite:///greader.db"],
-)
-def test_production_factory_requires_psycopg_driver(
-    monkeypatch, database_url: str
-) -> None:
-    monkeypatch.setenv("DATABASE_URL", database_url)
-
-    with pytest.raises(RuntimeError, match=r"postgresql\+psycopg://"):
-        ai_main.create_production_app()
-
-
-def test_production_factory_requires_database_url(monkeypatch) -> None:
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-
-    with pytest.raises(RuntimeError, match="DATABASE_URL is required"):
-        ai_main.create_production_app()
-
-
-def test_production_factory_selects_postgres_without_connecting(monkeypatch) -> None:
-    repository = InMemoryVectorRepository()
-    engine = object()
-    create_engine_calls: list[tuple[object, bool]] = []
-
-    def fake_create_engine(url: object, *, echo: bool) -> object:
-        create_engine_calls.append((url, echo))
-        return engine
-
-    def fake_postgres_repository(session_factory):
-        assert callable(session_factory)
-        return repository
-
-    monkeypatch.setenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://user:password@localhost/greader",
-    )
-    monkeypatch.setattr(postgres_adapter, "create_engine", fake_create_engine)
-    monkeypatch.setattr(
-        postgres_adapter, "PostgresVectorRepository", fake_postgres_repository
-    )
-
-    application = ai_main.create_production_app()
-
-    assert application.state.vector_service is not None
-    assert len(create_engine_calls) == 1
-    assert create_engine_calls[0][0].drivername == "postgresql+psycopg"
-    assert create_engine_calls[0][1] is False

@@ -37,6 +37,8 @@ class VectorService:
         _validate_source(source)
         if not isinstance(chunks, tuple):
             raise VectorValidationError("chunks must be a tuple")
+        if not chunks:
+            raise VectorValidationError("chunks must contain at least one chunk")
         for chunk in chunks:
             _validate_chunk(chunk, source_embedding_model=source.embedding_model)
         return self._repository.create_source_with_chunks(source, chunks)

@@ -1,0 +1,25 @@
+# Owners of the locked paths listed under "Off-limits regardless of task" in
+# docs/task-scope.md. A pull request touching one of these needs a review from
+# the owner before it can merge.
+#
+# This file is the enforcement; AGENTS.md § "Who may change the locked files"
+# is the reason. Turning it into a merge gate also needs
+# require_code_owner_reviews = true in setup-branch-protection.sh.
+
+# Migrations and the whole database layer they own — see AGENTS.md
+# § "Who may change database and locked files"
+/alembic/                       @Doonminus2
+/src/greader/database/          @Doonminus2
+
+# Credentials and dependency pins
+/.env.example                   @Doonminus2
+/pyproject.toml                 @Doonminus2
+/uv.lock                        @Doonminus2
+
+# CI, repository configuration, and the rules agents read
+/.github/                       @Doonminus2
+/.gitignore                     @Doonminus2
+/setup-branch-protection.sh     @Doonminus2
+/AGENTS.md                      @Doonminus2
+/CLAUDE.md                      @Doonminus2
+/docs/task-scope.md             @Doonminus2
