@@ -13,7 +13,7 @@ setup and background live in `README.md` and `docs/adr/`.
 | `core/topics`             | Working. **The reference slice — copy its shape.**  | shared           |
 | `core/assignments`        | Placeholder (docstrings only)                       | Assignment owner |
 | `database/`               | **Done.** 8 tables live on Neon, migrations applied | DB owner         |
-| `ai/`                     | Not started                                         | AI owner         |
+| `ai/`                     | In progress                                         | AI owner         |
 | `web/templates/base.html` | Shared layout                                       | Design           |
 
 Do not implement another area's placeholder unless the task says to.
@@ -80,8 +80,10 @@ one executable reference; prose in this file does not override it.
 
 ## Do not do these without a task saying so
 
-- Do not run `alembic upgrade`, `downgrade`, or `--autogenerate`. The database
-  is shared across the team; a downgrade destroys other people's work.
+- Do not run `alembic upgrade`, `downgrade`, or `--autogenerate` against the
+  shared database. It is shared across the team; a downgrade destroys other
+  people's work. The one exception is CI, which runs `alembic upgrade head`
+  against a Neon branch it creates and deletes within the same run.
 - Do not create or edit migration files.
 - Do not edit `.env`, `.env.example`, or anything holding credentials.
 - Do not add `<script>`, `javascript:` URLs, or inline handlers (`onclick`,
@@ -92,6 +94,26 @@ one executable reference; prose in this file does not override it.
   is a team rule to follow, not a tooling gate.
 
 If a task looks like it needs a schema change, stop and say so.
+
+## Who may change database and locked files
+
+All of `src/greader/database/` and `alembic/` belong to พาย (GitHub
+`Doonminus2`), in every case. A task whose description seems to need a
+`database/` or `alembic/` edit is not an exception — stop and ask พาย instead
+of editing it. `docs/task-scope.md` enforces this at the row level: it never
+grants a `database/` or `alembic/` path to a row owned by anyone else.
+
+A subset of that — the paths under "Off-limits regardless of task" in
+`docs/task-scope.md` (`alembic/`, credentials, `database/core/tables.py`,
+`database/rag/tables.py`, `pyproject.toml` dependencies, CI config, `AGENTS.md`
+itself) — is locked further still: those change only through an OPS task, and
+anyone else who needs one changed asks; they do not edit it and explain
+afterwards.
+
+`.github/CODEOWNERS` is what enforces that stricter subset: a pull request
+touching one of those paths cannot merge without a review from the owner. That
+file is the mechanism, `docs/task-scope.md`'s off-limits list is the reason —
+if the two ever disagree, CODEOWNERS wins and the list is what's out of date.
 
 ## Known trap: alembic autogenerate
 
@@ -150,8 +172,31 @@ uv run ruff format --check .   # `ruff format .` to fix
 ```
 
 `tests/unit/` domain + service · `tests/integration/` HTTP via ASGI transport ·
-`tests/architecture/` import direction and the no-JavaScript rule.
-Tests must never hit a real database or a real AI provider.
+`tests/architecture/` import direction and the no-JavaScript rule ·
+`tests/db/` database adapters against a real PostgreSQL · `tests/r2/` object
+storage behaviour against a real R2 bucket.
+
+Tests must never hit the shared database, the real R2 bucket, or a real AI
+provider. `tests/db/` and `tests/r2/` are the exceptions, and only through
+throwaway infrastructure:
+
+- `tests/db/` — mark tests `postgres`, read the DSN from the `postgres_url`
+  fixture, and never from `DATABASE_URL`. CI supplies `POSTGRES_TEST_URL` by
+  creating a Neon branch per run and deleting it afterwards.
+- `tests/r2/` — mark tests `r2`, read the client and bucket from the
+  `r2_test_bucket` fixture and a unique key from `r2_test_prefix`, and never
+  from `R2_BUCKET_NAME`/`R2_ENDPOINT_URL`/etc. Reserve this marker for
+  behaviour `moto` cannot faithfully reproduce (presigned URLs actually
+  fetched, multipart upload, conditional-write conflicts) — everything else
+  (upload-then-list) stays on `moto` or the existing stub. CI supplies
+  `R2_TEST_ENDPOINT_URL`, `R2_TEST_ACCESS_KEY_ID`, `R2_TEST_SECRET_ACCESS_KEY`
+  (secrets) and `R2_TEST_BUCKET_NAME` (variable), pointing at a dedicated
+  `greader-ci` bucket, plus a per-run `R2_TEST_PREFIX` cleaned up by
+  `scripts/ci_r2_cleanup.py` after the run.
+
+With those variables unset the marked tests skip themselves, so
+`uv run pytest` stays green with no database or bucket — one command
+everywhere. See `tests/conftest.py`.
 
 ## Definition of done
 
@@ -161,9 +206,57 @@ Tests must never hit a real database or a real AI provider.
 - unit test at the service/repository seam, integration test at the HTTP layer
 - architecture tests pass
 - `pytest`, `ruff check`, `ruff format --check` all pass
+- if the PR touches anything under `src/`, it also adds or modifies something
+  under `tests/` — a pre-existing suite staying green is not evidence the new
+  code works, only that it wasn't exercised
+- the PR description quotes the CI result for the PR's own head commit, not a
+  number from a local run
 
 ## Git
 
 Branch from `dev`, named `<type>/<TASK-ID>-<slug>` where type is `feat`, `fix`,
-`chore`, `docs`, or `refactor`. Pull requests target `dev` only and need one
-approval. Never commit directly to `main` or `dev`.
+`chore`, `docs`, or `refactor`. Pull requests target `dev`, not `main` — `main`
+is only this repo's default branch, so GitHub pre-fills it as the PR base;
+change the base to `dev` before opening, every time. PRs need one approval.
+Never commit directly to `main` or `dev`.
+
+## Typing rules
+
+These rules apply to every file under `src/` and `tests/`. `ruff`'s `ANN401`
+only flags `Any` in argument annotations — `-> dict[str, Any]` passes it clean.
+The actual enforcement is `tests/architecture/test_conventions.py`. **A rule
+below without a matching test in that file is advisory, not binding** — when
+you add a rule here, add its test in the same PR.
+
+**No `Any`**
+
+- Never import or use `typing.Any`, including `dict[str, Any]`, `list[Any]`, `Callable[..., Any]`.
+- If you think you need `Any`, the contract has not been decided yet. Stop and ask in the PR.
+- A service or repository must never return a bare `dict` from a public method. Return a
+  domain object (dataclass). Converting to dict/JSON is the schema layer's job, at `routes`.
+
+**`X | None` is allowed in exactly three cases**
+
+1. A `Repository.get()` whose Protocol declares `X | None` (see `core/topics/repository.py`).
+2. A domain field that is genuinely nullable, e.g. `artifact_id: str | None`.
+3. An optional argument defaulting to `None` where the `None` case is handled explicitly
+   on the following lines.
+
+Anywhere else, `| None` is not allowed.
+
+**Never use None as control flow**
+
+- A service must not return `None` to mean "not found". Raise a domain error
+  (`TopicNotFoundError`, `AssignmentNotFoundError`) and let `routes` translate it to HTTP.
+- Never write `value or []`, `value or {}`, `value or 0` to paper over a `None`.
+  If the field must not be empty, give the dataclass a `field(default_factory=list)`.
+  If it can genuinely be empty, write `if value is None:` so the case is visible.
+- Never write `getattr(obj, "field", [])` to dodge an AttributeError. If the attribute
+  should exist, access it directly and let the test fail loudly instead of hiding it at runtime.
+
+**Partial updates must not drop fields**
+
+- A use case that updates part of an entity must load the existing entity and merge.
+  Never build a fresh object from the request payload alone and hand it to `repository.update()`.
+- Every adapter implementing the same Protocol must behave identically. If the in-memory
+  adapter clears a relationship and the SQL adapter does not, that is a Protocol violation.

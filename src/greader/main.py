@@ -1,13 +1,21 @@
 """Application composition for the GReader team scaffold."""
 
+import tempfile
+import uuid
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session
 
 from greader.ai.client import StubGenerationClient
+from greader.core.assignments.repository import (
+    AssignmentRepository,
+    InMemoryAssignmentRepository,
+)
+from greader.core.assignments.routes import router as assignment_router
+from greader.core.assignments.service import AssignmentService
 from greader.core.generation.repository import GenerationClient
 from greader.core.generation.routes import router as generation_router
 from greader.core.topics.repository import InMemoryTopicRepository, TopicRepository
@@ -15,7 +23,12 @@ from greader.core.topics.routes import router as topic_router
 from greader.core.topics.service import TopicService
 from greader.database.health import check_db
 from greader.database.session import get_session
-from greader.database.storage import check_r2, get_r2_client
+from greader.database.storage import (
+    MAX_UPLOAD_SIZE_BYTES,
+    check_r2,
+    get_r2_client,
+    upload_file,
+)
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _WEB_DIR = _PACKAGE_DIR / "web"
@@ -26,6 +39,7 @@ _STATIC_DIR = _WEB_DIR / "static"
 def create_app(
     *,
     topic_repository: TopicRepository | None = None,
+    assignment_repository: AssignmentRepository | None = None,
     generation_client: GenerationClient | None = None,
 ) -> FastAPI:
     """Build an isolated application with server-owned in-memory state."""
@@ -39,9 +53,14 @@ def create_app(
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
     repository = topic_repository or InMemoryTopicRepository()
     application.state.topic_service = TopicService(repository)
+
+    assign_repo = assignment_repository or InMemoryAssignmentRepository()
+    application.state.assignment_service = AssignmentService(assign_repo)
+
     application.state.generation_client = generation_client or StubGenerationClient()
     application.state.templates = templates
     application.include_router(topic_router)
+    application.include_router(assignment_router)
     application.include_router(generation_router)
 
     @application.get("/")
@@ -73,6 +92,22 @@ def create_app(
             return check_r2(client)
         except Exception as exc:  # noqa: BLE001 — surface as a 503, not a 500 traceback
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @application.post("/api/v1/uploads")
+    def create_upload(
+        file: UploadFile,
+        client=Depends(get_r2_client),  # noqa: B008 — FastAPI DI
+    ) -> dict:
+        """Store an uploaded file in R2 and return its bucket/key."""
+        contents = file.file.read(MAX_UPLOAD_SIZE_BYTES + 1)
+        if len(contents) > MAX_UPLOAD_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="File exceeds size limit")
+
+        key = f"uploads/{uuid.uuid4()}-{file.filename}"
+        with tempfile.NamedTemporaryFile() as tmp:
+            tmp.write(contents)
+            tmp.flush()
+            return upload_file(client, tmp.name, key)
 
     return application
 
