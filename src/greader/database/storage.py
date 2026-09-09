@@ -18,6 +18,8 @@ R2_BUCKET_NAME = os.environ["R2_BUCKET_NAME"]
 R2_ACCESS_KEY_ID = os.environ["R2_ACCESS_KEY_ID"]
 R2_SECRET_ACCESS_KEY = os.environ["R2_SECRET_ACCESS_KEY"]
 
+MAX_UPLOAD_SIZE_BYTES = int(os.environ.get("MAX_UPLOAD_SIZE_BYTES", 20 * 1024 * 1024))
+
 _client = boto3.client(
     "s3",
     endpoint_url=R2_ENDPOINT_URL,
