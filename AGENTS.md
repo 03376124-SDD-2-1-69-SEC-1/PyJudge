@@ -219,3 +219,44 @@ Branch from `dev`, named `<type>/<TASK-ID>-<slug>` where type is `feat`, `fix`,
 is only this repo's default branch, so GitHub pre-fills it as the PR base;
 change the base to `dev` before opening, every time. PRs need one approval.
 Never commit directly to `main` or `dev`.
+
+## Typing rules
+
+These rules apply to every file under `src/` and `tests/`. `ruff`'s `ANN401`
+only flags `Any` in argument annotations — `-> dict[str, Any]` passes it clean.
+The actual enforcement is `tests/architecture/test_conventions.py`. **A rule
+below without a matching test in that file is advisory, not binding** — when
+you add a rule here, add its test in the same PR.
+
+**No `Any`**
+
+- Never import or use `typing.Any`, including `dict[str, Any]`, `list[Any]`, `Callable[..., Any]`.
+- If you think you need `Any`, the contract has not been decided yet. Stop and ask in the PR.
+- A service or repository must never return a bare `dict` from a public method. Return a
+  domain object (dataclass). Converting to dict/JSON is the schema layer's job, at `routes`.
+
+**`X | None` is allowed in exactly three cases**
+
+1. A `Repository.get()` whose Protocol declares `X | None` (see `core/topics/repository.py`).
+2. A domain field that is genuinely nullable, e.g. `artifact_id: str | None`.
+3. An optional argument defaulting to `None` where the `None` case is handled explicitly
+   on the following lines.
+
+Anywhere else, `| None` is not allowed.
+
+**Never use None as control flow**
+
+- A service must not return `None` to mean "not found". Raise a domain error
+  (`TopicNotFoundError`, `AssignmentNotFoundError`) and let `routes` translate it to HTTP.
+- Never write `value or []`, `value or {}`, `value or 0` to paper over a `None`.
+  If the field must not be empty, give the dataclass a `field(default_factory=list)`.
+  If it can genuinely be empty, write `if value is None:` so the case is visible.
+- Never write `getattr(obj, "field", [])` to dodge an AttributeError. If the attribute
+  should exist, access it directly and let the test fail loudly instead of hiding it at runtime.
+
+**Partial updates must not drop fields**
+
+- A use case that updates part of an entity must load the existing entity and merge.
+  Never build a fresh object from the request payload alone and hand it to `repository.update()`.
+- Every adapter implementing the same Protocol must behave identically. If the in-memory
+  adapter clears a relationship and the SQL adapter does not, that is a Protocol violation.

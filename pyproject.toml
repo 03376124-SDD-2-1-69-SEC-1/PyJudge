@@ -59,7 +59,7 @@ src = ["src", "tests"]
 exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/env.py" = ["E402", "I001"]
