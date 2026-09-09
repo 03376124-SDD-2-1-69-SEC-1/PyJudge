@@ -31,7 +31,7 @@ def test_title_only_update_preserves_artifact_and_test_cases() -> None:
 
     assert updated.title == "New title"
     assert updated.artifact_id == 42
-    stored = repository.get_by_id(existing.id or 0)
+    stored = repository.get(existing.id or 0)
     assert stored is not None
     assert stored.test_cases == existing.test_cases
 

@@ -1,22 +1,29 @@
 """Repository port and in-memory Assignment adapter."""
 
+from __future__ import annotations
+
 from typing import Protocol
 
 from greader.core.assignments.models import Assignment
 
 
 class AssignmentRepository(Protocol):
-    """Persistence operations required by AssignmentService."""
+    """Persistence operations required by AssignmentService.
 
-    def list_all(self) -> list[Assignment]: ...
+    `create` is the only operation allowed to assign an id: it takes an
+    Assignment whose `id` is `None` and returns one whose `id` is a real
+    int. Every other operation, including `update`, takes and returns an
+    Assignment that already has its id. Callers must always use the
+    returned object, never the one they passed in.
+    """
 
-    def get_by_id(self, assignment_id: int) -> Assignment | None: ...
+    def list(self) -> list[Assignment]: ...
+
+    def get(self, assignment_id: int) -> Assignment | None: ...
 
     def create(self, assignment: Assignment) -> Assignment: ...
 
-    def update(
-        self, assignment_id: int, assignment: Assignment
-    ) -> Assignment | None: ...
+    def update(self, assignment: Assignment) -> Assignment: ...
 
     def delete(self, assignment_id: int) -> bool: ...
 
@@ -29,11 +36,11 @@ class InMemoryAssignmentRepository:
         self._items: dict[int, Assignment] = {}
         self._next_id: int = 1
 
-    def list_all(self) -> list[Assignment]:
+    def list(self) -> list[Assignment]:
         """Return all stored Assignments."""
         return list(self._items.values())
 
-    def get_by_id(self, assignment_id: int) -> Assignment | None:
+    def get(self, assignment_id: int) -> Assignment | None:
         """Return an Assignment by id when present."""
         return self._items.get(assignment_id)
 
@@ -55,22 +62,25 @@ class InMemoryAssignmentRepository:
         self._items[new_id] = created
         return created
 
-    def update(self, assignment_id: int, assignment: Assignment) -> Assignment | None:
-        """Replace an existing Assignment and return the stored value."""
-        if assignment_id not in self._items:
-            return None
+    def update(self, assignment: Assignment) -> Assignment:
+        """Replace an existing Assignment and return the stored value.
+
+        `created_at` is system-managed and always comes from the stored
+        record, never from the entity passed in.
+        """
+        existing = self._items[assignment.id]
         updated = Assignment(
-            id=assignment_id,
+            id=existing.id,
             title=assignment.title,
             problem_statement=assignment.problem_statement,
             difficulty=assignment.difficulty,
             metadata=assignment.metadata,
             artifact_id=assignment.artifact_id,
-            created_at=self._items[assignment_id].created_at,
+            created_at=existing.created_at,
             updated_at=assignment.updated_at,
             test_cases=assignment.test_cases,
         )
-        self._items[assignment_id] = updated
+        self._items[existing.id] = updated
         return updated
 
     def delete(self, assignment_id: int) -> bool:

@@ -23,11 +23,11 @@ class AssignmentService:
 
     def list(self) -> list[Assignment]:
         """Return every Assignment."""
-        return self._repo.list_all()
+        return self._repo.list()
 
     def get(self, assignment_id: int) -> Assignment:
         """Return one Assignment or raise when it does not exist."""
-        assignment = self._repo.get_by_id(assignment_id)
+        assignment = self._repo.get(assignment_id)
         if assignment is None:
             raise AssignmentNotFoundError
         return assignment
@@ -72,10 +72,7 @@ class AssignmentService:
             updated_at=existing.updated_at,
             test_cases=existing.test_cases,
         )
-        updated = self._repo.update(assignment_id, updated_assignment)
-        if updated is None:
-            raise AssignmentNotFoundError
-        return updated
+        return self._repo.update(updated_assignment)
 
     def delete(self, assignment_id: int) -> bool:
         """Delete an Assignment and report whether it existed."""
@@ -179,4 +176,4 @@ class AssignmentService:
             updated_at=assignment.updated_at,
             test_cases=test_cases,
         )
-        self._repo.update(assignment.id, updated_assignment)
+        self._repo.update(updated_assignment)
