@@ -16,10 +16,10 @@ from greader.database import session, storage
 def isolated_factories(monkeypatch):
     monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
     session.get_engine.cache_clear()
-    storage.get_r2_client.cache_clear()
+    storage.get_r2_storage.cache_clear()
     yield
     session.get_engine.cache_clear()
-    storage.get_r2_client.cache_clear()
+    storage.get_r2_storage.cache_clear()
 
 
 def test_fresh_import_and_test_app_never_initialize_infrastructure() -> None:
@@ -81,8 +81,9 @@ def test_r2_initialization_preserves_configuration_and_is_cached(monkeypatch):
         monkeypatch.setenv(key, value)
     factory = Mock(return_value=Mock())
     monkeypatch.setattr(storage.boto3, "client", factory)
-    client = storage.get_r2_client()
-    assert storage.get_r2_client() is client
+    configured = storage.get_r2_storage()
+    client = configured.client
+    assert storage.get_r2_storage() is configured
     factory.assert_called_once()
     assert factory.call_args.args == ("s3",)
     options = factory.call_args.kwargs
@@ -91,9 +92,10 @@ def test_r2_initialization_preserves_configuration_and_is_cached(monkeypatch):
     assert options["aws_secret_access_key"] == settings["R2_SECRET_ACCESS_KEY"]
     assert options["config"].signature_version == "s3v4"
     assert options["region_name"] == "auto"
-    assert storage.check_r2(client) == {"connected": True, "bucket": "test-bucket"}
+    monkeypatch.delenv("R2_BUCKET_NAME")
+    assert storage.check_r2(configured) == {"connected": True, "bucket": "test-bucket"}
     client.head_bucket.assert_called_once_with(Bucket="test-bucket")
-    assert storage.upload_file(client, "local.pdf", "uploads/original.pdf") == {
+    assert storage.upload_file(configured, "local.pdf", "uploads/original.pdf") == {
         "bucket": "test-bucket",
         "key": "uploads/original.pdf",
     }
@@ -102,13 +104,32 @@ def test_r2_initialization_preserves_configuration_and_is_cached(monkeypatch):
     )
 
 
-def test_missing_r2_configuration_fails_before_client_construction(monkeypatch):
-    monkeypatch.delenv("R2_ENDPOINT_URL", raising=False)
+@pytest.mark.parametrize(
+    "missing",
+    ["R2_ENDPOINT_URL", "R2_BUCKET_NAME", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"],
+)
+def test_missing_r2_configuration_fails_before_client_construction(
+    monkeypatch, missing
+):
+    for name, value in {
+        "R2_ENDPOINT_URL": "https://example.r2.cloudflarestorage.com",
+        "R2_BUCKET_NAME": "test-bucket",
+        "R2_ACCESS_KEY_ID": "test-key",
+        "R2_SECRET_ACCESS_KEY": "test-secret",
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv(missing)
     factory = Mock()
     monkeypatch.setattr(storage.boto3, "client", factory)
-    with pytest.raises(RuntimeError, match="R2_ENDPOINT_URL is required"):
-        storage.get_r2_client()
+    with pytest.raises(RuntimeError, match=f"{missing} is required"):
+        storage.get_r2_storage()
     factory.assert_not_called()
+
+
+@pytest.mark.parametrize("bucket", ["", "   "])
+def test_storage_configuration_rejects_empty_bucket(bucket):
+    with pytest.raises(ValueError, match="nonempty bucket"):
+        storage.R2Storage(client=Mock(), bucket=bucket)
 
 
 def test_upload_limit_respects_deferred_dotenv_configuration(monkeypatch):
@@ -143,10 +164,12 @@ def test_health_checks_keep_dependency_overrides_and_failure_status(monkeypatch)
     db_session = Mock()
     r2_client = Mock()
     application.dependency_overrides[session.get_session] = lambda: db_session
-    application.dependency_overrides[storage.get_r2_client] = lambda: r2_client
+    application.dependency_overrides[storage.get_r2_storage] = lambda: (
+        storage.R2Storage(client=r2_client, bucket="test-bucket")
+    )
     check_db = Mock(return_value={"connected": True})
     monkeypatch.setattr(main, "check_db", check_db)
-    monkeypatch.setenv("R2_BUCKET_NAME", "test-bucket")
+    monkeypatch.delenv("R2_BUCKET_NAME", raising=False)
     with TestClient(application) as client:
         assert client.get("/health/db").json() == {"connected": True}
         assert client.get("/health/r2").json() == {

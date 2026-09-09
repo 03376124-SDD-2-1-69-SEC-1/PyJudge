@@ -1,16 +1,20 @@
 """AI-01's global validation handler preserves the application error contract."""
 
+from unittest.mock import Mock
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.database.storage import get_r2_client
+from greader.database.storage import R2Storage, get_r2_storage
 from greader.main import create_app
 
 
 @pytest.fixture()
 async def client():
     application = create_app()
-    application.dependency_overrides[get_r2_client] = lambda: object()
+    application.dependency_overrides[get_r2_storage] = lambda: R2Storage(
+        client=Mock(), bucket="test-bucket"
+    )
 
     @application.get("/validation-probe/{value}")
     def validation_probe(value: int, count: int):

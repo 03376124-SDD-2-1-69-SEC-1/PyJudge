@@ -25,9 +25,10 @@ from greader.database.health import check_db
 from greader.database.rag.vector_repository import PostgresVectorRepository
 from greader.database.session import get_engine, get_session
 from greader.database.storage import (
+    R2Storage,
     check_r2,
     get_max_upload_size_bytes,
-    get_r2_client,
+    get_r2_storage,
     upload_file,
 )
 
@@ -101,18 +102,18 @@ def create_app(
 
     @application.get("/health/r2")
     def health_r2(
-        client=Depends(get_r2_client),  # noqa: B008 — FastAPI DI
+        storage: R2Storage = Depends(get_r2_storage),  # noqa: B008 — FastAPI DI
     ) -> dict:
         """Confirm the R2 bucket is reachable."""
         try:
-            return check_r2(client)
+            return check_r2(storage)
         except Exception as exc:  # noqa: BLE001 — surface as a 503, not a 500 traceback
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @application.post("/api/v1/uploads")
     def create_upload(
         file: UploadFile,
-        client=Depends(get_r2_client),  # noqa: B008 — FastAPI DI
+        storage: R2Storage = Depends(get_r2_storage),  # noqa: B008 — FastAPI DI
     ) -> dict:
         """Store an uploaded file in R2 and return its bucket/key."""
         max_upload_size = get_max_upload_size_bytes()
@@ -124,7 +125,7 @@ def create_app(
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(contents)
             tmp.flush()
-            return upload_file(client, tmp.name, key)
+            return upload_file(storage, tmp.name, key)
 
     return application
 

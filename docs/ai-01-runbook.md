@@ -72,11 +72,13 @@ rtk proxy uv run ruff check .
 rtk proxy uv run ruff format --check .
 ```
 
-On Windows, existing template architecture tests need `PYTHONUTF8=1`. Existing
-upload tests need a nonempty dummy `R2_BUCKET_NAME` even though they override the
-client. These may be set only in the test process; no credential file changes are
-needed. AI-01's fresh-process regression test removes DB/R2 credentials, disables
-dotenv loading, and rejects engine/client construction and socket connections.
+On Windows, existing template architecture tests need `PYTHONUTF8=1`; plain
+pytest otherwise reports the existing template decoding failure. Upload and R2
+health tests override `get_r2_storage` with an explicit `R2Storage(client=fake,
+bucket="test-bucket")`, requiring no R2 environment settings. The production
+factory still requires every real R2 setting before constructing a client.
+AI-01's fresh-process regression test removes DB/R2 credentials, disables dotenv
+loading, and rejects engine/client construction and socket connections.
 
 Focused suites:
 
