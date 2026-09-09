@@ -222,7 +222,11 @@ Never commit directly to `main` or `dev`.
 
 ## Typing rules
 
-These rules apply to every file under `src/` and `tests/`.
+These rules apply to every file under `src/` and `tests/`. `ruff`'s `ANN401`
+only flags `Any` in argument annotations — `-> dict[str, Any]` passes it clean.
+The actual enforcement is `tests/architecture/test_conventions.py`. **A rule
+below without a matching test in that file is advisory, not binding** — when
+you add a rule here, add its test in the same PR.
 
 **No `Any`**
 
