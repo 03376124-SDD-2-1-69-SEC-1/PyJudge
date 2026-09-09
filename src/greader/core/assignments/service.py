@@ -1,28 +1,41 @@
+"""Assignment use cases independent from HTTP and database technology."""
+
 from typing import Any
 
 from greader.core.assignments.models import Assignment
 from greader.core.assignments.repository import AssignmentRepository
 
 
+class AssignmentNotFoundError(Exception):
+    """Raised when a requested Assignment does not exist."""
+
+
 class AssignmentService:
+    """Coordinate Assignment use cases through a repository seam."""
+
     def __init__(self, repo: AssignmentRepository) -> None:
+        """Initialize the service with an Assignment repository."""
         self._repo = repo
 
-    def list_assignments_as_dict(self) -> list[dict[str, Any]]:
-        assignments = self._repo.list_all()
-        return [self._to_dict(a) for a in assignments]
+    def list(self) -> list[Assignment]:
+        """Return every Assignment."""
+        return self._repo.list_all()
 
-    def get_assignment_as_dict(self, assignment_id: int) -> dict[str, Any] | None:
+    def get(self, assignment_id: int) -> Assignment:
+        """Return one Assignment or raise when it does not exist."""
         assignment = self._repo.get_by_id(assignment_id)
-        return self._to_dict(assignment) if assignment else None
+        if assignment is None:
+            raise AssignmentNotFoundError
+        return assignment
 
-    def create_assignment_as_dict(
+    def create(
         self,
         title: str,
         problem_statement: str,
         difficulty: str,
         metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> Assignment:
+        """Create and persist an Assignment."""
         assignment = Assignment(
             id=None,
             title=title,
@@ -30,22 +43,18 @@ class AssignmentService:
             difficulty=difficulty,
             metadata=metadata if metadata is not None else {},
         )
-        created = self._repo.create(assignment)
-        return self._to_dict(created)
+        return self._repo.create(assignment)
 
-    def update_assignment_as_dict(
+    def update(
         self,
         assignment_id: int,
         title: str | None = None,
         problem_statement: str | None = None,
         difficulty: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
-        existing = self._repo.get_by_id(assignment_id)
-        if not existing:
-            return None
-
-        # Partial update logic: ถ้า field ไหนไม่ได้ส่งมา ให้ใช้ค่าเดิมของ assignment
+    ) -> Assignment:
+        """Update supplied fields while retaining all omitted values."""
+        existing = self.get(assignment_id)
         updated_assignment = Assignment(
             id=assignment_id,
             title=title if title is not None else existing.title,
@@ -53,21 +62,17 @@ class AssignmentService:
             if problem_statement is not None
             else existing.problem_statement,
             difficulty=difficulty if difficulty is not None else existing.difficulty,
-            metadata=metadata if metadata is not None else existing.metadata or {},
+            metadata=metadata if metadata is not None else existing.metadata,
             artifact_id=existing.artifact_id,
+            created_at=existing.created_at,
+            updated_at=existing.updated_at,
+            test_cases=existing.test_cases,
         )
         updated = self._repo.update(assignment_id, updated_assignment)
-        return self._to_dict(updated) if updated else None
+        if updated is None:
+            raise AssignmentNotFoundError
+        return updated
 
-    def delete_assignment(self, assignment_id: int) -> bool:
+    def delete(self, assignment_id: int) -> bool:
+        """Delete an Assignment and report whether it existed."""
         return self._repo.delete(assignment_id)
-
-    def _to_dict(self, assignment: Assignment) -> dict[str, Any]:
-        return {
-            "id": assignment.id,
-            "title": assignment.title,
-            "problem_statement": assignment.problem_statement,
-            "difficulty": assignment.difficulty,
-            "metadata": assignment.metadata if assignment.metadata is not None else {},
-            "artifact_id": assignment.artifact_id,
-        }

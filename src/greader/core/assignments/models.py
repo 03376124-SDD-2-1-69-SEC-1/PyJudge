@@ -5,6 +5,8 @@ from typing import Any
 
 @dataclass(frozen=True, slots=True)
 class TestCase:
+    """A single executable test case belonging to an Assignment."""
+
     id: int | None
     assignment_id: int
     input_data: str
@@ -17,6 +19,8 @@ class TestCase:
 
 @dataclass(frozen=True, slots=True)
 class Assignment:
+    """Domain representation of a programming Assignment."""
+
     id: int | None
     title: str
     problem_statement: str
