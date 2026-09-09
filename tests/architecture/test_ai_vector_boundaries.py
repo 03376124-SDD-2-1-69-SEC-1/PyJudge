@@ -20,22 +20,19 @@ def test_ai_application_keeps_storage_imports_in_adapter() -> None:
                 continue
             for module in modules:
                 assert not module.startswith(
-                    (
-                        "sqlalchemy",
-                        "sqlmodel",
-                        "psycopg",
-                        "pgvector",
-                        "greader.database",
-                    )
+                    ("sqlalchemy", "sqlmodel", "psycopg", "pgvector")
                 ), (path, module)
                 if path.name != "main.py":
-                    assert not module.startswith("greader.ai.database"), path
+                    assert not module.startswith("greader.database"), path
 
 
 def test_ai_application_has_only_synchronous_functions() -> None:
-    for directory in ("app", "database"):
-        for path in Path(f"src/greader/ai/{directory}").glob("*.py"):
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            assert not any(
-                isinstance(node, ast.AsyncFunctionDef) for node in ast.walk(tree)
-            )
+    paths = [
+        *Path("src/greader/ai/app").glob("*.py"),
+        Path("src/greader/database/rag/vector_repository.py"),
+    ]
+    for path in paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        assert not any(
+            isinstance(node, ast.AsyncFunctionDef) for node in ast.walk(tree)
+        )

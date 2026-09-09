@@ -25,7 +25,7 @@ from greader.ai.app.repository import (
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
-from greader.ai.database.vector_repository import PostgresVectorRepository
+from greader.database.rag.vector_repository import PostgresVectorRepository
 
 MODEL = "model-a"
 

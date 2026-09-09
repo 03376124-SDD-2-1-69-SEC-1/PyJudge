@@ -19,7 +19,7 @@ from greader.ai.app.repository import (
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
-from greader.ai.database import vector_repository as postgres_adapter
+from greader.database.rag import vector_repository as postgres_adapter
 
 MODEL_A = "model-a"
 MODEL_B = "model-b"

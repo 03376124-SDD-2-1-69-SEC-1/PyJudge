@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from greader.ai.app.repository import VectorRepository
 from greader.ai.app.routes import router as vector_router
 from greader.ai.app.service import VectorService
-from greader.ai.database.vector_repository import create_postgres_repository
+from greader.database.rag.vector_repository import create_postgres_repository
 
 
 def create_app(*, repository: VectorRepository) -> FastAPI:
