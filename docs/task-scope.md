@@ -35,6 +35,22 @@ This is a single repo. "ai repo" in this table resolves to `src/greader/ai/`.
 | OPS-09 | พาย | `.github/`, `setup-branch-protection.sh`, `tests/conftest.py`, `tests/db/`, `pyproject.toml` pytest config, `.env.example`, `AGENTS.md`, `docs/task-scope.md` | CI runs `tests/db/` against a Neon branch it creates and deletes per run; the canary reports RUN, not SKIPPED |
 | CORE-10 | พาย | `database/core/assignment_repository.py`, `tests/db/` | `create_test_case`, `list_test_cases`, `update_test_case`, `delete_test_case` implemented on `SQLAssignmentRepository`; a `postgres`-marked test proves a test case round-trips through real Postgres |
 | OPS-10 | พาย | `.github/workflows/ci.yml`, `src/greader/r2_safety.py`, `scripts/ci_r2_cleanup.py`, `tests/r2/`, `tests/unit/test_r2_safety.py`, `tests/conftest.py`, `pyproject.toml`, `AGENTS.md`, `README.md` | `tests/r2/` runs in CI against the real `greader-ci` bucket, not skipped; presigned-URL fetch, multipart upload, and a conditional-write conflict are each proven against real R2 |
+| OPS-11 | พาย | `docs/task-scope.md` | a row that owns a slice can mount it without an out-of-scope edit |
+
+## The composition root
+
+`src/greader/main.py` wires the application together, so a slice cannot reach
+its own API without it. Any row whose done-condition names an endpoint may
+therefore edit `main.py` without that path being listed in its "May touch"
+column, and only to:
+
+- import its own repository, service, and router
+- add its own `create_app` keyword argument for the repository
+- build the repository and service, and put the service on `application.state`
+- call `application.include_router` for its own router
+
+Nothing else in `main.py`: no business rules, and no touching another slice's
+wiring. Copy the shape `core/topics` already uses there.
 
 ## Off-limits regardless of task
 
