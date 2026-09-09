@@ -40,6 +40,7 @@ class InMemoryAssignmentRepository:
             artifact_id=assignment.artifact_id,
             created_at=assignment.created_at,
             updated_at=assignment.updated_at,
+            test_cases=assignment.test_cases,
         )
         self._items[new_id] = created
         return created
@@ -57,6 +58,7 @@ class InMemoryAssignmentRepository:
             artifact_id=assignment.artifact_id,
             created_at=existing.created_at,
             updated_at=assignment.updated_at,
+            test_cases=assignment.test_cases,
         )
         self._items[assignment_id] = updated
         return updated

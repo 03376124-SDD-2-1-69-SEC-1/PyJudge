@@ -1,11 +1,16 @@
-from typing import Any
-
 from greader.core.test_cases.models import TestCase
 from greader.core.test_cases.repository import TestCaseRepository
 
 
+class TestCaseNotFoundError(Exception):
+    """Raised when a requested Test Case does not exist."""
+
+
 class TestCaseService:
+    """Coordinate Test Case use cases through a repository seam."""
+
     def __init__(self, repo: TestCaseRepository) -> None:
+        """Initialize the service with a Test Case repository."""
         self._repo = repo
 
     def create_test_case(
@@ -15,7 +20,8 @@ class TestCaseService:
         expected_output: str,
         is_hidden: bool,
         order_index: int,
-    ) -> dict[str, Any]:
+    ) -> TestCase:
+        """Create and persist a Test Case."""
         tc = TestCase(
             id=None,
             assignment_id=assignment_id,
@@ -24,18 +30,21 @@ class TestCaseService:
             is_hidden=is_hidden,
             order_index=order_index,
         )
-        created = self._repo.create_test_case(tc)
-        return self._to_dict(created)
+        return self._repo.create_test_case(tc)
 
-    def list_test_cases(self, assignment_id: int) -> list[dict[str, Any]]:
+    def list_test_cases(self, assignment_id: int) -> list[TestCase]:
+        """List Test Cases belonging to an Assignment."""
         test_cases = self._repo.list_test_cases(assignment_id)
-        return [self._to_dict(tc) for tc in test_cases]
+        return test_cases
 
     def get_test_case(
         self, assignment_id: int, test_case_id: int
-    ) -> dict[str, Any] | None:
+    ) -> TestCase:
+        """Return a Test Case or raise TestCaseNotFoundError."""
         tc = self._repo.get_test_case(assignment_id, test_case_id)
-        return self._to_dict(tc) if tc else None
+        if tc is None:
+            raise TestCaseNotFoundError
+        return tc
 
     def update_test_case(
         self,
@@ -45,10 +54,9 @@ class TestCaseService:
         expected_output: str | None = None,
         is_hidden: bool | None = None,
         order_index: int | None = None,
-    ) -> dict[str, Any] | None:
-        existing = self._repo.get_test_case(assignment_id, test_case_id)
-        if not existing:
-            return None
+    ) -> TestCase:
+        """Merge supplied fields into an existing Test Case."""
+        existing = self.get_test_case(assignment_id, test_case_id)
 
         updated_tc = TestCase(
             id=test_case_id,
@@ -63,17 +71,11 @@ class TestCaseService:
             else existing.order_index,
         )
         updated = self._repo.update_test_case(assignment_id, test_case_id, updated_tc)
-        return self._to_dict(updated) if updated else None
+        if updated is None:
+            raise TestCaseNotFoundError
+        return updated
 
-    def delete_test_case(self, assignment_id: int, test_case_id: int) -> bool:
-        return self._repo.delete_test_case(assignment_id, test_case_id)
-
-    def _to_dict(self, tc: TestCase) -> dict[str, Any]:
-        return {
-            "id": tc.id,
-            "assignment_id": tc.assignment_id,
-            "input_data": tc.input_data,
-            "expected_output": tc.expected_output,
-            "is_hidden": tc.is_hidden,
-            "order_index": tc.order_index,
-        }
+    def delete_test_case(self, assignment_id: int, test_case_id: int) -> None:
+        """Delete a Test Case or raise TestCaseNotFoundError."""
+        if not self._repo.delete_test_case(assignment_id, test_case_id):
+            raise TestCaseNotFoundError

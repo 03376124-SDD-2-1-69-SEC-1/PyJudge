@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +21,7 @@ class Assignment:
     title: str = ""
     problem_statement: str = ""
     difficulty: str = "easy"
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
     artifact_id: int | None = None
     created_at: datetime | None = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime | None = field(default_factory=lambda: datetime.now(UTC))

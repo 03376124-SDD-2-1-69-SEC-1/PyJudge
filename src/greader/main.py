@@ -11,7 +11,6 @@ from sqlmodel import Session
 
 from greader.ai.client import StubGenerationClient
 
-# === Import Assignment ===
 from greader.core.assignments.repository import (
     AssignmentRepository,
     InMemoryAssignmentRepository,
@@ -20,7 +19,12 @@ from greader.core.assignments.routes import router as assignment_router
 from greader.core.assignments.service import AssignmentService
 from greader.core.generation.repository import GenerationClient
 from greader.core.generation.routes import router as generation_router
+from greader.core.test_cases.repository import (
+    InMemoryTestCaseRepository,
+    TestCaseRepository,
+)
 from greader.core.test_cases.routes import router as test_cases_router
+from greader.core.test_cases.service import TestCaseService
 from greader.core.topics.repository import InMemoryTopicRepository, TopicRepository
 from greader.core.topics.routes import router as topic_router
 from greader.core.topics.service import TopicService
@@ -42,7 +46,8 @@ _STATIC_DIR = _WEB_DIR / "static"
 def create_app(
     *,
     topic_repository: TopicRepository | None = None,
-    assignment_repository: AssignmentRepository | None = None,  # === เพิ่ม parameter  ===
+    assignment_repository: AssignmentRepository | None = None,
+    test_case_repository: TestCaseRepository | None = None,
     generation_client: GenerationClient | None = None,
 ) -> FastAPI:
     """Build an isolated application with server-owned in-memory state."""
@@ -57,15 +62,17 @@ def create_app(
     repository = topic_repository or InMemoryTopicRepository()
     application.state.topic_service = TopicService(repository)
 
-    # === Setup Assignment Service (แก้ไขจุดนี้) ===
     assign_repo = assignment_repository or InMemoryAssignmentRepository()
     application.state.assignment_service = AssignmentService(assign_repo)
+    test_case_repo = test_case_repository or InMemoryTestCaseRepository()
+    application.state.test_case_service = TestCaseService(test_case_repo)
 
     application.state.generation_client = generation_client or StubGenerationClient()
     application.state.templates = templates
     application.include_router(topic_router)
-    application.include_router(assignment_router)  # === เพิ่ม Mount Router ตรงนี้ ===
+    application.include_router(assignment_router)
     application.include_router(generation_router)
+    application.include_router(test_cases_router)
 
     @application.get("/")
     def home(request: Request):
@@ -117,5 +124,3 @@ def create_app(
 
 
 app = create_app()
-
-app.include_router(test_cases_router)
