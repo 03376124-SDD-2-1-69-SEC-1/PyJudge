@@ -68,8 +68,6 @@ class AssignmentService:
             difficulty=difficulty if difficulty is not None else existing.difficulty,
             metadata=metadata if metadata is not None else existing.metadata,
             artifact_id=existing.artifact_id,
-            created_at=existing.created_at,
-            updated_at=existing.updated_at,
             test_cases=existing.test_cases,
         )
         return self._repo.update(updated_assignment)
@@ -91,7 +89,6 @@ class AssignmentService:
         next_id = max((tc.id for tc in existing.test_cases if tc.id), default=0) + 1
         new_test_case = TestCase(
             id=next_id,
-            assignment_id=assignment_id,
             input_data=input_data,
             expected_output=expected_output,
             is_hidden=is_hidden,
@@ -122,7 +119,6 @@ class AssignmentService:
         existing_test_case = self._find_test_case(existing_assignment, test_case_id)
         updated_test_case = TestCase(
             id=existing_test_case.id,
-            assignment_id=assignment_id,
             input_data=input_data
             if input_data is not None
             else existing_test_case.input_data,
@@ -135,8 +131,6 @@ class AssignmentService:
             order_index=order_index
             if order_index is not None
             else existing_test_case.order_index,
-            created_at=existing_test_case.created_at,
-            updated_at=existing_test_case.updated_at,
         )
         replacement = [
             updated_test_case if tc.id == test_case_id else tc
@@ -172,8 +166,6 @@ class AssignmentService:
             difficulty=assignment.difficulty,
             metadata=assignment.metadata,
             artifact_id=assignment.artifact_id,
-            created_at=assignment.created_at,
-            updated_at=assignment.updated_at,
             test_cases=test_cases,
         )
         self._repo.update(updated_assignment)

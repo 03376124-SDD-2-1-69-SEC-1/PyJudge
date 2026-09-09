@@ -36,6 +36,7 @@ This is a single repo. "ai repo" in this table resolves to `src/greader/ai/`.
 | CORE-10 | พาย | `database/core/assignment_repository.py`, `tests/db/` | `create_test_case`, `list_test_cases`, `update_test_case`, `delete_test_case` implemented on `SQLAssignmentRepository`; a `postgres`-marked test proves a test case round-trips through real Postgres |
 | OPS-10 | พาย | `.github/workflows/ci.yml`, `src/greader/r2_safety.py`, `scripts/ci_r2_cleanup.py`, `tests/r2/`, `tests/unit/test_r2_safety.py`, `tests/conftest.py`, `pyproject.toml`, `AGENTS.md`, `README.md` | `tests/r2/` runs in CI against the real `greader-ci` bucket, not skipped; presigned-URL fetch, multipart upload, and a conditional-write conflict are each proven against real R2 |
 | OPS-11 | พาย | `docs/task-scope.md`, `AGENTS.md`, `pyproject.toml` | a row that owns a slice can mount it without an out-of-scope edit |
+| CORE-11 | พาย | `src/greader/core/assignments/`, `tests/` | the domain layer holds no field that exists only to satisfy a table; the contract test covers parent/child containment |
 
 ## The composition root
 

@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 import pytest
 
-from greader.core.assignments.models import Assignment
+from greader.core.assignments.models import Assignment, TestCase
 from greader.core.assignments.repository import (
     AssignmentRepository,
     InMemoryAssignmentRepository,
@@ -24,12 +24,14 @@ def _assignment(
     problem_statement: str = "Statement",
     difficulty: str = "easy",
     metadata: dict[str, object] | None = None,
+    test_cases: list[TestCase] | None = None,
 ) -> Assignment:
     return Assignment(
         title=title,
         problem_statement=problem_statement,
         difficulty=difficulty,
         metadata=metadata if metadata is not None else {},
+        test_cases=test_cases if test_cases is not None else [],
     )
 
 
@@ -102,15 +104,12 @@ def test_update_preserves_fields_absent_from_the_update(
             difficulty=created.difficulty,
             metadata=created.metadata,
             artifact_id=created.artifact_id,
-            created_at=created.created_at,
-            updated_at=created.updated_at,
             test_cases=created.test_cases,
         )
     )
 
     assert updated.title == "New title"
     assert updated.metadata == {"key": "value"}
-    assert updated.created_at == created.created_at
 
 
 def test_delete_returns_true_once_then_false(repository: AssignmentRepository) -> None:
@@ -118,3 +117,18 @@ def test_delete_returns_true_once_then_false(repository: AssignmentRepository) -
 
     assert repository.delete(created.id) is True
     assert repository.delete(created.id) is False
+
+
+def test_test_case_belongs_to_its_parent_by_containment_alone(
+    repository: AssignmentRepository,
+) -> None:
+    """A TestCase reached through its parent carries no separate parent pointer."""
+    created = repository.create(
+        _assignment(test_cases=[TestCase(id=1, input_data="in", expected_output="out")])
+    )
+
+    fetched = repository.get(created.id)
+
+    assert fetched is not None
+    (test_case,) = fetched.test_cases
+    assert test_case.input_data == "in"

@@ -55,19 +55,13 @@ class InMemoryAssignmentRepository:
             difficulty=assignment.difficulty,
             metadata=assignment.metadata,
             artifact_id=assignment.artifact_id,
-            created_at=assignment.created_at,
-            updated_at=assignment.updated_at,
             test_cases=assignment.test_cases,
         )
         self._items[new_id] = created
         return created
 
     def update(self, assignment: Assignment) -> Assignment:
-        """Replace an existing Assignment and return the stored value.
-
-        `created_at` is system-managed and always comes from the stored
-        record, never from the entity passed in.
-        """
+        """Replace an existing Assignment and return the stored value."""
         existing = self._items[assignment.id]
         updated = Assignment(
             id=existing.id,
@@ -76,8 +70,6 @@ class InMemoryAssignmentRepository:
             difficulty=assignment.difficulty,
             metadata=assignment.metadata,
             artifact_id=assignment.artifact_id,
-            created_at=existing.created_at,
-            updated_at=assignment.updated_at,
             test_cases=assignment.test_cases,
         )
         self._items[existing.id] = updated

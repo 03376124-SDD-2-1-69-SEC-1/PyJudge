@@ -153,6 +153,57 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
     )
 
 
+# A field goes in either allowlist only when a use case reads it and the PR
+# says which one. Expected first entry for ALLOWED_TIMESTAMP_FIELDS:
+# `approved_at` on a draft, once GReader's approval flow needs it -- unlike
+# `created_at`/`updated_at`, that's a business fact, not row bookkeeping.
+ALLOWED_TIMESTAMP_FIELDS: set[str] = set()  # empty on purpose
+ALLOWED_ID_SUFFIX_FIELDS = {"artifact_id"}
+
+
+def _dataclass_field_names(tree: ast.Module) -> list[tuple[str, str, int]]:
+    fields = []
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for item in node.body:
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                fields.append((node.name, item.target.id, item.lineno))
+    return fields
+
+
+def test_domain_models_hold_no_table_only_fields() -> None:
+    violations = []
+    for source_file in sorted(CORE_ROOT.glob("*/models.py")):
+        tree = _parse(source_file)
+        for class_name, field_name, lineno in _dataclass_field_names(tree):
+            if (
+                field_name.endswith("_at")
+                and field_name not in ALLOWED_TIMESTAMP_FIELDS
+            ):
+                violations.append(
+                    f"{source_file}:{lineno}: {class_name}.{field_name} "
+                    "(looks like a persistence timestamp)"
+                )
+            elif (
+                field_name.endswith("_id")
+                and field_name not in ALLOWED_ID_SUFFIX_FIELDS
+            ):
+                violations.append(
+                    f"{source_file}:{lineno}: {class_name}.{field_name} "
+                    "(looks like a foreign-key column)"
+                )
+
+    assert not violations, (
+        "AGENTS.md 'Layering' -> models.py: the domain layer holds business "
+        "concepts only and does not carry fields that exist to satisfy a "
+        "table (see CORE-11). A field ending in `_at` or `_id` must be "
+        "allowlisted in ALLOWED_TIMESTAMP_FIELDS / ALLOWED_ID_SUFFIX_FIELDS "
+        "if a use case reads it -- say which one in the PR. Violations:\n"
+        + "\n".join(violations)
+    )
+
+
 def test_http_client_tests_live_under_integration() -> None:
     violations = []
     for source_file in sorted(TESTS_ROOT.rglob("*.py")):
