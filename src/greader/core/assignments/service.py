@@ -1,7 +1,5 @@
 """Assignment use cases independent from HTTP and database technology."""
 
-from typing import Any
-
 from greader.core.assignments.models import Assignment
 from greader.core.assignments.repository import AssignmentRepository
 
@@ -33,7 +31,7 @@ class AssignmentService:
         title: str,
         problem_statement: str,
         difficulty: str,
-        metadata: dict[str, Any] | None = None,
+        metadata: dict[str, object] | None = None,
     ) -> Assignment:
         """Create and persist an Assignment."""
         assignment = Assignment(
@@ -51,7 +49,7 @@ class AssignmentService:
         title: str | None = None,
         problem_statement: str | None = None,
         difficulty: str | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: dict[str, object] | None = None,
     ) -> Assignment:
         """Update supplied fields while retaining all omitted values."""
         existing = self.get(assignment_id)

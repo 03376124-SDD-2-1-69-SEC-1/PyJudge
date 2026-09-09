@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +24,7 @@ class Assignment:
     title: str
     problem_statement: str
     difficulty: str
-    metadata: dict[str, Any]
+    metadata: dict[str, object]
     artifact_id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
