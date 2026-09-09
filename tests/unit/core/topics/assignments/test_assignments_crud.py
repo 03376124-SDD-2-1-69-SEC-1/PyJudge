@@ -81,3 +81,30 @@ def test_assignments_crud_endpoints():
         client.delete(f"/api/v1/assignments/{assign_id}").status_code
         == status.HTTP_404_NOT_FOUND
     )
+
+
+def test_update_assignment_without_metadata():
+    # 1. Create assignment
+    res = client.post(
+        "/api/v1/assignments",
+        json={
+            "title": "HW1 Bug Fix Test",
+            "problem_statement": "Test problem",
+            "difficulty": "easy",
+            "metadata": {"initial": "value"},
+        },
+    )
+    assert res.status_code == status.HTTP_201_CREATED
+    assign_id = res.json()["id"]
+
+    # 2. Update without including 'metadata' in payload (Should return 200 OK)
+    res_update = client.put(
+        f"/api/v1/assignments/{assign_id}",
+        json={
+            "title": "HW1 Updated",
+            "problem_statement": "Updated problem",
+            "difficulty": "medium",
+        },
+    )
+    assert res_update.status_code == status.HTTP_200_OK
+    assert res_update.json()["title"] == "HW1 Updated"
