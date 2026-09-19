@@ -13,9 +13,8 @@ client โดยตรง" — ไฟล์นี้ถูก import ได้�
 ห้าม import ตรงจาก src/greader/core/*
 """
 
-from __future__ import annotations
-
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import (
     BigInteger,
@@ -29,6 +28,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
+
+# No `from __future__ import annotations` here on purpose: SQLModel's
+# Relationship() resolves its related class from the *runtime* annotation
+# object, not from SQLAlchemy's Mapped[]-based declarative typing. Postponed
+# evaluation turns every annotation into an unparsed string and breaks that
+# resolution (confirmed: it fails identically whether the annotation is
+# `list[X]` or `Mapped[list["X"]]`). A relationship pointing at a class defined
+# later in this file is written as a quoted forward reference instead, e.g.
+# `list["KnowledgeDocument"]` — the old PEP 484 style, not Mapped[].
 
 SCHEMA = "core"
 
@@ -98,8 +106,8 @@ class User(SQLModel, table=True):
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    documents: list[KnowledgeDocument] = Relationship(back_populates="uploader")
-    generation_requests: list[GenerationRequest] = Relationship(
+    documents: list["KnowledgeDocument"] = Relationship(back_populates="uploader")
+    generation_requests: list["GenerationRequest"] = Relationship(
         back_populates="requester"
     )
 
@@ -166,7 +174,7 @@ class GenerationRequest(SQLModel, table=True):
     updated_at: datetime = _updated_at()
 
     requester: User | None = Relationship(back_populates="generation_requests")
-    artifacts: list[GenerationArtifact] = Relationship(back_populates="request")
+    artifacts: list["GenerationArtifact"] = Relationship(back_populates="request")
 
 
 class GenerationArtifact(SQLModel, table=True):
@@ -207,7 +215,7 @@ class GenerationArtifact(SQLModel, table=True):
     # unique=True บน assignments.artifact_id อยู่แล้ว แต่เขียนไว้กันพลาด
     # ถ้าวันหลังมีคนถอด unique ออก จะได้ error ตรงจุดแทนที่จะเงียบๆ
     # กลายเป็น list
-    assignment: Assignment | None = Relationship(
+    assignment: Optional["Assignment"] = Relationship(
         back_populates="artifact",
         sa_relationship_kwargs={"uselist": False},
     )
@@ -248,7 +256,7 @@ class Assignment(SQLModel, table=True):
     updated_at: datetime = _updated_at()
 
     artifact: GenerationArtifact | None = Relationship(back_populates="assignment")
-    test_cases: list[TestCase] = Relationship(
+    test_cases: list["TestCase"] = Relationship(
         back_populates="assignment",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
