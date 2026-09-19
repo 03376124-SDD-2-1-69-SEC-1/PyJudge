@@ -37,6 +37,10 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The repo root on sys.path so tests can import the fakes in tests/fakes/.
+# They live under tests/ on purpose: an in-memory adapter inside src/ can be
+# wired into a running application by accident.
+pythonpath = ["."]
 addopts = "--strict-markers"
 filterwarnings = [
     "ignore::pytest.PytestCollectionWarning",
@@ -60,6 +64,11 @@ exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN401"]
+
+[tool.ruff.lint.isort]
+# `tests` is an import root too (see pytest pythonpath), so the fakes and
+# contracts sort with greader instead of landing among third-party packages.
+known-first-party = ["greader", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/env.py" = ["E402", "I001"]

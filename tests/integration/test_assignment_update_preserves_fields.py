@@ -1,4 +1,4 @@
-"""The maintainer's regression test for the PUT-wipes-fields bug.
+"""The maintainer's regression test for the partial-update-wipes-fields bug.
 
 Reported twice, on PR #14 and PR #15: `update_assignment_as_dict` builds a
 fresh `Assignment` from the request payload alone and hands it to
@@ -25,12 +25,12 @@ clobbering the field.
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.main import create_app
+from tests.fakes.app import build_app
 
 
 @pytest.fixture()
 async def client():
-    application = create_app()
+    application = build_app()
     transport = ASGITransport(app=application)
     async with AsyncClient(
         transport=transport,
@@ -67,7 +67,7 @@ async def test_title_only_update_preserves_test_cases_and_artifact_id(
     )
     assert tc_created.status_code == 201
 
-    updated = await client.put(
+    updated = await client.patch(
         f"/api/v1/assignments/{assignment_id}",
         json={"title": "New title"},
     )
@@ -83,7 +83,7 @@ async def test_title_only_update_preserves_test_cases_and_artifact_id(
         await client.get(f"/api/v1/assignments/{assignment_id}/test-cases")
     ).json()
     assert len(test_cases) == 1, (
-        "PUT with a title-only payload must not drop test_cases -- the "
+        "PATCH with a title-only payload must not drop test_cases -- the "
         "service must load the existing Assignment and merge, not build a "
         "fresh one from the payload alone."
     )

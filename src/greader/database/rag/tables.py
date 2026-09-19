@@ -16,8 +16,6 @@ column type — ตอนเช็ค pyproject.toml ใน handoff ยังไ
 คู่กับ sqlmodel/psycopg/alembic
 """
 
-from __future__ import annotations
-
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
@@ -34,6 +32,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
+
+# No `from __future__ import annotations` here on purpose -- see the identical
+# note in database/core/tables.py. SQLModel resolves Relationship()'s related
+# class from the runtime annotation object; postponed evaluation breaks that.
 
 SCHEMA = "rag"
 EMBEDDING_DIM = 768  # ล็อกตาม embedding model จริง (§6.4) — เปลี่ยนโมเดล
@@ -117,7 +119,7 @@ class KnowledgeSource(SQLModel, table=True):
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    chunks: list[KnowledgeChunk] = Relationship(
+    chunks: list["KnowledgeChunk"] = Relationship(
         back_populates="source",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

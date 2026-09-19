@@ -1,11 +1,29 @@
 """Domain representation of an Assignment and its embedded TestCases."""
 
 from dataclasses import dataclass, field
+from enum import StrEnum
+
+
+class Difficulty(StrEnum):
+    """How hard an Assignment is.
+
+    The same three values the `core.assignments` CHECK constraint allows,
+    declared here so an invalid difficulty fails in the domain rather than only
+    at the schema layer or the database.
+    """
+
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
 
 
 @dataclass(frozen=True, slots=True)
 class TestCase:
-    """A single executable test case belonging to an Assignment."""
+    """A single executable test case belonging to an Assignment.
+
+    `id` is `None` only before the repository has persisted it — the repository
+    assigns child ids just as it assigns the parent's.
+    """
 
     input_data: str
     expected_output: str
@@ -29,7 +47,7 @@ class Assignment:
 
     title: str
     problem_statement: str
-    difficulty: str
+    difficulty: Difficulty
     id: int | None = None
     metadata: dict[str, object] = field(default_factory=dict)
     artifact_id: int | None = None

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from greader.core.assignments.models import Assignment, TestCase
-from greader.core.assignments.repository import AssignmentRepository
+from greader.core.assignments.models import Assignment, Difficulty, TestCase
+from greader.core.assignments.ports import AssignmentRepository
 
 
 class AssignmentNotFoundError(Exception):
@@ -36,12 +36,11 @@ class AssignmentService:
         self,
         title: str,
         problem_statement: str,
-        difficulty: str,
+        difficulty: Difficulty,
         metadata: dict[str, object] | None = None,
     ) -> Assignment:
         """Create and persist an Assignment."""
         assignment = Assignment(
-            id=None,
             title=title,
             problem_statement=problem_statement,
             difficulty=difficulty,
@@ -49,32 +48,62 @@ class AssignmentService:
         )
         return self._repo.create(assignment)
 
-    def update(
+    def replace(
+        self,
+        assignment_id: int,
+        title: str,
+        problem_statement: str,
+        difficulty: Difficulty,
+        metadata: dict[str, object],
+    ) -> Assignment:
+        """Replace every client-writable field of an Assignment.
+
+        Test cases and `artifact_id` are not client-writable through this use
+        case, so they are carried over from the stored entity.
+        """
+        existing = self.get(assignment_id)
+        return self._repo.update(
+            Assignment(
+                id=assignment_id,
+                title=title,
+                problem_statement=problem_statement,
+                difficulty=difficulty,
+                metadata=metadata,
+                artifact_id=existing.artifact_id,
+                test_cases=existing.test_cases,
+            )
+        )
+
+    def patch(
         self,
         assignment_id: int,
         title: str | None = None,
         problem_statement: str | None = None,
-        difficulty: str | None = None,
+        difficulty: Difficulty | None = None,
         metadata: dict[str, object] | None = None,
     ) -> Assignment:
         """Update supplied fields while retaining all omitted values."""
         existing = self.get(assignment_id)
-        updated_assignment = Assignment(
-            id=assignment_id,
-            title=title if title is not None else existing.title,
-            problem_statement=problem_statement
-            if problem_statement is not None
-            else existing.problem_statement,
-            difficulty=difficulty if difficulty is not None else existing.difficulty,
-            metadata=metadata if metadata is not None else existing.metadata,
-            artifact_id=existing.artifact_id,
-            test_cases=existing.test_cases,
+        return self._repo.update(
+            Assignment(
+                id=assignment_id,
+                title=title if title is not None else existing.title,
+                problem_statement=problem_statement
+                if problem_statement is not None
+                else existing.problem_statement,
+                difficulty=difficulty
+                if difficulty is not None
+                else existing.difficulty,
+                metadata=metadata if metadata is not None else existing.metadata,
+                artifact_id=existing.artifact_id,
+                test_cases=existing.test_cases,
+            )
         )
-        return self._repo.update(updated_assignment)
 
-    def delete(self, assignment_id: int) -> bool:
-        """Delete an Assignment and report whether it existed."""
-        return self._repo.delete(assignment_id)
+    def delete(self, assignment_id: int) -> None:
+        """Delete an Assignment or raise when it does not exist."""
+        if not self._repo.delete(assignment_id):
+            raise AssignmentNotFoundError
 
     def add_test_case(
         self,
@@ -84,18 +113,26 @@ class AssignmentService:
         is_hidden: bool,
         order_index: int,
     ) -> TestCase:
-        """Append a TestCase to an Assignment and persist the aggregate."""
+        """Append a TestCase to an Assignment and persist the aggregate.
+
+        The id comes from the repository, not from here: a service-side counter
+        would disagree with the sequence the database uses and would reuse an id
+        after a delete.
+        """
         existing = self.get(assignment_id)
-        next_id = max((tc.id for tc in existing.test_cases if tc.id), default=0) + 1
         new_test_case = TestCase(
-            id=next_id,
             input_data=input_data,
             expected_output=expected_output,
             is_hidden=is_hidden,
             order_index=order_index,
         )
-        self._save_test_cases(existing, [*existing.test_cases, new_test_case])
-        return new_test_case
+        updated = self._save_test_cases(existing, [*existing.test_cases, new_test_case])
+
+        known_ids = {test_case.id for test_case in existing.test_cases}
+        # Exactly one test case must be new. Unpacking fails loudly if the
+        # adapter returned anything else, instead of guessing which one it is.
+        (added,) = [tc for tc in updated.test_cases if tc.id not in known_ids]
+        return added
 
     def list_test_cases(self, assignment_id: int) -> list[TestCase]:
         """Return every TestCase belonging to an Assignment."""
@@ -136,19 +173,18 @@ class AssignmentService:
             updated_test_case if tc.id == test_case_id else tc
             for tc in existing_assignment.test_cases
         ]
-        self._save_test_cases(existing_assignment, replacement)
-        return updated_test_case
+        updated = self._save_test_cases(existing_assignment, replacement)
+        return self._find_test_case(updated, test_case_id)
 
-    def delete_test_case(self, assignment_id: int, test_case_id: int) -> bool:
-        """Delete a TestCase and report whether it existed."""
+    def delete_test_case(self, assignment_id: int, test_case_id: int) -> None:
+        """Delete a TestCase or raise when it does not exist."""
         existing_assignment = self.get(assignment_id)
         remaining = [
             tc for tc in existing_assignment.test_cases if tc.id != test_case_id
         ]
         if len(remaining) == len(existing_assignment.test_cases):
-            return False
+            raise TestCaseNotFoundError
         self._save_test_cases(existing_assignment, remaining)
-        return True
 
     def _find_test_case(self, assignment: Assignment, test_case_id: int) -> TestCase:
         for test_case in assignment.test_cases:
@@ -158,14 +194,15 @@ class AssignmentService:
 
     def _save_test_cases(
         self, assignment: Assignment, test_cases: list[TestCase]
-    ) -> None:
-        updated_assignment = Assignment(
-            id=assignment.id,
-            title=assignment.title,
-            problem_statement=assignment.problem_statement,
-            difficulty=assignment.difficulty,
-            metadata=assignment.metadata,
-            artifact_id=assignment.artifact_id,
-            test_cases=test_cases,
+    ) -> Assignment:
+        return self._repo.update(
+            Assignment(
+                id=assignment.id,
+                title=assignment.title,
+                problem_statement=assignment.problem_statement,
+                difficulty=assignment.difficulty,
+                metadata=assignment.metadata,
+                artifact_id=assignment.artifact_id,
+                test_cases=test_cases,
+            )
         )
-        self._repo.update(updated_assignment)

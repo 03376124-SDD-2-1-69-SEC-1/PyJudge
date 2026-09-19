@@ -271,11 +271,12 @@ src/greader/
 │   │   ├── repository.py        typing.Protocol + InMemory impl
 │   │   ├── service.py           sync ล้วน รับ repo ผ่าน constructor
 │   │   └── routes.py            sync def, ดึง service จาก app.state
-│   └── assignments/             🔒 teammate — ยังเป็น docstring
+│   └── assignments/             ✅ slice ที่สมบูรณ์แล้ว — มี SQL adapter ใน database/core/
 │       ├── models.py            dataclass ล้วน
-│       ├── repository.py        Protocol interface
+│       ├── ports.py             typing.Protocol
 │       ├── service.py
-│       └── routes.py
+│       ├── routes.py
+│       └── testcase_routes.py
 │
 ├── database/                    ← ของ tech lead คนเดียว ที่เดียวที่ import ORM ได้
 │   │                              (ดู AGENTS.md หัวข้อ "Who may change database and locked files")
@@ -285,7 +286,7 @@ src/greader/
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── tables.py            ✅ SQLModel — schema `core`
-│   │   └── assignment_repository.py   ⏳ adapter ของ tech lead (รอ Protocol จาก teammate)
+│   │   └── assignment_repository.py   ✅ implement core/assignments/ports.py
 │   └── rag/
 │       ├── __init__.py
 │       └── tables.py            ✅ SQLModel — schema `rag`
@@ -304,7 +305,7 @@ alembic/                         ← root ตาม convention
 
 ```text
 core/assignments/models.py      (dataclass)
-core/assignments/repository.py  (Protocol)
+core/assignments/ports.py       (Protocol)
             ↑ implement โดย ↓
 database/core/assignment_repository.py   ← adapter ของ tech lead อยู่ตรงนี้เท่านั้น
             ↓ ใช้ ↓
@@ -500,9 +501,7 @@ USING hnsw (embedding vector_cosine_ops);
 
 | เรื่อง | สถานะ |
 |---|---|
-| `main.py` ยังไม่ mount assignment router | ต้องตกลงว่าใครใส่ |
 | Embedding model ตัวจริง | `VECTOR(768)` เป็น one-way door เปลี่ยนมิติทีหลัง = migrate ทั้งตาราง |
-| Protocol ใน `core/assignments/repository.py` | รอ teammate กำหนดก่อน ถึงจะเขียน adapter ได้ |
 
 ## เทคโนโลยีที่ใช้
 

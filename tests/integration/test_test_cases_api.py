@@ -3,13 +3,13 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.main import create_app
+from tests.fakes.app import build_app
 
 
 @pytest.fixture()
 async def client() -> AsyncClient:
     """Yield an isolated async client for one test."""
-    application = create_app()
+    application = build_app()
     transport = ASGITransport(app=application)
     async with AsyncClient(
         transport=transport,
@@ -145,7 +145,7 @@ async def test_update_test_case_title_only_preserves_other_fields(
     )
     test_case_id = created.json()["id"]
 
-    response = await client.put(
+    response = await client.patch(
         f"/api/v1/assignments/{assignment_id}/test-cases/{test_case_id}",
         json={"is_hidden": True},
     )

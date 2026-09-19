@@ -3,12 +3,12 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.main import create_app
+from tests.fakes.app import build_app
 
 
 @pytest.fixture()
 async def client():
-    application = create_app()
+    application = build_app()
     transport = ASGITransport(app=application)
     async with AsyncClient(
         transport=transport,
@@ -75,10 +75,10 @@ async def test_topic_patch_empty_body_is_a_no_op(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_topic_patch_unknown_id_returns_404(client: AsyncClient) -> None:
-    response = await client.patch("/api/v1/topics/missing", json={"name": "Trees"})
+    response = await client.patch("/api/v1/topics/999999", json={"name": "Trees"})
 
     assert response.status_code == 404
-    assert response.json() == {"detail": {"code": "topic_not_found"}}
+    assert response.json()["detail"]["code"] == "topic_not_found"
 
 
 @pytest.mark.anyio
@@ -93,7 +93,7 @@ async def test_topic_patch_duplicate_name_returns_409(client: AsyncClient) -> No
     )
 
     assert response.status_code == 409
-    assert response.json() == {"detail": {"code": "topic_name_conflict"}}
+    assert response.json()["detail"]["code"] == "topic_name_conflict"
 
 
 @pytest.mark.anyio
@@ -118,7 +118,7 @@ async def test_topic_duplicate_name_returns_stable_error_code(
     response = await client.post("/api/v1/topics", json={"name": " graphs "})
 
     assert response.status_code == 409
-    assert response.json() == {"detail": {"code": "topic_name_conflict"}}
+    assert response.json()["detail"]["code"] == "topic_name_conflict"
 
 
 @pytest.mark.anyio

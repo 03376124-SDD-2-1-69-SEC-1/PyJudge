@@ -158,7 +158,11 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
 # `approved_at` on a draft, once GReader's approval flow needs it -- unlike
 # `created_at`/`updated_at`, that's a business fact, not row bookkeeping.
 ALLOWED_TIMESTAMP_FIELDS: set[str] = set()  # empty on purpose
-ALLOWED_ID_SUFFIX_FIELDS = {"artifact_id"}
+# `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
+# `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
+# Citation carries them as a business fact about itself (which source chunk it
+# quotes), not as a column that exists only to satisfy a table (OPS-12).
+ALLOWED_ID_SUFFIX_FIELDS = {"artifact_id", "chunk_id", "source_id"}
 
 
 def _dataclass_field_names(tree: ast.Module) -> list[tuple[str, str, int]]:
@@ -201,6 +205,63 @@ def test_domain_models_hold_no_table_only_fields() -> None:
         "allowlisted in ALLOWED_TIMESTAMP_FIELDS / ALLOWED_ID_SUFFIX_FIELDS "
         "if a use case reads it -- say which one in the PR. Violations:\n"
         + "\n".join(violations)
+    )
+
+
+def test_no_in_memory_adapter_ships_inside_src() -> None:
+    """Fakes live in tests/fakes/, never in the package.
+
+    An in-memory adapter inside `src/` can be wired into a running application by
+    accident, which is how every endpoint came to serve process memory while the
+    Neon database sat unused. Keeping them out of the package makes that
+    impossible rather than merely discouraged.
+    """
+    violations = []
+    for source_file in sorted(SRC_ROOT.rglob("*.py")):
+        tree = _parse(source_file)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            if node.name.startswith(("InMemory", "Fake")):
+                violations.append(f"{source_file}:{node.lineno}: {node.name}")
+
+    assert not violations, (
+        "In-memory adapters belong in tests/fakes/, not in src/greader/. "
+        "Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_create_app_has_no_adapter_defaults() -> None:
+    """Omitting an argument must mean "build the real adapter", never a fake.
+
+    Every keyword-only argument defaults to None so `create_app()` wires SQL and
+    R2 adapters; a non-None default would let the application start on something
+    that is not the database.
+    """
+    tree = _parse(MAIN_PY)
+    create_app_node = next(
+        (
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "create_app"
+        ),
+        None,
+    )
+    assert create_app_node is not None, f"{MAIN_PY} must define create_app()"
+
+    violations = [
+        argument.arg
+        for argument, default in zip(
+            create_app_node.args.kwonlyargs,
+            create_app_node.args.kw_defaults,
+            strict=True,
+        )
+        if not (isinstance(default, ast.Constant) and default.value is None)
+    ]
+
+    assert not violations, (
+        "create_app keyword arguments must default to None so an omitted "
+        "argument builds the real adapter. Violations: " + ", ".join(violations)
     )
 
 

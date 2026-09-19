@@ -1,6 +1,6 @@
 """Generation slice: HTTP contract, client Protocol, and routes."""
 
-from greader.core.generation.repository import GenerationClient
+from greader.core.generation.ports import GenerationClient
 from greader.core.generation.schemas import (
     AssignmentDraft,
     Citation,

@@ -1,5 +1,7 @@
 """FastAPI adapter for the Topic reference API."""
 
+from typing import NoReturn
+
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from greader.core.topics.models import Topic
@@ -27,12 +29,18 @@ def _response(topic: Topic) -> TopicResponse:
     return TopicResponse(id=topic.id, name=topic.name, description=topic.description)
 
 
-def _raise_not_found() -> None:
-    raise HTTPException(status_code=404, detail={"code": "topic_not_found"})
+def _raise_not_found() -> NoReturn:
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={"code": "topic_not_found", "message": "Topic not found"},
+    )
 
 
-def _raise_name_conflict() -> None:
-    raise HTTPException(status_code=409, detail={"code": "topic_name_conflict"})
+def _raise_name_conflict() -> NoReturn:
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={"code": "topic_name_conflict", "message": "Topic name already in use"},
+    )
 
 
 @router.post("", response_model=TopicResponse, status_code=status.HTTP_201_CREATED)
@@ -56,7 +64,7 @@ def list_topics(request: Request) -> list[TopicResponse]:
 
 
 @router.get("/{topic_id}", response_model=TopicResponse)
-def get_topic(request: Request, topic_id: str) -> TopicResponse:
+def get_topic(request: Request, topic_id: int) -> TopicResponse:
     """Get one Topic."""
     try:
         return _response(_service(request).get(topic_id))
@@ -67,7 +75,7 @@ def get_topic(request: Request, topic_id: str) -> TopicResponse:
 @router.put("/{topic_id}", response_model=TopicResponse)
 def replace_topic(
     request: Request,
-    topic_id: str,
+    topic_id: int,
     payload: TopicReplace,
 ) -> TopicResponse:
     """Replace one Topic."""
@@ -88,7 +96,7 @@ def replace_topic(
 @router.patch("/{topic_id}", response_model=TopicResponse)
 def patch_topic(
     request: Request,
-    topic_id: str,
+    topic_id: int,
     payload: TopicPatch,
 ) -> TopicResponse:
     """Update only the fields present in the request body."""
@@ -110,7 +118,7 @@ def patch_topic(
 
 
 @router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_topic(request: Request, topic_id: str) -> Response:
+def delete_topic(request: Request, topic_id: int) -> Response:
     """Delete one Topic."""
     try:
         _service(request).delete(topic_id)
