@@ -22,8 +22,9 @@ from greader.core.assignments.ports import AssignmentRepository
 from greader.core.assignments.routes import router as assignment_router
 from greader.core.assignments.service import AssignmentService
 from greader.core.assignments.testcase_routes import router as test_case_router
-from greader.core.generation.ports import GenerationClient
+from greader.core.generation.ports import GenerationClient, GenerationRepository
 from greader.core.generation.routes import router as generation_router
+from greader.core.generation.service import GenerationService
 from greader.core.topics.ports import TopicRepository
 from greader.core.topics.routes import router as topic_router
 from greader.core.topics.service import TopicService
@@ -31,6 +32,7 @@ from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorag
 from greader.core.uploads.routes import router as upload_router
 from greader.core.uploads.service import UploadService
 from greader.database.core.assignment_repository import SQLAssignmentRepository
+from greader.database.core.generation_repository import SQLGenerationRepository
 from greader.database.core.knowledge_document_repository import (
     SQLKnowledgeDocumentRepository,
 )
@@ -58,6 +60,7 @@ def create_app(
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
+    generation_repository: GenerationRepository | None = None,
 ) -> FastAPI:
     """Build the application, wiring SQL adapters for anything not supplied."""
     # Resolved lazily and at most once each, so an app built entirely from
@@ -112,7 +115,11 @@ def create_app(
 
     if generation_client is None:
         generation_client = StubGenerationClient()
-    application.state.generation_client = generation_client
+    if generation_repository is None:
+        generation_repository = SQLGenerationRepository(use_session_factory())
+    application.state.generation_service = GenerationService(
+        generation_repository, generation_client
+    )
 
     application.include_router(topic_router)
     application.include_router(assignment_router)

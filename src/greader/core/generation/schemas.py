@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from greader.core.generation.models import ReviewStatus
+
 
 class ContractModel(BaseModel):
     """Base model that rejects fields outside the shared contract."""
@@ -53,7 +55,21 @@ class Citation(ContractModel):
 
 
 class GenerationResponse(ContractModel):
-    """Draft and supporting citations returned by the generation endpoint."""
+    """Draft and supporting citations a GenerationClient returns.
+
+    This is the wire shape between Core and the AI client -- it carries no id
+    because nothing has been persisted yet at that point. The persisted
+    artifact returned by the HTTP endpoints is `GenerationArtifactResponse`.
+    """
 
     draft: AssignmentDraft
     citations: list[Citation]
+
+
+class GenerationArtifactResponse(ContractModel):
+    """Persisted generation artifact returned by the generation endpoints."""
+
+    id: int
+    draft: AssignmentDraft
+    citations: list[Citation]
+    review_status: ReviewStatus

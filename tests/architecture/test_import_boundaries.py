@@ -6,10 +6,11 @@ from pathlib import Path
 
 CORE_ROOT = Path("src/greader/core")
 
-# Generation is intentionally a pure proxy: its route forwards the request to the
-# GenerationClient port and returns the response unchanged. With no business logic,
-# retries, response mapping, or error translation, a service layer would add no value.
-ROUTE_SERVICE_EXCEPTIONS = {"generation"}
+# Every slice now has a service layer: generation lost its exemption once its
+# route started persisting a request/artifact through GenerationService instead
+# of calling GenerationClient directly (OPS-12). Keep this set empty rather than
+# deleting it, so the next bare-proxy slice has an obvious place to register.
+ROUTE_SERVICE_EXCEPTIONS: set[str] = set()
 
 
 def test_core_never_imports_ai() -> None:
@@ -61,7 +62,7 @@ def test_every_slice_module_is_importable() -> None:
             "testcase_routes",
         ),
         "uploads": ("models", "schemas", "ports", "service", "routes"),
-        "generation": ("schemas", "ports", "routes"),
+        "generation": ("models", "schemas", "ports", "service", "routes"),
     }
     for slice_name, modules in slices.items():
         for module in modules:

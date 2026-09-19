@@ -158,7 +158,11 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
 # `approved_at` on a draft, once GReader's approval flow needs it -- unlike
 # `created_at`/`updated_at`, that's a business fact, not row bookkeeping.
 ALLOWED_TIMESTAMP_FIELDS: set[str] = set()  # empty on purpose
-ALLOWED_ID_SUFFIX_FIELDS = {"artifact_id"}
+# `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
+# `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
+# Citation carries them as a business fact about itself (which source chunk it
+# quotes), not as a column that exists only to satisfy a table (OPS-12).
+ALLOWED_ID_SUFFIX_FIELDS = {"artifact_id", "chunk_id", "source_id"}
 
 
 def _dataclass_field_names(tree: ast.Module) -> list[tuple[str, str, int]]:
