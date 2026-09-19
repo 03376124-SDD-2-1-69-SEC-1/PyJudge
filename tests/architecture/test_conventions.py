@@ -204,6 +204,63 @@ def test_domain_models_hold_no_table_only_fields() -> None:
     )
 
 
+def test_no_in_memory_adapter_ships_inside_src() -> None:
+    """Fakes live in tests/fakes/, never in the package.
+
+    An in-memory adapter inside `src/` can be wired into a running application by
+    accident, which is how every endpoint came to serve process memory while the
+    Neon database sat unused. Keeping them out of the package makes that
+    impossible rather than merely discouraged.
+    """
+    violations = []
+    for source_file in sorted(SRC_ROOT.rglob("*.py")):
+        tree = _parse(source_file)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            if node.name.startswith(("InMemory", "Fake")):
+                violations.append(f"{source_file}:{node.lineno}: {node.name}")
+
+    assert not violations, (
+        "In-memory adapters belong in tests/fakes/, not in src/greader/. "
+        "Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_create_app_has_no_adapter_defaults() -> None:
+    """Omitting an argument must mean "build the real adapter", never a fake.
+
+    Every keyword-only argument defaults to None so `create_app()` wires SQL and
+    R2 adapters; a non-None default would let the application start on something
+    that is not the database.
+    """
+    tree = _parse(MAIN_PY)
+    create_app_node = next(
+        (
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "create_app"
+        ),
+        None,
+    )
+    assert create_app_node is not None, f"{MAIN_PY} must define create_app()"
+
+    violations = [
+        argument.arg
+        for argument, default in zip(
+            create_app_node.args.kwonlyargs,
+            create_app_node.args.kw_defaults,
+            strict=True,
+        )
+        if not (isinstance(default, ast.Constant) and default.value is None)
+    ]
+
+    assert not violations, (
+        "create_app keyword arguments must default to None so an omitted "
+        "argument builds the real adapter. Violations: " + ", ".join(violations)
+    )
+
+
 def test_http_client_tests_live_under_integration() -> None:
     violations = []
     for source_file in sorted(TESTS_ROOT.rglob("*.py")):

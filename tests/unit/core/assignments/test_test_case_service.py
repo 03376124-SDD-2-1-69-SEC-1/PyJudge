@@ -1,21 +1,24 @@
+"""Tests for TestCase application rules on the Assignment aggregate."""
+
 import pytest
 
-from greader.core.assignments.repository import InMemoryAssignmentRepository
+from greader.core.assignments.models import Difficulty
 from greader.core.assignments.service import (
     AssignmentNotFoundError,
     AssignmentService,
     TestCaseNotFoundError,
 )
+from tests.fakes.assignments import FakeAssignmentRepository
 
 
 def _make_service_with_assignment() -> tuple[AssignmentService, int]:
-    service = AssignmentService(InMemoryAssignmentRepository())
+    service = AssignmentService(FakeAssignmentRepository())
     assignment = service.create(
         title="Assignment",
         problem_statement="Solve it",
-        difficulty="easy",
+        difficulty=Difficulty.EASY,
     )
-    return service, assignment.id or 0
+    return service, assignment.id
 
 
 def test_add_test_case_persists_on_the_assignment() -> None:
@@ -33,8 +36,25 @@ def test_add_test_case_persists_on_the_assignment() -> None:
     assert service.get(assignment_id).test_cases == [created]
 
 
+def test_add_test_case_returns_the_id_the_repository_assigned() -> None:
+    """The service must not invent child ids: the store owns them."""
+    service, assignment_id = _make_service_with_assignment()
+
+    created = service.add_test_case(
+        assignment_id=assignment_id,
+        input_data="1",
+        expected_output="1",
+        is_hidden=False,
+        order_index=0,
+    )
+
+    stored = service.get_test_case(assignment_id, created.id)
+    assert isinstance(created.id, int)
+    assert stored == created
+
+
 def test_add_test_case_on_missing_assignment_raises() -> None:
-    service = AssignmentService(InMemoryAssignmentRepository())
+    service = AssignmentService(FakeAssignmentRepository())
 
     with pytest.raises(AssignmentNotFoundError):
         service.add_test_case(
@@ -65,7 +85,7 @@ def test_update_test_case_field_only_preserves_other_fields() -> None:
 
     updated = service.update_test_case(
         assignment_id=assignment_id,
-        test_case_id=created.id or 0,
+        test_case_id=created.id,
         is_hidden=True,
     )
 
@@ -93,7 +113,7 @@ def test_update_test_case_does_not_disturb_other_test_cases() -> None:
     )
 
     service.update_test_case(
-        assignment_id=assignment_id, test_case_id=first.id or 0, input_data="1 updated"
+        assignment_id=assignment_id, test_case_id=first.id, input_data="1 updated"
     )
 
     stored = service.list_test_cases(assignment_id)
@@ -118,16 +138,16 @@ def test_delete_test_case_removes_only_that_case() -> None:
         order_index=1,
     )
 
-    deleted = service.delete_test_case(assignment_id, first.id or 0)
+    service.delete_test_case(assignment_id, first.id)
 
-    assert deleted is True
     assert service.list_test_cases(assignment_id) == [second]
 
 
-def test_delete_missing_test_case_returns_false() -> None:
+def test_delete_missing_test_case_raises() -> None:
     service, assignment_id = _make_service_with_assignment()
 
-    assert service.delete_test_case(assignment_id, 999) is False
+    with pytest.raises(TestCaseNotFoundError):
+        service.delete_test_case(assignment_id, 999)
 
 
 def test_deleting_assignment_removes_its_test_cases() -> None:

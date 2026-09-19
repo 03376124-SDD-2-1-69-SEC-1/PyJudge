@@ -1,31 +1,33 @@
-"""HTTP integration tests for the R2 file-upload endpoint."""
+"""HTTP integration tests for the knowledge document upload endpoint."""
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.database.storage import MAX_UPLOAD_SIZE_BYTES, get_r2_client
-from greader.main import create_app
+from tests.fakes.app import build_app
+from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
 
-
-class FakeR2Client:
-    """Stub in place of the boto3 client — never touches real R2."""
-
-    def __init__(self) -> None:
-        self.uploads: list[tuple[str, str, str]] = []
-
-    def upload_file(self, local_path: str, bucket: str, key: str) -> None:
-        self.uploads.append((local_path, bucket, key))
+MAX_UPLOAD_SIZE_BYTES = 64
 
 
 @pytest.fixture()
-async def fake_r2_client():
-    return FakeR2Client()
+async def storage() -> FakeObjectStorage:
+    return FakeObjectStorage()
 
 
 @pytest.fixture()
-async def client(fake_r2_client: FakeR2Client):
-    application = create_app()
-    application.dependency_overrides[get_r2_client] = lambda: fake_r2_client
+async def documents() -> FakeKnowledgeDocumentRepository:
+    return FakeKnowledgeDocumentRepository()
+
+
+@pytest.fixture()
+async def client(
+    storage: FakeObjectStorage, documents: FakeKnowledgeDocumentRepository
+):
+    application = build_app(
+        object_storage=storage,
+        knowledge_document_repository=documents,
+        max_upload_size_bytes=MAX_UPLOAD_SIZE_BYTES,
+    )
     transport = ASGITransport(app=application)
     async with AsyncClient(
         transport=transport,
@@ -35,24 +37,51 @@ async def client(fake_r2_client: FakeR2Client):
 
 
 @pytest.mark.anyio
-async def test_upload_stores_file_and_returns_bucket_key(
-    client: AsyncClient, fake_r2_client: FakeR2Client
+async def test_upload_stores_the_object_and_indexes_a_document(
+    client: AsyncClient, storage: FakeObjectStorage
 ) -> None:
     response = await client.post(
         "/api/v1/uploads",
         files={"file": ("notes.txt", b"hello world", "text/plain")},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     body = response.json()
-    assert body["bucket"]
-    assert body["key"].startswith("uploads/")
-    assert body["key"].endswith("-notes.txt")
-    assert len(fake_r2_client.uploads) == 1
+    assert isinstance(body["id"], int)
+    assert body["filename"] == "notes.txt"
+    assert body["object_key"].startswith("uploads/")
+    assert body["object_key"].endswith("-notes.txt")
+    assert body["status"] == "uploaded"
+    assert list(storage.objects) == [body["object_key"]]
 
 
 @pytest.mark.anyio
-async def test_upload_rejects_file_over_size_limit(client: AsyncClient) -> None:
+async def test_uploaded_document_is_readable_by_id(client: AsyncClient) -> None:
+    """A citation's document_id resolves to a filename through Core (CORE-09)."""
+    created = await client.post(
+        "/api/v1/uploads",
+        files={"file": ("lecture.pdf", b"%PDF-1.4 fake", "application/pdf")},
+    )
+    document_id = created.json()["id"]
+
+    response = await client.get(f"/api/v1/uploads/{document_id}")
+
+    assert response.status_code == 200
+    assert response.json()["filename"] == "lecture.pdf"
+
+
+@pytest.mark.anyio
+async def test_unknown_document_returns_404(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/uploads/999999")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "knowledge_document_not_found"
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_file_over_size_limit(
+    client: AsyncClient, storage: FakeObjectStorage
+) -> None:
     oversized = b"x" * (MAX_UPLOAD_SIZE_BYTES + 1)
 
     response = await client.post(
@@ -61,11 +90,15 @@ async def test_upload_rejects_file_over_size_limit(client: AsyncClient) -> None:
     )
 
     assert response.status_code == 413
+    assert response.json()["detail"]["code"] == "upload_too_large"
+    assert storage.objects == {}
 
 
 @pytest.mark.anyio
-async def test_openapi_describes_upload_operation(client: AsyncClient) -> None:
+async def test_openapi_describes_upload_operations(client: AsyncClient) -> None:
     response = await client.get("/openapi.json")
 
     assert response.status_code == 200
-    assert set(response.json()["paths"]["/api/v1/uploads"]) == {"post"}
+    paths = response.json()["paths"]
+    assert set(paths["/api/v1/uploads"]) == {"post"}
+    assert set(paths["/api/v1/uploads/{document_id}"]) == {"get"}

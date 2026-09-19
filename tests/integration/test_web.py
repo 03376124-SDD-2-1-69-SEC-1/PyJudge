@@ -3,12 +3,12 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.main import create_app
+from tests.fakes.app import build_app
 
 
 @pytest.mark.anyio
 async def test_home_uses_shared_layout_without_authored_javascript() -> None:
-    transport = ASGITransport(app=create_app())
+    transport = ASGITransport(app=build_app())
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/")
 

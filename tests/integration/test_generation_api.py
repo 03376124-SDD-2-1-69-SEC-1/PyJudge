@@ -3,12 +3,12 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.main import create_app
+from tests.fakes.app import build_app
 
 
 @pytest.fixture()
 async def client():
-    application = create_app()
+    application = build_app()
     transport = ASGITransport(app=application)
     async with AsyncClient(
         transport=transport,
