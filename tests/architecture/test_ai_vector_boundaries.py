@@ -12,10 +12,6 @@ def test_ai_application_keeps_storage_imports_in_adapter() -> None:
                 modules = [alias.name for alias in node.names]
             elif isinstance(node, ast.ImportFrom):
                 modules = [node.module or ""]
-                if path.name == "service.py":
-                    assert all(
-                        alias.name != "InMemoryVectorRepository" for alias in node.names
-                    ), path
             else:
                 continue
             for module in modules:

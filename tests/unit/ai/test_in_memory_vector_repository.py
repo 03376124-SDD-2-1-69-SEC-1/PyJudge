@@ -3,12 +3,9 @@
 import pytest
 
 from greader.ai.app.models import NewKnowledgeChunk, NewKnowledgeSource
-from greader.ai.app.repository import (
-    DuplicateChunkError,
-    DuplicateSourceError,
-    InMemoryVectorRepository,
-)
+from greader.ai.app.repository import DuplicateChunkError, DuplicateSourceError
 from greader.ai.app.service import VectorService
+from tests.fakes.vector import FakeVectorRepository
 
 MODEL_A = "model-a"
 MODEL_B = "model-b"
@@ -46,7 +43,7 @@ def _chunk(
 
 
 def test_search_returns_expected_fields_and_similarity_score() -> None:
-    service = VectorService(InMemoryVectorRepository())
+    service = VectorService(FakeVectorRepository())
     created = service.create_source_with_chunks(_source(1), (_chunk(0, _embedding()),))
 
     results = service.search(_embedding(), embedding_model=MODEL_A, top_k=1)
@@ -60,7 +57,7 @@ def test_search_returns_expected_fields_and_similarity_score() -> None:
 
 
 def test_search_ranks_by_cosine_similarity() -> None:
-    service = VectorService(InMemoryVectorRepository())
+    service = VectorService(FakeVectorRepository())
     service.create_source_with_chunks(
         _source(1),
         (
@@ -80,7 +77,7 @@ def test_search_ranks_by_cosine_similarity() -> None:
 
 
 def test_equal_scores_use_ascending_chunk_id() -> None:
-    service = VectorService(InMemoryVectorRepository())
+    service = VectorService(FakeVectorRepository())
     created = service.create_source_with_chunks(
         _source(1),
         (_chunk(0, _embedding()), _chunk(1, _embedding())),
@@ -95,7 +92,7 @@ def test_equal_scores_use_ascending_chunk_id() -> None:
 
 
 def test_search_isolates_embedding_models() -> None:
-    service = VectorService(InMemoryVectorRepository())
+    service = VectorService(FakeVectorRepository())
     service.create_source_with_chunks(
         _source(1, MODEL_A), (_chunk(0, _embedding(), model=MODEL_A),)
     )
@@ -109,7 +106,7 @@ def test_search_isolates_embedding_models() -> None:
 
 
 def test_search_excludes_chunks_without_embeddings() -> None:
-    service = VectorService(InMemoryVectorRepository())
+    service = VectorService(FakeVectorRepository())
     service.create_source_with_chunks(
         _source(1),
         (
@@ -124,14 +121,14 @@ def test_search_excludes_chunks_without_embeddings() -> None:
 
 
 def test_search_returns_empty_list_when_nothing_matches() -> None:
-    service = VectorService(InMemoryVectorRepository())
+    service = VectorService(FakeVectorRepository())
 
     assert service.search(_embedding(), embedding_model=MODEL_A, top_k=10) == []
 
 
 @pytest.mark.parametrize("scale", [1e-300, 1e300])
 def test_cosine_avoids_float_overflow_and_underflow(scale: float) -> None:
-    service = VectorService(InMemoryVectorRepository())
+    service = VectorService(FakeVectorRepository())
     vector = _embedding(scale, scale)
     service.create_source_with_chunks(_source(1), (_chunk(0, vector),))
     results = service.search(vector, embedding_model=MODEL_A, top_k=1)
@@ -139,7 +136,7 @@ def test_cosine_avoids_float_overflow_and_underflow(scale: float) -> None:
 
 
 def test_duplicate_source_raises_contract_error() -> None:
-    repository = InMemoryVectorRepository()
+    repository = FakeVectorRepository()
     repository.create_source_with_chunks(_source(1), ())
 
     with pytest.raises(DuplicateSourceError):
@@ -147,7 +144,7 @@ def test_duplicate_source_raises_contract_error() -> None:
 
 
 def test_duplicate_chunks_roll_back_source_and_all_ids() -> None:
-    repository = InMemoryVectorRepository()
+    repository = FakeVectorRepository()
     duplicate_chunks = (
         _chunk(0, _embedding(), content_hash="same-hash"),
         _chunk(1, _embedding(), content_hash="same-hash"),

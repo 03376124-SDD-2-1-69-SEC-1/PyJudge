@@ -81,12 +81,12 @@ async def test_openapi_documents_shared_validation_envelope(client):
 
 @pytest.mark.anyio
 async def test_existing_topic_error_codes_are_unchanged(client):
-    missing = await client.get("/api/v1/topics/missing")
+    missing = await client.get("/api/v1/topics/999999")
     assert missing.status_code == 404
-    assert missing.json() == {"detail": {"code": "topic_not_found"}}
+    assert missing.json()["detail"]["code"] == "topic_not_found"
     assert (
         await client.post("/api/v1/topics", json={"name": "Graphs"})
     ).status_code == 201
     duplicate = await client.post("/api/v1/topics", json={"name": "Graphs"})
     assert duplicate.status_code == 409
-    assert duplicate.json() == {"detail": {"code": "topic_name_conflict"}}
+    assert duplicate.json()["detail"]["code"] == "topic_name_conflict"

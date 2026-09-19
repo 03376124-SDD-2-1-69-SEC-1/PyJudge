@@ -5,12 +5,11 @@ factory from the composition root. Importing this module does not read database
 credentials or create an engine.
 """
 
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
-from typing import Any
 
 from sqlalchemy import insert, literal, select
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import RowMapping, make_url
 from sqlalchemy.exc import (
     ArgumentError,
     IntegrityError,
@@ -193,7 +192,7 @@ def _search_statement(embedding: Embedding, *, embedding_model: str, limit: int)
     )
 
 
-def _source_from_row(row: Mapping[str, Any]) -> KnowledgeSource:
+def _source_from_row(row: RowMapping) -> KnowledgeSource:
     return KnowledgeSource(
         id=row["id"],
         core_document_id=row["core_document_id"],
@@ -206,7 +205,7 @@ def _source_from_row(row: Mapping[str, Any]) -> KnowledgeSource:
     )
 
 
-def _chunk_from_row(row: Mapping[str, Any]) -> KnowledgeChunk:
+def _chunk_from_row(row: RowMapping) -> KnowledgeChunk:
     stored_embedding = row["embedding"]
     return KnowledgeChunk(
         id=row["id"],
@@ -227,8 +226,7 @@ def _chunk_from_row(row: Mapping[str, Any]) -> KnowledgeChunk:
 
 
 def _translate_integrity_error(error: IntegrityError) -> VectorRepositoryError:
-    diagnostic = getattr(error.orig, "diag", None)
-    constraint_name = getattr(diagnostic, "constraint_name", None)
+    constraint_name = error.orig.diag.constraint_name
     if constraint_name == SOURCE_UNIQUE_CONSTRAINT:
         return DuplicateSourceError()
     if constraint_name == CHUNK_UNIQUE_CONSTRAINT:

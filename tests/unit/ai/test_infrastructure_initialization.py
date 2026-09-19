@@ -49,6 +49,7 @@ with patch('sqlmodel.create_engine', side_effect=AssertionError('engine construc
 
 
 def test_missing_database_url_fails_loudly_before_any_connection(monkeypatch) -> None:
+    monkeypatch.setattr(config, "load_dotenv", lambda: None)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("R2_ENDPOINT_URL", "https://example.r2.cloudflarestorage.com")
     monkeypatch.setenv("R2_BUCKET_NAME", "test-bucket")
@@ -59,6 +60,7 @@ def test_missing_database_url_fails_loudly_before_any_connection(monkeypatch) ->
 
 
 def test_settings_are_resolved_once_and_reused(monkeypatch) -> None:
+    monkeypatch.setattr(config, "load_dotenv", lambda: None)
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
     monkeypatch.setenv("R2_ENDPOINT_URL", "https://example.r2.cloudflarestorage.com")
     monkeypatch.setenv("R2_BUCKET_NAME", "test-bucket")

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from greader.ai.app.repository import InMemoryVectorRepository, VectorRepository
+from greader.ai.app.repository import VectorRepository
 from greader.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
 from greader.core.assignments.ports import AssignmentRepository
 from greader.core.generation.ports import GenerationClient, GenerationRepository
@@ -20,6 +20,7 @@ from tests.fakes.assignments import FakeAssignmentRepository
 from tests.fakes.generation import FakeGenerationRepository
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
+from tests.fakes.vector import FakeVectorRepository
 
 
 def fake_settings(
@@ -63,7 +64,7 @@ def build_app(
     if generation_repository is None:
         generation_repository = FakeGenerationRepository()
     if vector_repository is None:
-        vector_repository = InMemoryVectorRepository()
+        vector_repository = FakeVectorRepository()
 
     return create_app(
         settings=fake_settings(max_upload_size_bytes=max_upload_size_bytes),

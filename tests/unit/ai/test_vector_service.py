@@ -5,8 +5,8 @@ from dataclasses import replace
 import pytest
 
 from greader.ai.app.models import NewKnowledgeChunk, NewKnowledgeSource
-from greader.ai.app.repository import InMemoryVectorRepository
 from greader.ai.app.service import VectorService, VectorValidationError
+from tests.fakes.vector import FakeVectorRepository
 
 MODEL = "text-embedding-sample"
 
@@ -44,7 +44,7 @@ def _chunk(
 
 
 def _service() -> VectorService:
-    return VectorService(InMemoryVectorRepository())
+    return VectorService(FakeVectorRepository())
 
 
 def test_create_source_with_chunks_returns_database_shaped_ids() -> None:

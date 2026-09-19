@@ -15,11 +15,11 @@ from greader.ai.app.models import (
     SourceCreationResult,
 )
 from greader.ai.app.repository import (
-    InMemoryVectorRepository,
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
 from greader.database.rag import vector_repository as postgres_adapter
+from tests.fakes.vector import FakeVectorRepository
 
 MODEL_A = "model-a"
 MODEL_B = "model-b"
@@ -70,7 +70,7 @@ def _search_payload(*, model: str = MODEL_A, top_k: int = 10) -> dict[str, objec
 
 @pytest.fixture()
 async def client() -> AsyncIterator[AsyncClient]:
-    application = ai_main.create_app(repository=InMemoryVectorRepository())
+    application = ai_main.create_app(repository=FakeVectorRepository())
     transport = ASGITransport(app=application)
     async with AsyncClient(
         transport=transport,
@@ -335,7 +335,7 @@ def test_import_and_test_app_construction_need_no_credentials(monkeypatch) -> No
     monkeypatch.delenv("DATABASE_URL", raising=False)
 
     reloaded = importlib.reload(ai_main)
-    application = reloaded.create_app(repository=InMemoryVectorRepository())
+    application = reloaded.create_app(repository=FakeVectorRepository())
 
     assert application.state.vector_service is not None
 
@@ -361,7 +361,7 @@ def test_production_factory_requires_database_url(monkeypatch) -> None:
 
 
 def test_production_factory_selects_postgres_without_connecting(monkeypatch) -> None:
-    repository = InMemoryVectorRepository()
+    repository = FakeVectorRepository()
     engine = object()
     create_engine_calls: list[tuple[object, bool]] = []
 
