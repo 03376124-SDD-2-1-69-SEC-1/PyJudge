@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Request, status
 
-from greader.core.generation.repository import GenerationClient
+from greader.core.generation.ports import GenerationClient
 from greader.core.generation.schemas import GenerationRequest, GenerationResponse
 
 router = APIRouter(prefix="/api/v1/generations", tags=["generation"])

@@ -1,7 +1,8 @@
-"""Client seam for the generation use case.
+"""Client port for the generation use case.
 
-The ai repo satisfies this Protocol with a real HTTP adapter later (OPS-04).
-Nothing in core/ may import that adapter directly; only main.py wires it in.
+`ai/client.py` satisfies this Protocol with a stub today and an HTTP adapter
+later (OPS-04). Nothing in `core/` may import that adapter directly; only
+`main.py` wires it in.
 """
 
 from typing import Protocol

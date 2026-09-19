@@ -1,7 +1,8 @@
-"""Storage seam and in-memory adapter for Topics.
+"""Repository port for Topics.
 
-When the database owner defines the Core schema, add a new adapter here or in
-the database package. Keep TopicService dependent on TopicRepository.
+`database/core/topic_repository.py` provides the SQL adapter and
+`tests/fakes/topics.py` the in-memory one. Keep TopicService dependent on this
+Protocol only.
 """
 
 from typing import Protocol
@@ -10,39 +11,33 @@ from greader.core.topics.models import Topic
 
 
 class TopicRepository(Protocol):
-    """Database operations required by Topic use cases."""
+    """Persistence operations required by TopicService.
+
+    `create` is the only operation allowed to assign an id: it takes a Topic
+    whose `id` is `None` and returns one whose `id` is a real int. `update` takes
+    and returns a Topic that already has its id.
+    """
 
     def list(self) -> list[Topic]:
         """Return every stored Topic."""
         ...
 
-    def get(self, topic_id: str) -> Topic | None:
+    def get(self, topic_id: int) -> Topic | None:
         """Return one Topic, if it exists."""
         ...
 
-    def save(self, topic: Topic) -> None:
-        """Create or replace a Topic."""
+    def find_by_name(self, name: str) -> Topic | None:
+        """Return the Topic holding this name, compared case-insensitively."""
         ...
 
-    def delete(self, topic_id: str) -> bool:
+    def create(self, topic: Topic) -> Topic:
+        """Insert a Topic and return it with the id the store assigned."""
+        ...
+
+    def update(self, topic: Topic) -> Topic:
+        """Replace an existing Topic and return the stored value."""
+        ...
+
+    def delete(self, topic_id: int) -> bool:
         """Delete a Topic and report whether it existed."""
         ...
-
-
-class InMemoryTopicRepository:
-    """Process-local storage used until a database adapter exists."""
-
-    def __init__(self) -> None:
-        self._topics: dict[str, Topic] = {}
-
-    def list(self) -> list[Topic]:
-        return list(self._topics.values())
-
-    def get(self, topic_id: str) -> Topic | None:
-        return self._topics.get(topic_id)
-
-    def save(self, topic: Topic) -> None:
-        self._topics[topic.id] = topic
-
-    def delete(self, topic_id: str) -> bool:
-        return self._topics.pop(topic_id, None) is not None
