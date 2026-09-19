@@ -256,11 +256,12 @@ src/greader/
 │   │   ├── repository.py        typing.Protocol + in-memory impl
 │   │   ├── service.py           pure sync, receives repo via constructor
 │   │   └── routes.py            sync def, pulls service from app.state
-│   └── assignments/              🔒 teammate — still docstrings only
+│   └── assignments/              ✅ complete slice — SQL adapter in database/core/
 │       ├── models.py            plain dataclasses
-│       ├── repository.py        Protocol interface
+│       ├── ports.py             typing.Protocol
 │       ├── service.py
-│       └── routes.py
+│       ├── routes.py
+│       └── testcase_routes.py
 │
 ├── database/                    ← tech lead only; the only place allowed to import an ORM
 │   │                              (see AGENTS.md § "Who may change database and locked files")
@@ -270,7 +271,7 @@ src/greader/
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── tables.py            ✅ SQLModel — schema `core`
-│   │   └── assignment_repository.py   ⏳ tech lead's adapter (waiting on teammate's Protocol)
+│   │   └── assignment_repository.py   ✅ implements core/assignments/ports.py
 │   └── rag/
 │       ├── __init__.py
 │       └── tables.py            ✅ SQLModel — schema `rag`
@@ -289,7 +290,7 @@ Hard rule — import direction:
 
 ```text
 core/assignments/models.py      (dataclass)
-core/assignments/repository.py  (Protocol)
+core/assignments/ports.py       (Protocol)
             ↑ implemented by ↓
 database/core/assignment_repository.py   ← tech lead's adapter lives here, and only here
             ↓ uses ↓
@@ -490,9 +491,7 @@ forgotten split.
 
 | Topic | Status |
 |---|---|
-| `main.py` doesn't mount the assignment router yet | Need to agree who adds it |
 | Real embedding model | `VECTOR(768)` is a one-way door — changing dimensions later means migrating the whole table |
-| Protocol in `core/assignments/repository.py` | Waiting on the teammate to define it before the adapter can be written |
 
 ## Technology Stack
 

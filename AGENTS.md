@@ -11,8 +11,8 @@ setup and background live in `README.md` and `docs/adr/`.
 | Area                      | State                                               | Owner            |
 | ------------------------- | --------------------------------------------------- | ---------------- |
 | `core/topics`             | Working. **The reference slice — copy its shape.**  | shared           |
-| `core/assignments`        | Placeholder (docstrings only)                       | Assignment owner |
-| `database/`               | **Done.** 8 tables live on Neon, migrations applied | DB owner         |
+| `core/assignments`        | Working. Complete slice with a SQL adapter.         | Assignment owner |
+| `database/`               | **Done.** 9 tables live on Neon, migrations applied | DB owner         |
 | `ai/`                     | In progress                                         | AI owner         |
 | `web/templates/base.html` | Shared layout                                       | Design           |
 
@@ -43,16 +43,20 @@ BigInteger` is expected and correct.
 ## Layering
 
 ```
-routes.py → service.py → repository Protocol → adapter
+routes.py → service.py → ports.py (Protocol) → adapter
 ```
 
 | File            | Holds                                     | Must not import              |
 | --------------- | ----------------------------------------- | ---------------------------- |
 | `models.py`     | domain model (frozen slotted dataclass)   | FastAPI, ORM, storage client |
 | `schemas.py`    | request/response shapes for OpenAPI       | business rules               |
-| `repository.py` | `typing.Protocol` + in-memory adapter     | HTTP                         |
+| `ports.py`      | `typing.Protocol`                         | HTTP                         |
 | `service.py`    | use cases; takes the repo via constructor | FastAPI, ORM, SQL            |
 | `routes.py`     | HTTP in, service call, error mapping      | business rules, SQL          |
+
+The in-memory adapter is not part of the slice — it lives in
+`tests/fakes/<slice>.py` (e.g. `tests/fakes/topics.py`), satisfying the same
+Protocol as the SQL adapter under `database/`.
 
 Database adapters live only in `database/core/<slice>_repository.py`.
 Nothing under `core/` may import an ORM or a storage client.
@@ -146,7 +150,7 @@ a `typing.Protocol` defined in the module that needs it, never through a
 concrete client type directly.
 
 - The Protocol is the port. It lives next to the code that uses it
-  (e.g. `core/generation/repository.py` defines the Protocol and its interface;
+  (e.g. `core/generation/ports.py` defines the Protocol and its interface;
   `ai/client.py` provides an adapter that implements it).
 - Concrete implementations are adapters: a stub for tests/mocks, a real one
   for production. Both satisfy the same Protocol.
@@ -186,9 +190,12 @@ throwaway infrastructure:
 - `tests/r2/` — mark tests `r2`, read the client and bucket from the
   `r2_test_bucket` fixture and a unique key from `r2_test_prefix`, and never
   from `R2_BUCKET_NAME`/`R2_ENDPOINT_URL`/etc. Reserve this marker for
-  behaviour `moto` cannot faithfully reproduce (presigned URLs actually
-  fetched, multipart upload, conditional-write conflicts) — everything else
-  (upload-then-list) stays on `moto` or the existing stub. CI supplies
+  behaviour the existing stub cannot faithfully reproduce (presigned URLs
+  actually fetched, multipart upload, conditional-write conflicts) —
+  everything else (upload-then-list) stays on the existing stub. `moto` is
+  not a dev dependency today (not listed in `pyproject.toml`); adopting it
+  would be a dependency change, so that's an OPS task, not something to add
+  ad hoc. CI supplies
   `R2_TEST_ENDPOINT_URL`, `R2_TEST_ACCESS_KEY_ID`, `R2_TEST_SECRET_ACCESS_KEY`
   (secrets) and `R2_TEST_BUCKET_NAME` (variable), pointing at a dedicated
   `greader-ci` bucket, plus a per-run `R2_TEST_PREFIX` cleaned up by
@@ -237,7 +244,7 @@ you add a rule here, add its test in the same PR.
 
 **`X | None` is allowed in exactly three cases**
 
-1. A `Repository.get()` whose Protocol declares `X | None` (see `core/topics/repository.py`).
+1. A `Repository.get()` whose Protocol declares `X | None` (see `core/topics/ports.py`).
 2. A domain field that is genuinely nullable, e.g. `artifact_id: str | None`.
 3. An optional argument defaulting to `None` where the `None` case is handled explicitly
    on the following lines.
