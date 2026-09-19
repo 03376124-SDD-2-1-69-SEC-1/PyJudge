@@ -67,6 +67,6 @@ class TopicPatch(BaseModel):
 class TopicResponse(BaseModel):
     """Public representation returned by the Topic API."""
 
-    id: str
+    id: int
     name: str
     description: str | None

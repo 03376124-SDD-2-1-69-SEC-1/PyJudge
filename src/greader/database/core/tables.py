@@ -23,6 +23,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     func,
     text,
 )
@@ -280,3 +281,26 @@ class TestCase(SQLModel, table=True):
     updated_at: datetime = _updated_at()
 
     assignment: Assignment | None = Relationship(back_populates="test_cases")
+
+
+class Topic(SQLModel, table=True):
+    """หัวข้อที่ใช้จัดหมวด Assignment (OPS-12)
+
+    ไม่มี FK จาก assignments มาที่นี่ — ตอนนี้ assignments.metadata เก็บ topic
+    เป็นค่าใน JSONB ตาม §6 ยังไม่ได้ตกลงว่าจะผูกเป็นความสัมพันธ์จริง
+    """
+
+    __tablename__ = "topics"
+    __table_args__ = (
+        # unique แบบ case-insensitive: กฎเดิมใน TopicService เทียบด้วย casefold
+        # อยู่แล้ว เอามาเป็น index ของ DB เพื่อให้ adapter ทั้งสองตัวตอบเหมือนกัน
+        # และให้ find_by_name ใช้ index ได้ ไม่ต้องโหลดทุกแถว
+        Index("uq_topics_name_lower", text("lower(name)"), unique=True),
+        {"schema": SCHEMA},
+    )
+
+    id: int | None = _pk()
+    name: str = Field(nullable=False)
+    description: str | None = Field(default=None)
+    created_at: datetime = _created_at()
+    updated_at: datetime = _updated_at()

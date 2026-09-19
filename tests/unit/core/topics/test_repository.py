@@ -1,19 +1,18 @@
-"""Tests for the in-memory Topic storage adapter."""
+"""The in-memory TopicRepository against the shared contract.
 
-from greader.core.topics.models import Topic
-from greader.core.topics.repository import InMemoryTopicRepository
+`tests/db/test_topic_repository.py` binds the same contract to the SQL adapter.
+"""
 
+import pytest
 
-def test_repository_returns_saved_topic() -> None:
-    repository = InMemoryTopicRepository()
-    topic = Topic(id="topic-1", name="Graphs", description="Network problems")
-
-    repository.save(topic)
-
-    assert repository.get("topic-1") == topic
+from greader.core.topics.ports import TopicRepository
+from tests.contracts.topic_repository import TopicRepositoryContract
+from tests.fakes.topics import FakeTopicRepository
 
 
-def test_repository_delete_reports_missing_topic() -> None:
-    repository = InMemoryTopicRepository()
+class TestFakeTopicRepository(TopicRepositoryContract):
+    """Run the contract against the in-memory adapter."""
 
-    assert repository.delete("missing") is False
+    @pytest.fixture()
+    def repository(self) -> TopicRepository:
+        return FakeTopicRepository()
