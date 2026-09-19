@@ -8,7 +8,7 @@ bucket `greader-ci` (ลบของเก่ากว่า 1 วัน) เป
 ห้ามแก้ guard ของ prefix เด็ดขาด: prefix ผิดพลาด (ว่าง, "/", หรือไม่ขึ้นต้น
 ด้วย "ci/" หรือ "local/") ต้องทำให้ script exit ไม่ใช่ 0 ทันที ไม่งั้น bug เล็ก ๆ
 ในตัวแปร environment จะกลายเป็นการลบทั้ง bucket guard เดียวกันนี้ (และการเช็ค
-endpoint) อยู่ใน src/greader/r2_safety.py ใช้ร่วมกับ tests/conftest.py — ที่นั่น
+endpoint) อยู่ใน src/greader/database/storage/safety.py ใช้ร่วมกับ tests/conftest.py — ที่นั่น
 เป็นอีกจุดที่ลบ object จริงเหมือนกัน
 """
 
@@ -20,7 +20,7 @@ import sys
 import boto3
 from botocore.config import Config
 
-from greader.r2_safety import assert_safe_prefix, assert_valid_r2_endpoint
+from greader.database.storage.safety import assert_safe_prefix, assert_valid_r2_endpoint
 
 REQUIRED_VARS = (
     "R2_TEST_ENDPOINT_URL",

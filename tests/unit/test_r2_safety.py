@@ -2,7 +2,7 @@
 
 import pytest
 
-from greader.r2_safety import assert_valid_r2_endpoint
+from greader.database.storage.safety import assert_valid_r2_endpoint
 
 
 def test_accepts_a_well_formed_endpoint() -> None:

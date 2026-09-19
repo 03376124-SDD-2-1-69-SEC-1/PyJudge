@@ -22,7 +22,7 @@ from urllib.parse import urlsplit
 import boto3
 import pytest
 
-from greader.r2_safety import assert_safe_prefix, assert_valid_r2_endpoint
+from greader.database.storage.safety import assert_safe_prefix, assert_valid_r2_endpoint
 
 TEST_URL_VAR = "POSTGRES_TEST_URL"
 SHARED_URL_VARS = ("DATABASE_URL", "DATABASE_URL_UNPOOLED")
