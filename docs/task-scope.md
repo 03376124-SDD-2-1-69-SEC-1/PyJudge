@@ -38,6 +38,7 @@ This is a single repo. "ai repo" in this table resolves to `src/greader/ai/`.
 | OPS-11 | พาย | `docs/task-scope.md`, `AGENTS.md`, `pyproject.toml` | a row that owns a slice can mount it without an out-of-scope edit |
 | CORE-11 | พาย | `src/greader/core/assignments/`, `tests/` | the domain layer holds no field that exists only to satisfy a table; the contract test covers parent/child containment |
 | OPS-12 | พาย | anything | wired Assignments/Topics/Uploads to real Postgres and R2; removed every in-memory adapter from src/; fixed a pre-existing SQLModel mapper bug in tables.py. Done — see refactor/OPS-12-real-persistence. |
+| OPS-13 | พาย | `core/generation/__init__.py`, `core/generation/service.py`, `database/core/generation_repository.py`, `tests/fakes/generation.py`, `tests/contracts/generation_repository.py`, `tests/db/test_generation_repository.py`, `tests/db/conftest.py`, `tests/unit/core/generation/test_generation_repository_contract.py`, `tests/unit/core/generation/test_generation_service.py` | `__init__.py` no longer re-exports schema types under domain names; the JSON codec is public and shared by both adapters; a contract test proves the fake and SQL adapter round-trip identically; `generate()` marks a request failed if `create_artifact` raises, not only if the client call does |
 
 ## The composition root
 

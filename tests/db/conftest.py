@@ -11,7 +11,13 @@ from sqlalchemy import create_engine, text
 
 from greader.database.session import SessionFactory, build_session_factory
 
-CORE_TABLES = ("core.assignments", "core.topics", "core.knowledge_documents")
+CORE_TABLES = (
+    "core.assignments",
+    "core.topics",
+    "core.knowledge_documents",
+    "core.generation_requests",
+    "core.generation_artifacts",
+)
 
 
 @pytest.fixture(scope="module")

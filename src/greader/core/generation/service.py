@@ -38,6 +38,11 @@ class GenerationService:
         A request that never gets an artifact is not silently dropped: it is
         left on record as `failed`, with the error code explaining why, and
         the failure is re-raised so the caller knows generation did not happen.
+        This covers the client call and the artifact write. It does not cover
+        `mark_request_completed` itself failing after a successful artifact
+        write -- the adapter opens one session per call with no transaction
+        spanning the two, so that narrower case leaves the request `pending`
+        despite an artifact existing.
         """
         filters: dict[str, object] = (
             request.filters.model_dump(exclude_none=True)
@@ -56,7 +61,15 @@ class GenerationService:
 
         draft = _to_domain_draft(response.draft)
         citations = [_to_domain_citation(citation) for citation in response.citations]
-        artifact = self._repository.create_artifact(request_id, draft, citations)
+
+        try:
+            artifact = self._repository.create_artifact(request_id, draft, citations)
+        except Exception as exc:
+            self._repository.mark_request_failed(
+                request_id, error_code="persistence_error"
+            )
+            raise GenerationFailedError from exc
+
         self._repository.mark_request_completed(request_id)
         return artifact
 
