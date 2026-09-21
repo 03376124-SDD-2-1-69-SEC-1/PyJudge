@@ -12,10 +12,16 @@ one passes a fake from `tests/fakes/` explicitly.
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session
 
+from greader.ai.app.repository import VectorRepository
+from greader.ai.app.routes import router as vector_router
+from greader.ai.app.schemas import ApplicationErrorResponse
+from greader.ai.app.service import VectorService
 from greader.ai.client import StubGenerationClient
 from greader.config import Settings, get_settings
 from greader.core.assignments.ports import AssignmentRepository
@@ -38,6 +44,7 @@ from greader.database.core.knowledge_document_repository import (
 )
 from greader.database.core.topic_repository import SQLTopicRepository
 from greader.database.health import check_db
+from greader.database.rag.vector_repository import PostgresVectorRepository
 from greader.database.session import (
     SessionFactory,
     build_engine,
@@ -61,6 +68,7 @@ def create_app(
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
     generation_repository: GenerationRepository | None = None,
+    vector_repository: VectorRepository | None = None,
 ) -> FastAPI:
     """Build the application, wiring SQL adapters for anything not supplied."""
     # Resolved lazily and at most once each, so an app built entirely from
@@ -84,6 +92,7 @@ def create_app(
         title="GReader",
         description="A modular-monolith service for instructor assignment authoring.",
         version="0.1.0",
+        responses={422: {"model": ApplicationErrorResponse}},
     )
     application.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
@@ -121,11 +130,31 @@ def create_app(
         generation_repository, generation_client
     )
 
+    if vector_repository is None:
+        vector_repository = PostgresVectorRepository(use_session_factory())
+    application.state.vector_service = VectorService(vector_repository)
+
     application.include_router(topic_router)
     application.include_router(assignment_router)
     application.include_router(test_case_router)
     application.include_router(generation_router)
     application.include_router(upload_router)
+    application.include_router(vector_router)
+
+    @application.exception_handler(RequestValidationError)
+    def request_validation_error(
+        request: Request, error: RequestValidationError
+    ) -> JSONResponse:
+        """Use the application error envelope without echoing submitted values."""
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": {
+                    "code": "request_validation_error",
+                    "message": "Request body or parameters are invalid",
+                }
+            },
+        )
 
     @application.get("/")
     def home(request: Request):

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from greader.ai.app.repository import VectorRepository
 from greader.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
 from greader.core.assignments.ports import AssignmentRepository
 from greader.core.generation.ports import GenerationClient, GenerationRepository
@@ -19,6 +20,7 @@ from tests.fakes.assignments import FakeAssignmentRepository
 from tests.fakes.generation import FakeGenerationRepository
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
+from tests.fakes.vector import FakeVectorRepository
 
 
 def fake_settings(
@@ -47,6 +49,7 @@ def build_app(
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
     generation_repository: GenerationRepository | None = None,
+    vector_repository: VectorRepository | None = None,
     max_upload_size_bytes: int = DEFAULT_MAX_UPLOAD_SIZE_BYTES,
 ) -> FastAPI:
     """Return an app whose every port is backed by a fake."""
@@ -60,6 +63,8 @@ def build_app(
         object_storage = FakeObjectStorage()
     if generation_repository is None:
         generation_repository = FakeGenerationRepository()
+    if vector_repository is None:
+        vector_repository = FakeVectorRepository()
 
     return create_app(
         settings=fake_settings(max_upload_size_bytes=max_upload_size_bytes),
@@ -69,4 +74,5 @@ def build_app(
         object_storage=object_storage,
         generation_client=generation_client,
         generation_repository=generation_repository,
+        vector_repository=vector_repository,
     )
