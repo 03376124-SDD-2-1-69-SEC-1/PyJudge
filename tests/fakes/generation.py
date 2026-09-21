@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from greader.core.generation.models import AssignmentDraft, Citation, GenerationArtifact
+from greader.database.core.generation_repository import (
+    citation_from_json,
+    citation_to_json,
+    draft_from_json,
+    draft_to_json,
+)
 
 
 @dataclass
@@ -49,11 +55,20 @@ class FakeGenerationRepository:
     def create_artifact(
         self, request_id: int, draft: AssignmentDraft, citations: list[Citation]
     ) -> GenerationArtifact:
-        """Insert an artifact linked to `request_id` and return it with an id."""
+        """Insert an artifact linked to `request_id` and return it with an id.
+
+        Round-trips `draft`/`citations` through the same JSON codec the SQL
+        adapter uses, so a contract test run against this fake exercises the
+        codec instead of just handing the same object back by reference.
+        """
         artifact_id = self._next_artifact_id
         self._next_artifact_id += 1
         artifact = GenerationArtifact(
-            id=artifact_id, draft=draft, citations=list(citations)
+            id=artifact_id,
+            draft=draft_from_json(draft_to_json(draft)),
+            citations=[
+                citation_from_json(citation_to_json(citation)) for citation in citations
+            ],
         )
         self._artifacts[artifact_id] = artifact
         return artifact

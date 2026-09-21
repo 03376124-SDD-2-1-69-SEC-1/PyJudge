@@ -3,6 +3,7 @@
 import pytest
 
 from greader.ai.client import StubGenerationClient
+from greader.core.generation.models import AssignmentDraft, Citation, GenerationArtifact
 from greader.core.generation.schemas import GenerationRequest
 from greader.core.generation.service import (
     GenerationArtifactNotFoundError,
@@ -18,6 +19,16 @@ class _FailingClient:
     def generate(self, request: GenerationRequest) -> None:
         """Raise instead of producing a draft."""
         raise RuntimeError("the AI service is unreachable")
+
+
+class _FailingArtifactRepository(FakeGenerationRepository):
+    """A GenerationRepository double whose create_artifact always raises."""
+
+    def create_artifact(
+        self, request_id: int, draft: AssignmentDraft, citations: list[Citation]
+    ) -> GenerationArtifact:
+        """Raise instead of persisting the artifact."""
+        raise RuntimeError("the database is unreachable")
 
 
 def test_generate_persists_request_and_artifact_and_returns_it() -> None:
@@ -62,6 +73,18 @@ def test_generate_marks_the_request_failed_and_raises_on_client_error() -> None:
     stored_request = repository.requests[1]
     assert stored_request.status == "failed"
     assert stored_request.error_code
+
+
+def test_generate_marks_the_request_failed_and_raises_when_persistence_fails() -> None:
+    repository = _FailingArtifactRepository()
+    service = GenerationService(repository, StubGenerationClient())
+
+    with pytest.raises(GenerationFailedError):
+        service.generate(GenerationRequest(prompt="anything"))
+
+    stored_request = repository.requests[1]
+    assert stored_request.status == "failed"
+    assert stored_request.error_code == "persistence_error"
 
 
 def test_get_returns_a_persisted_artifact() -> None:

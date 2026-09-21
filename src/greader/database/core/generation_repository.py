@@ -38,7 +38,12 @@ def _test_case_from_json(data: dict[str, object]) -> TestCaseDraft:
     )
 
 
-def _draft_to_json(draft: AssignmentDraft) -> dict[str, object]:
+def draft_to_json(draft: AssignmentDraft) -> dict[str, object]:
+    """Serialize a draft to the JSON shape stored in `generation_artifacts.draft`.
+
+    Public so `tests/fakes/generation.py` can round-trip through the same
+    codec the SQL adapter uses, instead of storing the domain object as-is.
+    """
     return {
         "title": draft.title,
         "statement": draft.statement,
@@ -46,7 +51,8 @@ def _draft_to_json(draft: AssignmentDraft) -> dict[str, object]:
     }
 
 
-def _draft_from_json(data: dict[str, object]) -> AssignmentDraft:
+def draft_from_json(data: dict[str, object]) -> AssignmentDraft:
+    """Inverse of `draft_to_json`."""
     test_cases = data["test_cases"]
     return AssignmentDraft(
         title=str(data["title"]),
@@ -55,7 +61,11 @@ def _draft_from_json(data: dict[str, object]) -> AssignmentDraft:
     )
 
 
-def _citation_to_json(citation: Citation) -> dict[str, object]:
+def citation_to_json(citation: Citation) -> dict[str, object]:
+    """Serialize a citation to the `generation_artifacts.citations` JSON shape.
+
+    Public so `tests/fakes/generation.py` can round-trip through it too.
+    """
     return {
         "chunk_id": citation.chunk_id,
         "source_id": citation.source_id,
@@ -65,7 +75,8 @@ def _citation_to_json(citation: Citation) -> dict[str, object]:
     }
 
 
-def _citation_from_json(data: dict[str, object]) -> Citation:
+def citation_from_json(data: dict[str, object]) -> Citation:
+    """Inverse of `citation_to_json`."""
     page = data["page"]
     return Citation(
         chunk_id=int(data["chunk_id"]),
@@ -79,8 +90,8 @@ def _citation_from_json(data: dict[str, object]) -> Citation:
 def _to_domain(row: GenerationArtifactRow) -> GenerationArtifact:
     return GenerationArtifact(
         id=row.id,
-        draft=_draft_from_json(row.draft),
-        citations=[_citation_from_json(item) for item in row.citations],
+        draft=draft_from_json(row.draft),
+        citations=[citation_from_json(item) for item in row.citations],
         review_status=ReviewStatus(row.review_status),
     )
 
@@ -139,8 +150,8 @@ class SQLGenerationRepository:
         with self._session_factory() as session:
             row = GenerationArtifactRow(
                 request_id=request_id,
-                draft=_draft_to_json(draft),
-                citations=[_citation_to_json(citation) for citation in citations],
+                draft=draft_to_json(draft),
+                citations=[citation_to_json(citation) for citation in citations],
             )
             session.add(row)
             session.commit()
