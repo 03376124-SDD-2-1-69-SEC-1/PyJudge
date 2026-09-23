@@ -72,6 +72,18 @@ _TEMPLATE_DIR = _WEB_DIR / "templates"
 _STATIC_DIR = _WEB_DIR / "static"
 
 
+def asset_url(path: str) -> str:
+    """Return `/static/<path>?v=<mtime>` so a rebuilt file gets a new URL.
+
+    StaticFiles sends no Cache-Control, so browsers cache app.css heuristically
+    from Last-Modified and can keep an old build for days, even across a
+    reload. The version changes whenever the file on disk changes, including
+    a `tailwindcss --watch` rebuild while the server keeps running.
+    """
+    version = int((_STATIC_DIR / path).stat().st_mtime)
+    return f"/static/{path}?v={version}"
+
+
 def create_app(
     *,
     settings: Settings | None = None,
@@ -116,6 +128,7 @@ def create_app(
     application.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
+    templates.env.globals["asset_url"] = asset_url
     application.state.templates = templates
     # The "log in as" list on G-01 exists only when scripts/demo.py passes it.
     if demo_accounts is None:
