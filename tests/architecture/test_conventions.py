@@ -173,6 +173,8 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "closed_at",
     "published_at",
     "changed_at",
+    # generation: T-01 Drafts "Created" column and T-03a "Generated ...".
+    "generated_at",
 }
 # `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
 # `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
@@ -338,7 +340,15 @@ LEGACY_TEMPLATE_RENDERERS: set[Path] = set()
 # Slices whose every public use case takes the Actor first. A slice listed here
 # is checked as soon as its service.py exists; assignments and generation join
 # when their use cases gain an actor.
-ACTOR_SLICES = ("classrooms", "submissions", "notifications", "admin", "documents")
+ACTOR_SLICES = (
+    "classrooms",
+    "assignments",
+    "generation",
+    "submissions",
+    "notifications",
+    "admin",
+    "documents",
+)
 ROLE_ATTRIBUTES = {"role", "instructor_id"}
 
 

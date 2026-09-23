@@ -20,7 +20,11 @@ from greader.core.assignments.ports import (
 from greader.core.auth.pages import DemoAccount
 from greader.core.auth.ports import AuthRepository, Clock
 from greader.core.classrooms.ports import ClassroomRepository, ClassroomStats
-from greader.core.generation.ports import GenerationClient, GenerationRepository
+from greader.core.generation.ports import (
+    DocumentCatalog,
+    DraftRepository,
+    GenerationClient,
+)
 from greader.core.topics.ports import TopicRepository
 from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from greader.integrations.email import StubEmailSender
@@ -33,7 +37,7 @@ from tests.fakes.assignments import (
 )
 from tests.fakes.auth import FakeAuthRepository, FakeClock
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
-from tests.fakes.generation import FakeGenerationRepository
+from tests.fakes.generation import FakeDocumentCatalog, FakeDraftRepository
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
@@ -67,7 +71,8 @@ def build_app(
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
-    generation_repository: GenerationRepository | None = None,
+    draft_repository: DraftRepository | None = None,
+    document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
     verification_mailer: StubEmailSender | None = None,
@@ -92,8 +97,10 @@ def build_app(
         knowledge_document_repository = FakeKnowledgeDocumentRepository()
     if object_storage is None:
         object_storage = FakeObjectStorage()
-    if generation_repository is None:
-        generation_repository = FakeGenerationRepository()
+    if draft_repository is None:
+        draft_repository = FakeDraftRepository()
+    if document_catalog is None:
+        document_catalog = FakeDocumentCatalog()
     if vector_repository is None:
         vector_repository = FakeVectorRepository()
     if auth_repository is None:
@@ -117,7 +124,8 @@ def build_app(
         knowledge_document_repository=knowledge_document_repository,
         object_storage=object_storage,
         generation_client=generation_client,
-        generation_repository=generation_repository,
+        draft_repository=draft_repository,
+        document_catalog=document_catalog,
         vector_repository=vector_repository,
         auth_repository=auth_repository,
         verification_mailer=verification_mailer,

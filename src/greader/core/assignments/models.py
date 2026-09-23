@@ -96,6 +96,18 @@ class AssignmentVersion:
 
 
 @dataclass(frozen=True, slots=True)
+class AssignmentContent:
+    """What T-04 steps 1-3 collect about the content itself."""
+
+    title: str
+    problem_statement: str
+    difficulty: Difficulty
+    test_cases: list[TestCase] = field(default_factory=list)
+    topic_id: int | None = None
+    settings: JudgingSettings = field(default_factory=JudgingSettings)
+
+
+@dataclass(frozen=True, slots=True)
 class Schedule:
     """T-04 step 3 settings copied into every Posting, editable per Classroom."""
 

@@ -1,0 +1,14 @@
+{# T-04 stepper header and the T-04a required-fields alert. #}
+{% from "_components/ui.html" import alert %}
+<ol class="steps" aria-label="Review steps">
+  {% for number, label in [(1, "Edit problem"), (2, "Test cases"), (3, "Settings"), (4, "Confirm classrooms")] %}
+  <li{% if number == step %} aria-current="step"{% elif number < step %} data-done{% endif %}>
+    <a class="no-underline" href="/classes/{{ classroom_id }}/drafts/{{ draft.id }}?step={{ number }}">{{ number }} · {{ label }}</a>
+  </li>
+  {% endfor %}
+</ol>
+{% if missing %}
+  {% call alert(tone="danger", state="T-04a") %}
+    Fill in the required fields before continuing: {{ missing | join(", ") }}.
+  {% endcall %}
+{% endif %}

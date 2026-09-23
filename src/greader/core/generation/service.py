@@ -1,103 +1,392 @@
-"""Generation use cases, independent from HTTP and persistence technology."""
+"""Generation use cases: T-03 generate, T-04 review stepper, publish (ADR-0007 §4).
+
+Every public method takes the Actor first. A Draft belongs to the Instructor
+who asked for it; anyone else is told it does not exist (404). The Classroom
+it is generated in must be one the Instructor owns.
+"""
 
 from __future__ import annotations
 
-from greader.core.generation.models import (
-    AssignmentDraft,
-    Citation,
-    GenerationArtifact,
-    TestCaseDraft,
+from dataclasses import replace
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
+
+from greader.core.assignments.models import (
+    AssignmentContent,
+    Difficulty,
+    JudgingSettings,
+    PublishedAssignment,
+    Schedule,
+    TestCase,
+    TestCaseKind,
 )
-from greader.core.generation.ports import GenerationClient, GenerationRepository
+from greader.core.auth.models import Actor, PermissionDeniedError, Role
+from greader.core.classrooms.models import Classroom, ClassroomRole
+from greader.core.generation.models import (
+    Citation,
+    DocumentSummary,
+    Draft,
+    DraftPart,
+    DraftSettings,
+    DraftStatus,
+    QuotaStatus,
+)
+from greader.core.generation.ports import (
+    AssignmentPublisher,
+    ClassroomLookup,
+    Clock,
+    DocumentCatalog,
+    DraftRepository,
+    GenerationClient,
+)
 from greader.core.generation.schemas import AssignmentDraft as DraftSchema
 from greader.core.generation.schemas import Citation as CitationSchema
-from greader.core.generation.schemas import GenerationRequest
+from greader.core.generation.schemas import (
+    GenerationFilters,
+    GenerationRequest,
+    GenerationResponse,
+)
+
+# ADR-0007 §4.4: daily, reset at midnight Bangkok. A-01 will make the limit
+# configurable; until the admin slice lands it is this default.
+DEFAULT_DAILY_QUOTA = 20
+QUOTA_ZONE = ZoneInfo("Asia/Bangkok")
+STEPS = (1, 2, 3, 4)
 
 
 class GenerationFailedError(Exception):
-    """Raised when the generation client could not produce a draft."""
+    """T-03d: the model did not respond. Nothing was saved, no quota used."""
 
 
-class GenerationArtifactNotFoundError(Exception):
-    """Raised when a requested generation artifact does not exist."""
+class QuotaExceededError(Exception):
+    """No generations left today."""
+
+
+class DraftNotFoundError(Exception):
+    """Missing, published already, or not this Instructor's."""
+
+
+class ClassroomNotVisibleError(Exception):
+    """The Classroom is missing or the Actor is not in it (404)."""
+
+
+class DocumentNotAllowedError(Exception):
+    """A chosen Document is not in the Instructor's library."""
+
+
+class MissingFieldsError(Exception):
+    """T-04a: fields a step needs before moving on."""
+
+    def __init__(self, fields: list[str]) -> None:
+        super().__init__(", ".join(fields))
+        self.fields = fields
+
+
+class _Unset:
+    """Marks a stepper field left out of the form."""
+
+
+UNSET = _Unset()
 
 
 class GenerationService:
-    """Coordinate the generation use case through client and repository seams."""
-
     def __init__(
-        self, repository: GenerationRepository, client: GenerationClient
+        self,
+        drafts: DraftRepository,
+        client: GenerationClient,
+        documents: DocumentCatalog,
+        classrooms: ClassroomLookup,
+        publisher: AssignmentPublisher,
+        clock: Clock,
+        daily_quota: int = DEFAULT_DAILY_QUOTA,
     ) -> None:
-        """Initialize the service with its repository and client seams."""
-        self._repository = repository
+        self._drafts = drafts
         self._client = client
+        self._documents = documents
+        self._classrooms = classrooms
+        self._publisher = publisher
+        self._clock = clock
+        self._daily_quota = daily_quota
 
-    def generate(self, request: GenerationRequest) -> GenerationArtifact:
-        """Persist a pending request, call the client, and persist its artifact.
+    # ---- T-03 ----------------------------------------------------------------
 
-        A request that never gets an artifact is not silently dropped: it is
-        left on record as `failed`, with the error code explaining why, and
-        the failure is re-raised so the caller knows generation did not happen.
-        This covers the client call and the artifact write. It does not cover
-        `mark_request_completed` itself failing after a successful artifact
-        write -- the adapter opens one session per call with no transaction
-        spanning the two, so that narrower case leaves the request `pending`
-        despite an artifact existing.
-        """
-        filters: dict[str, object] = (
-            request.filters.model_dump(exclude_none=True)
-            if request.filters is not None
-            else {}
+    def documents(self, actor: Actor) -> list[DocumentSummary]:
+        """The T-03 picker; empty means T-03b."""
+        self._require_instructor(actor)
+        return self._documents.documents_of(actor.user_id)
+
+    def quota(self, actor: Actor) -> QuotaStatus:
+        self._require_instructor(actor)
+        return QuotaStatus(
+            used=self._drafts.count_generations(actor.user_id, self._day_start()),
+            limit=self._daily_quota,
         )
-        request_id = self._repository.create_request(request.prompt, filters)
 
-        try:
-            response = self._client.generate(request)
-        except Exception as exc:
-            self._repository.mark_request_failed(
-                request_id, error_code="generation_client_error"
+    def generate(
+        self,
+        actor: Actor,
+        classroom_id: int,
+        *,
+        prompt: str,
+        difficulty: Difficulty,
+        topic_id: int | None = None,
+        document_ids: list[int] | None = None,
+    ) -> Draft:
+        """Ask the model for a draft; charge the quota only when it answers."""
+        self._require_owner(actor, classroom_id)
+        prompt = prompt.strip()
+        if not prompt:
+            raise ValueError("describe the problem you want")
+        if document_ids is None:
+            document_ids = []
+        allowed = {
+            document.id for document in self._documents.documents_of(actor.user_id)
+        }
+        if not set(document_ids) <= allowed:
+            raise DocumentNotAllowedError
+        self._require_quota(actor)
+
+        response = self._call(
+            GenerationRequest(
+                prompt=prompt,
+                filters=GenerationFilters(difficulty=difficulty.value),
+                document_ids=document_ids,
             )
-            raise GenerationFailedError from exc
-
-        draft = _to_domain_draft(response.draft)
-        citations = [_to_domain_citation(citation) for citation in response.citations]
-
-        try:
-            artifact = self._repository.create_artifact(request_id, draft, citations)
-        except Exception as exc:
-            self._repository.mark_request_failed(
-                request_id, error_code="persistence_error"
+        )
+        now = self._clock.now()
+        draft = self._drafts.create(
+            Draft(
+                classroom_id=classroom_id,
+                requested_by=actor.user_id,
+                prompt=prompt,
+                content=_content(response.draft, difficulty, topic_id),
+                citations=[_citation(c) for c in response.citations],
+                document_ids=list(document_ids),
+                generated_at=now,
+                classroom_ids=[classroom_id],
             )
-            raise GenerationFailedError from exc
+        )
+        self._drafts.record_generation(actor.user_id, now)
+        return draft
 
-        self._repository.mark_request_completed(request_id)
-        return artifact
+    def regenerate(self, actor: Actor, draft_id: int, part: DraftPart) -> Draft:
+        """T-03a "Regenerate this part"; a success counts against the quota."""
+        draft = self.draft(actor, draft_id)
+        self._require_quota(actor)
+        response = self._call(
+            GenerationRequest(
+                prompt=draft.prompt,
+                filters=GenerationFilters(difficulty=draft.content.difficulty.value),
+                document_ids=draft.document_ids,
+            )
+        )
+        if part is DraftPart.TITLE:
+            content = replace(draft.content, title=response.draft.title)
+        else:
+            content = replace(draft.content, problem_statement=response.draft.statement)
+        updated = self._drafts.update(replace(draft, content=content))
+        self._drafts.record_generation(actor.user_id, self._clock.now())
+        return updated
 
-    def get(self, artifact_id: int) -> GenerationArtifact:
-        """Return one generation artifact or raise when it does not exist."""
-        artifact = self._repository.get(artifact_id)
-        if artifact is None:
-            raise GenerationArtifactNotFoundError
-        return artifact
+    # ---- Drafts (T-01 list, T-04 stepper) --------------------------------------
+
+    def drafts(self, actor: Actor, classroom_id: int) -> list[Draft]:
+        """T-01 "Drafts": this Instructor's unpublished Drafts, newest first."""
+        role = self._classrooms.role_of(actor, classroom_id)
+        if role is ClassroomRole.OUTSIDER:
+            raise ClassroomNotVisibleError
+        if role is not ClassroomRole.OWNER:
+            return []
+        return sorted(
+            (
+                draft
+                for draft in self._drafts.list_for_classroom(classroom_id)
+                if draft.status is DraftStatus.REVIEWING
+                and draft.requested_by == actor.user_id
+            ),
+            key=lambda draft: draft.generated_at,
+            reverse=True,
+        )
+
+    def draft(self, actor: Actor, draft_id: int) -> Draft:
+        draft = self._drafts.get(draft_id)
+        if (
+            draft is None
+            or draft.requested_by != actor.user_id
+            or draft.status is not DraftStatus.REVIEWING
+        ):
+            raise DraftNotFoundError
+        return draft
+
+    def published(self, actor: Actor, draft_id: int) -> Draft:
+        """T-04b: a Draft this Instructor already published."""
+        draft = self._drafts.get(draft_id)
+        if (
+            draft is None
+            or draft.requested_by != actor.user_id
+            or draft.status is not DraftStatus.PUBLISHED
+        ):
+            raise DraftNotFoundError
+        return draft
+
+    def save(
+        self,
+        actor: Actor,
+        draft_id: int,
+        *,
+        title: str | _Unset = UNSET,
+        problem_statement: str | _Unset = UNSET,
+        difficulty: Difficulty | _Unset = UNSET,
+        topic_id: int | None | _Unset = UNSET,
+        test_cases: list[TestCase] | _Unset = UNSET,
+        judging: JudgingSettings | _Unset = UNSET,
+        settings: DraftSettings | _Unset = UNSET,
+        classroom_ids: list[int] | _Unset = UNSET,
+    ) -> Draft:
+        """Save one stepper step. Fields left out keep their value."""
+        draft = self.draft(actor, draft_id)
+        content = draft.content
+        content = replace(
+            content,
+            title=content.title if isinstance(title, _Unset) else title.strip(),
+            problem_statement=content.problem_statement
+            if isinstance(problem_statement, _Unset)
+            else problem_statement.strip(),
+            difficulty=content.difficulty
+            if isinstance(difficulty, _Unset)
+            else difficulty,
+            topic_id=content.topic_id if isinstance(topic_id, _Unset) else topic_id,
+            test_cases=content.test_cases
+            if isinstance(test_cases, _Unset)
+            else [tc for tc in test_cases if tc.input_data or tc.expected_output],
+            settings=content.settings if isinstance(judging, _Unset) else judging,
+        )
+        new_settings = draft.settings if isinstance(settings, _Unset) else settings
+        if new_settings.max_score <= 0 or content.settings.time_limit_ms <= 0:
+            raise ValueError("max score and time limit must be positive")
+        chosen = draft.classroom_ids
+        if not isinstance(classroom_ids, _Unset):
+            owned = {c.id for c in self._classrooms.owned_classrooms(actor)}
+            if not set(classroom_ids) <= owned:
+                raise ClassroomNotVisibleError
+            chosen = sorted(set(classroom_ids))
+        return self._drafts.update(
+            replace(draft, content=content, settings=new_settings, classroom_ids=chosen)
+        )
+
+    def missing_fields(self, actor: Actor, draft_id: int, step: int) -> list[str]:
+        """What must be filled before leaving `step` (T-04a); empty when done."""
+        draft = self.draft(actor, draft_id)
+        return _missing(draft, step)
+
+    def publish_targets(self, actor: Actor) -> list[tuple[Classroom, int]]:
+        """T-04 step 4: the Instructor's active Classrooms and student counts."""
+        self._require_instructor(actor)
+        return [
+            (classroom, len(self._classrooms.member_ids(actor, classroom.id)))
+            for classroom in self._classrooms.owned_classrooms(actor)
+        ]
+
+    def publish(self, actor: Actor, draft_id: int) -> PublishedAssignment:
+        """T-04 step 4 "Approve and publish" to every chosen Classroom."""
+        draft = self.draft(actor, draft_id)
+        missing = [field for step in STEPS for field in _missing(draft, step)]
+        if missing:
+            raise MissingFieldsError(missing)
+        settings = draft.settings
+        published = self._publisher.publish(
+            actor,
+            draft.content,
+            Schedule(
+                deadline=settings.deadline,
+                max_score=settings.max_score,
+                allow_late=settings.allow_late,
+                allow_resubmission=settings.allow_resubmission,
+            ),
+            draft.classroom_ids,
+        )
+        self._drafts.update(
+            replace(
+                draft,
+                status=DraftStatus.PUBLISHED,
+                assignment_id=published.assignment.id,
+            )
+        )
+        return published
+
+    def discard(self, actor: Actor, draft_id: int) -> None:
+        self._drafts.delete(self.draft(actor, draft_id).id)
+
+    # ---- Internals ---------------------------------------------------------
+
+    def _call(self, request: GenerationRequest) -> GenerationResponse:
+        try:
+            return self._client.generate(request)
+        except Exception as error:  # noqa: BLE001 -- any client failure is T-03d
+            raise GenerationFailedError from error
+
+    def _require_instructor(self, actor: Actor) -> None:
+        if actor.role is not Role.INSTRUCTOR:
+            raise PermissionDeniedError
+
+    def _require_owner(self, actor: Actor, classroom_id: int) -> None:
+        role = self._classrooms.role_of(actor, classroom_id)
+        if role is ClassroomRole.OUTSIDER:
+            raise ClassroomNotVisibleError
+        if role is not ClassroomRole.OWNER:
+            raise PermissionDeniedError
+
+    def _require_quota(self, actor: Actor) -> None:
+        if self.quota(actor).remaining <= 0:
+            raise QuotaExceededError
+
+    def _day_start(self) -> datetime:
+        local = self._clock.now().astimezone(QUOTA_ZONE)
+        return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
 
 
-def _to_domain_draft(draft: DraftSchema) -> AssignmentDraft:
-    return AssignmentDraft(
+def _missing(draft: Draft, step: int) -> list[str]:
+    content = draft.content
+    if step == 1:
+        missing = []
+        if not content.title:
+            missing.append("title")
+        if not content.problem_statement:
+            missing.append("description")
+        return missing
+    if step == 2:
+        return [] if content.test_cases else ["test cases"]
+    if step == 3:
+        return [] if draft.settings.deadline is not None else ["deadline"]
+    if step == 4:
+        return [] if draft.classroom_ids else ["classrooms"]
+    raise ValueError(f"unknown step {step}")
+
+
+def _content(
+    draft: DraftSchema, difficulty: Difficulty, topic_id: int | None
+) -> AssignmentContent:
+    return AssignmentContent(
         title=draft.title,
-        statement=draft.statement,
+        problem_statement=draft.statement,
+        difficulty=difficulty,
+        topic_id=topic_id,
+        settings=JudgingSettings(),
         test_cases=[
-            TestCaseDraft(
+            TestCase(
                 input_data=test_case.input_data,
                 expected_output=test_case.expected_output,
-                is_hidden=test_case.is_hidden,
-                order_index=test_case.order_index,
+                kind=TestCaseKind.HIDDEN
+                if test_case.is_hidden
+                else TestCaseKind.SAMPLE,
+                order_index=index,
             )
-            for test_case in draft.test_cases
+            for index, test_case in enumerate(draft.test_cases)
         ],
     )
 
 
-def _to_domain_citation(citation: CitationSchema) -> Citation:
+def _citation(citation: CitationSchema) -> Citation:
     return Citation(
         chunk_id=citation.chunk_id,
         source_id=citation.source_id,

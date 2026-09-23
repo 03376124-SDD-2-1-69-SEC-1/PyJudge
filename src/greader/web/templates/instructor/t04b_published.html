@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import link_button with context %}
+{% block title %}Published · GReader{% endblock %}
+{% block content %}
+<section data-page="T-04" data-state="T-04b" class="empty">
+  <div class="placeholder h-12 w-12">✓</div>
+  <h1 class="h1">Published to {{ draft.classroom_ids | length }} classroom{{ "s" if draft.classroom_ids | length != 1 }}</h1>
+  {% set notified = namespace(total=0) %}
+  {% for classroom, students in targets %}{% if classroom.id in draft.classroom_ids %}{% set notified.total = notified.total + students %}{% endif %}{% endfor %}
+  <p class="muted">{{ notified.total }} students can see it now. The draft has been removed from Drafts.</p>
+  <div class="flex gap-2.5">
+    {{ link_button("/classes/" ~ classroom_id ~ "/assignments/" ~ draft.assignment_id, "View problem") }}
+    {{ link_button("/classes/" ~ classroom_id, "Back to classroom", variant="primary") }}
+  </div>
+</section>
+{% endblock %}

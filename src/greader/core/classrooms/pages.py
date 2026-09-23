@@ -180,6 +180,13 @@ def classroom_page(
             actor, classroom_id, filter
         )
         context["filter"] = filter.value
+        if isinstance(view, InstructorClassroomView):
+            generation = request.app.state.generation_service
+            context["drafts"] = generation.drafts(actor, classroom_id)
+            context["draft_sources"] = {
+                document.id: document.filename
+                for document in generation.documents(actor)
+            }
     if tab == "summary":
         context["summary"] = _assignments(request).summary(actor, classroom_id)
     return _templates(request).TemplateResponse(request, tabs[tab], context)

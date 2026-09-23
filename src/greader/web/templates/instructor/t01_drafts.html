@@ -1,0 +1,20 @@
+{# T-01 "Drafts · n": the Instructor's unpublished Drafts in this Classroom. #}
+{% from "_components/forms.html" import link_button with context %}
+{% if drafts %}
+<p class="eyebrow mb-2">Drafts · {{ drafts | length }}</p>
+<div class="table-wrap mb-6">
+  <table class="table">
+    <thead><tr><th>Title</th><th>Source</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+      {% for draft in drafts %}
+      <tr>
+        <td>{{ draft.content.title }}</td>
+        <td class="text-soft">{% for c in draft.citations %}{{ draft_sources.get(c.source_id, "source " ~ c.source_id) }}{% if c.page %} · p. {{ c.page }}{% endif %}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</td>
+        <td>{{ draft.generated_at | local }}</td>
+        <td class="text-right">{{ link_button("/classes/" ~ view.classroom.id ~ "/drafts/" ~ draft.id ~ "?step=1", "Continue review", size="sm") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

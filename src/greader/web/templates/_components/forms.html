@@ -93,3 +93,49 @@ btn{% if variant != "secondary" %} btn-{{ variant }}{% endif %}{% if size %} btn
 {% macro toggle(target, aria_label="", class="") -%}
 <button type="button" popovertarget="{{ target }}" class="cursor-pointer {{ class }}"{% if aria_label %} aria-label="{{ aria_label }}"{% endif %}>{{ caller() }}</button>
 {%- endmacro %}
+
+{#- Radio buttons drawn as a segmented control (T-03 difficulty). -#}
+{% macro radio_seg(name, label, options, selected) -%}
+<div class="field">
+  <span class="label">{{ label }}</span>
+  <div class="radio-seg self-start" role="radiogroup" aria-label="{{ label }}">
+    {% for value, text in options %}
+    <label><input type="radio" name="{{ name }}" value="{{ value }}"{% if value == selected %} checked{% endif %}>{{ text }}</label>
+    {% endfor %}
+  </div>
+</div>
+{%- endmacro %}
+
+{#- A select whose options carry values: options = [(value, text), ...]. -#}
+{% macro value_select(name, label, options, selected="", blank="", id="") -%}
+{%- set field_id = id or "f-" ~ name %}
+<div class="field">
+  <label class="label" for="{{ field_id }}">{{ label }}</label>
+  <select class="input" id="{{ field_id }}" name="{{ name }}"{{ attrs(kwargs) }}>
+    {% if blank %}<option value="">{{ blank }}</option>{% endif %}
+    {% for value, text in options %}<option value="{{ value }}"{% if value | string == selected | string %} selected{% endif %}>{{ text }}</option>{% endfor %}
+  </select>
+</div>
+{%- endmacro %}
+
+{#- One bare cell control for editable tables (T-04 step 2): no label row. -#}
+{% macro cell_input(name, value, label, class="") -%}
+<input class="input h-8 {{ class }}" name="{{ name }}" value="{{ value }}" aria-label="{{ label }}"{{ attrs(kwargs) }}>
+{%- endmacro %}
+
+{% macro cell_select(name, options, selected, label) -%}
+<select class="input h-8" name="{{ name }}" aria-label="{{ label }}">
+  {% for value in options %}<option{% if value == selected %} selected{% endif %}>{{ value }}</option>{% endfor %}
+</select>
+{%- endmacro %}
+
+{% macro cell_check(name, value, label) -%}
+<label class="check text-xs"><input type="checkbox" name="{{ name }}" value="{{ value }}">{{ label }}</label>
+{%- endmacro %}
+
+{#- Multi-line cell (test input/output keeps its newlines). The newline after
+    the tag is eaten by the browser, so a value that starts with one survives. -#}
+{% macro cell_textarea(name, value, label, class="") -%}
+<textarea class="input h-auto min-h-16 py-1.5 {{ class }}" name="{{ name }}" rows="{{ [value.count("\n") + 1, 2] | max }}" aria-label="{{ label }}"{{ attrs(kwargs) }}>
+{{ value }}</textarea>
+{%- endmacro %}

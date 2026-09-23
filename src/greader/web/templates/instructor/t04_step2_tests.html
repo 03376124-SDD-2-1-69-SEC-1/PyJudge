@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, button, cell_input, cell_textarea, cell_check, hidden with context %}
+{% block title %}Test cases · Review draft · GReader{% endblock %}
+{% block content %}
+<section data-page="T-04" data-step="2">
+  {% include "instructor/t04_steps.html" %}
+  <form method="post" action="/classes/{{ classroom_id }}/drafts/{{ draft.id }}/step2" class="flex flex-col gap-6">
+    {{ csrf_field() }}
+    {% set rows = draft.content.test_cases %}
+    {% set groups = [("sample", "Sample tests", "shown to students", "+ Add sample"), ("hidden", "Hidden tests", "pass/fail only", "+ Add hidden"), ("edge", "Edge cases", "", "+ Add edge case")] %}
+    {% set ns = namespace(index=0) %}
+    {% for kind, title, subtitle, add_label in groups %}
+    <section>
+      <div class="mb-2 flex items-center justify-between">
+        <p class="eyebrow">{{ title }}{% if subtitle %} · {{ subtitle }}{% endif %}</p>
+        {{ button(add_label, size="sm", name="action", value="add_" ~ kind) }}
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Input</th><th>Expected output</th><th>Note</th><th></th></tr></thead>
+          <tbody>
+            {% set group_rows = rows | selectattr("kind.value", "equalto", kind) | list %}
+            {% if request.query_params.get("add") == kind %}{% set group_rows = group_rows + [none] %}{% endif %}
+            {% for tc in group_rows %}
+            <tr>
+              <td>{{ cell_textarea("input_data", tc.input_data if tc else "", "Input", class="font-mono") }}</td>
+              <td>{{ cell_textarea("expected_output", tc.expected_output if tc else "", "Expected output", class="font-mono") }}</td>
+              <td>{{ cell_input("note", tc.note if tc else "", "Note") }}{{ hidden("kind", kind) }}</td>
+              <td class="text-right">{{ cell_check("delete", ns.index, "Delete") }}</td>
+            </tr>
+            {% set ns.index = ns.index + 1 %}
+            {% else %}
+            <tr><td colspan="4" class="muted">None yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endfor %}
+    {% if "test cases" in missing %}<p class="error-text">Add at least one test case.</p>{% endif %}
+    {% include "instructor/t04_nav.html" %}
+  </form>
+</section>
+{% endblock %}

@@ -22,6 +22,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from greader.core.assignments.models import (
+    AssignmentContent,
     Difficulty,
     PostingSummary,
     Schedule,
@@ -30,7 +31,6 @@ from greader.core.assignments.models import (
     TestCase,
     TestCaseKind,
 )
-from greader.core.assignments.service import AssignmentContent
 from greader.core.auth.models import Actor, InstructorRequest, Role, User
 from greader.core.auth.pages import DemoAccount
 from greader.core.classrooms.models import (
@@ -40,11 +40,18 @@ from greader.core.classrooms.models import (
     StudentCardStats,
     StudentProgress,
 )
+from greader.core.generation.models import DocumentSummary
 from greader.integrations.clock import SystemClock
 from tests.fakes.app import build_app
 from tests.fakes.assignments import FakePostingStats
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
+from tests.fakes.generation import (
+    FakeDocumentCatalog,
+    FakeDraftRepository,
+    FakeGenerationClient,
+    binary_search_response,
+)
 
 BANGKOK = ZoneInfo("Asia/Bangkok")
 
@@ -147,6 +154,10 @@ class DemoSeed:
         self.classrooms = FakeClassroomRepository()
         self.stats = FakeClassroomStats()
         self.posting_stats = FakePostingStats()
+        self.drafts = FakeDraftRepository()
+        self.documents = FakeDocumentCatalog()
+        # Every T-03 "Generate" answers with the prototype's binary-search draft.
+        self.generation_client = FakeGenerationClient(binary_search_response())
         self.accounts: list[DemoAccount] = []
         self._seed_accounts()
         self._seed_classrooms()
@@ -338,12 +349,39 @@ def _seed_coursework(app: FastAPI, seed: DemoSeed) -> None:
             )
 
 
+def _seed_generation(app: FastAPI, seed: DemoSeed) -> None:
+    """Somchai's T-06 library and the T-01 draft "Stack with min() in O(1)"."""
+    seed.documents.by_owner[seed.somchai.id] = [
+        DocumentSummary(id=1, filename="lecture-06-searching.pdf", pages=24),
+        DocumentSummary(id=2, filename="lecture-07-stacks.pdf", pages=18),
+        DocumentSummary(id=3, filename="tutorial-03.pdf", pages=9),
+    ]
+    service = app.state.generation_service
+    draft = service.generate(
+        _actor(seed.somchai),
+        seed.programming_1.id,
+        prompt="A stack that returns its minimum in O(1).",
+        difficulty=Difficulty.HARD,
+        document_ids=[2],
+    )
+    service.save(
+        _actor(seed.somchai),
+        draft.id,
+        title="Stack with min() in O(1)",
+        problem_statement=(
+            "Implement a stack with push, pop and min, each in O(1). Read one "
+            "command per line and print the result of every min."
+        ),
+    )
+
+
 def build_demo_app(seed: DemoSeed | None = None) -> FastAPI:
     """The demo application; `seed` is exposed so tests can inspect it."""
     if seed is None:
         seed = DemoSeed()
     app = _build(seed)
     _seed_coursework(app, seed)
+    _seed_generation(app, seed)
     return app
 
 
@@ -356,6 +394,9 @@ def _build(seed: DemoSeed) -> FastAPI:
         classroom_repository=seed.classrooms,
         classroom_stats=seed.stats,
         posting_stats=seed.posting_stats,
+        draft_repository=seed.drafts,
+        document_catalog=seed.documents,
+        generation_client=seed.generation_client,
         demo_accounts=tuple(seed.accounts),
     )
 

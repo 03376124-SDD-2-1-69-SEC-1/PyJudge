@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from greader.core.assignments.models import (
+    AssignmentContent,
     Difficulty,
     InstructorProblemList,
     InstructorSummary,
@@ -19,7 +20,6 @@ from greader.core.assignments.models import (
     TestCaseKind,
 )
 from greader.core.assignments.service import (
-    AssignmentContent,
     AssignmentNotFoundError,
     AssignmentService,
     ClassroomNotVisibleError,

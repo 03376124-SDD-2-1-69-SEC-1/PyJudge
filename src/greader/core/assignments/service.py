@@ -7,11 +7,12 @@ a Classroom the Actor neither owns nor belongs to is ClassroomNotVisibleError
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from datetime import datetime
 
 from greader.core.assignments.models import (
     Assignment,
+    AssignmentContent,
     AssignmentVersion,
     Difficulty,
     FailRate,
@@ -71,18 +72,6 @@ class _Unset:
 
 
 UNSET = _Unset()
-
-
-@dataclass(frozen=True, slots=True)
-class AssignmentContent:
-    """What T-04 steps 1-3 collect about the content itself."""
-
-    title: str
-    problem_statement: str
-    difficulty: Difficulty
-    test_cases: list[TestCase] = field(default_factory=list)
-    topic_id: int | None = None
-    settings: JudgingSettings = field(default_factory=JudgingSettings)
 
 
 class AssignmentService:

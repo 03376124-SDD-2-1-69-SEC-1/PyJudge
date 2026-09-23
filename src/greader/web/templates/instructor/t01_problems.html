@@ -17,6 +17,8 @@
   </div>
   {% endif %}
 
+  {% include "instructor/t01_drafts.html" %}
+
   {% if problems.problems %}
   <p class="eyebrow mb-2">Published · {{ problems.problems | length }}</p>
   <div class="table-wrap">
@@ -36,7 +38,7 @@
       </tbody>
     </table>
   </div>
-  {% else %}
+  {% elif not drafts %}
     {% call empty_state("No problems in this classroom", "Generate one from your uploaded lecture notes, or upload a PDF first.", state="T-01b") %}
       {{ link_button("/documents", "Upload documents") }}
       {{ link_button("/classes/" ~ view.classroom.id ~ "/generate", "+ Create problem with AI", variant="primary") }}

@@ -77,7 +77,7 @@ def test_every_slice_module_is_importable() -> None:
             "testcase_routes",
         ),
         "uploads": ("models", "schemas", "ports", "service", "routes"),
-        "generation": ("models", "schemas", "ports", "service", "routes"),
+        "generation": ("models", "schemas", "ports", "service", "routes", "pages"),
         "auth": (
             "models",
             "schemas",

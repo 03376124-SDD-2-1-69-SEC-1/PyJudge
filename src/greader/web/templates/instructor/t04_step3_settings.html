@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, field, value_select, checkbox with context %}
+{% block title %}Settings · Review draft · GReader{% endblock %}
+{% block content %}
+<section data-page="T-04" data-step="3">
+  {% include "instructor/t04_steps.html" %}
+  <form method="post" action="/classes/{{ classroom_id }}/drafts/{{ draft.id }}/step3">
+    {{ csrf_field() }}
+    <div class="grid max-w-3xl gap-4 sm:grid-cols-2">
+      {{ field("deadline", "Deadline (Bangkok time)", type="datetime-local", value=deadline_value, error="A deadline is required." if "deadline" in missing else "") }}
+      {{ field("max_score", "Max score", type="number", value=draft.settings.max_score, min=1) }}
+      {{ field("time_limit_s", "Time limit per test (s)", type="number", value="%.1f" | format(draft.content.settings.time_limit_ms / 1000), min="0.1", step="0.1") }}
+      {{ value_select("language", "Language", [("python3", "Python 3")], selected=draft.content.settings.language.value) }}
+    </div>
+    <div class="mt-5 flex flex-col gap-2.5">
+      {{ checkbox("allow_late", "Allow late submissions", checked=draft.settings.allow_late, note="· marked “Late”, no automatic penalty") }}
+      {{ checkbox("allow_resubmission", "Allow resubmission until the deadline", checked=draft.settings.allow_resubmission) }}
+      {{ checkbox("show_hidden_names", "Show hidden test names to students", checked=draft.content.settings.show_hidden_names) }}
+    </div>
+    <p class="hint mt-3">Deadline, max score and the late/resubmission policy are copied to every classroom you publish to, and can be changed per classroom later.</p>
+    {% include "instructor/t04_nav.html" %}
+  </form>
+</section>
+{% endblock %}

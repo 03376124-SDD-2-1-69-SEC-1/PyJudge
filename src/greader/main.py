@@ -53,8 +53,14 @@ from greader.core.classrooms.pages import router as classroom_page_router
 from greader.core.classrooms.ports import ClassroomRepository, ClassroomStats
 from greader.core.classrooms.routes import router as classroom_router
 from greader.core.classrooms.service import ClassroomService
-from greader.core.generation.ports import GenerationClient, GenerationRepository
-from greader.core.generation.routes import router as generation_router
+from greader.core.generation.pages import router as generation_page_router
+from greader.core.generation.ports import (
+    DocumentCatalog,
+    DraftRepository,
+    GenerationClient,
+)
+from greader.core.generation.routes import classroom_router as draft_classroom_router
+from greader.core.generation.routes import router as draft_router
 from greader.core.generation.service import GenerationService
 from greader.core.topics.ports import TopicRepository
 from greader.core.topics.routes import router as topic_router
@@ -62,7 +68,6 @@ from greader.core.topics.service import TopicService
 from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from greader.core.uploads.routes import router as upload_router
 from greader.core.uploads.service import UploadService
-from greader.database.core.generation_repository import SQLGenerationRepository
 from greader.database.core.knowledge_document_repository import (
     SQLKnowledgeDocumentRepository,
 )
@@ -117,7 +122,8 @@ def create_app(
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
-    generation_repository: GenerationRepository | None = None,
+    draft_repository: DraftRepository | None = None,
+    document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
     verification_mailer: VerificationMailer | None = None,
@@ -203,12 +209,31 @@ def create_app(
     # Numbers from Submissions; the submissions slice will provide them.
     if posting_stats is None:
         posting_stats = PendingRepository("posting stats")
-    application.state.assignment_service = AssignmentService(
+    assignment_service = AssignmentService(
         assignment_repository,
         version_repository,
         posting_repository,
         classroom_service,
         posting_stats,
+        clock,
+    )
+    application.state.assignment_service = assignment_service
+
+    # Drafts have no table until OPS-15 and the Document library arrives with
+    # the documents slice; database/core/generation_repository.py holds the
+    # pre-ADR request/artifact shape and is not wired.
+    if generation_client is None:
+        generation_client = StubGenerationClient()
+    if draft_repository is None:
+        draft_repository = PendingRepository("drafts")
+    if document_catalog is None:
+        document_catalog = PendingRepository("documents")
+    application.state.generation_service = GenerationService(
+        draft_repository,
+        generation_client,
+        document_catalog,
+        classroom_service,
+        assignment_service,
         clock,
     )
 
@@ -231,14 +256,6 @@ def create_app(
         max_upload_size_bytes=use_settings().max_upload_size_bytes,
     )
 
-    if generation_client is None:
-        generation_client = StubGenerationClient()
-    if generation_repository is None:
-        generation_repository = SQLGenerationRepository(use_session_factory())
-    application.state.generation_service = GenerationService(
-        generation_repository, generation_client
-    )
-
     if vector_repository is None:
         vector_repository = PostgresVectorRepository(use_session_factory())
     application.state.vector_service = VectorService(vector_repository)
@@ -247,7 +264,9 @@ def create_app(
     application.include_router(assignment_router)
     application.include_router(assignment_classroom_router)
     application.include_router(test_case_router)
-    application.include_router(generation_router)
+    application.include_router(draft_router)
+    application.include_router(draft_classroom_router)
+    application.include_router(generation_page_router)
     application.include_router(upload_router)
     application.include_router(vector_router)
     application.include_router(auth_router)
