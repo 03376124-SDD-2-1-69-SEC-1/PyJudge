@@ -5,6 +5,7 @@ When you add a rule to AGENTS.md, add its test here in the same PR.
 """
 
 import ast
+import re
 from pathlib import Path
 
 CORE_ROOT = Path("src/greader/core")
@@ -277,4 +278,180 @@ def test_http_client_tests_live_under_integration() -> None:
         "Files that use AsyncClient or TestClient are HTTP tests and belong "
         "under tests/integration/, matching "
         "tests/integration/test_topics_api.py. Violations:\n" + "\n".join(violations)
+    )
+
+
+# --- ADR-0007: classroom-centric flow ------------------------------------------
+
+TEMPLATE_ROOT = SRC_ROOT / "web" / "templates"
+# Templates that predate the page-group layout. home.html goes away when the
+# classroom pages land; do not add to this set.
+TOP_LEVEL_TEMPLATES = {"base.html", "home.html"}
+# Page group directory -> the page-ID letters it may hold (G/C shared, S, T, A).
+TEMPLATE_GROUPS = {
+    "shared": ("g", "c"),
+    "student": ("s",),
+    "instructor": ("t",),
+    "admin": ("a",),
+}
+TEMPLATE_NAME = re.compile(r"^([a-z])\d{2}[a-z]?_[a-z0-9_]+\.html$")
+# main.py still renders the placeholder home page; it moves into a pages.py
+# with the classroom pages. Do not add to this set.
+LEGACY_TEMPLATE_RENDERERS = {MAIN_PY}
+# Slices whose every public use case takes the Actor first. A slice listed here
+# is checked as soon as its service.py exists; assignments and generation join
+# when their use cases gain an actor.
+ACTOR_SLICES = ("classrooms", "submissions", "notifications", "admin", "documents")
+ROLE_ATTRIBUTES = {"role", "instructor_id"}
+
+
+def _api_modules() -> list[Path]:
+    return sorted(
+        path
+        for path in CORE_ROOT.glob("*/*.py")
+        if path.name == "routes.py" or path.name.endswith("_routes.py")
+    )
+
+
+def _page_modules() -> list[Path]:
+    return sorted(CORE_ROOT.glob("*/pages.py"))
+
+
+def _router_prefixes(path: Path) -> list[tuple[int, str]]:
+    prefixes = []
+    for node in ast.walk(_parse(path)):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "APIRouter"
+        ):
+            continue
+        prefix = ""
+        for keyword in node.keywords:
+            if keyword.arg == "prefix" and isinstance(keyword.value, ast.Constant):
+                prefix = str(keyword.value.value)
+        prefixes.append((node.lineno, prefix))
+    return prefixes
+
+
+def test_api_routers_live_under_api_v1() -> None:
+    violations = [
+        f"{path}:{lineno}: prefix={prefix!r}"
+        for path in _api_modules()
+        for lineno, prefix in _router_prefixes(path)
+        if not prefix.startswith("/api/v1/")
+    ]
+
+    assert not violations, (
+        "JSON routers live under /api/v1/ (AGENTS.md 'Definition of done'). "
+        "Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_page_routers_carry_no_api_prefix() -> None:
+    violations = [
+        f"{path}:{lineno}: prefix={prefix!r}"
+        for path in _page_modules()
+        for lineno, prefix in _router_prefixes(path)
+        if prefix.startswith("/api")
+    ]
+
+    assert not violations, (
+        "pages.py serves HTML at page URLs, never under /api (ADR-0007 §9). "
+        "Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_only_page_modules_render_templates() -> None:
+    allowed = set(_page_modules()) | LEGACY_TEMPLATE_RENDERERS
+    violations = []
+    for source_file in sorted(SRC_ROOT.rglob("*.py")):
+        if source_file in allowed:
+            continue
+        for node in ast.walk(_parse(source_file)):
+            if isinstance(node, ast.Attribute) and node.attr == "TemplateResponse":
+                violations.append(f"{source_file}:{node.lineno}")
+
+    assert not violations, (
+        "Only core/<slice>/pages.py renders templates; routes.py returns JSON "
+        "(AGENTS.md 'Definition of done'). Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_templates_live_in_a_page_group() -> None:
+    violations = []
+    for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
+        relative = template.relative_to(TEMPLATE_ROOT)
+        if len(relative.parts) == 1:
+            if relative.name not in TOP_LEVEL_TEMPLATES:
+                violations.append(f"{relative}: not in a page group directory")
+            continue
+        group = relative.parts[0]
+        match = TEMPLATE_NAME.match(relative.name)
+        if len(relative.parts) != 2 or group not in TEMPLATE_GROUPS:
+            violations.append(f"{relative}: group must be one of {TEMPLATE_GROUPS}")
+        elif match is None:
+            violations.append(f"{relative}: name must be <page-id>_<slug>.html")
+        elif match.group(1) not in TEMPLATE_GROUPS[group]:
+            violations.append(f"{relative}: page ID does not belong in {group}/")
+
+    assert not violations, (
+        "Templates live in web/templates/<group>/<page-id>_<slug>.html, e.g. "
+        "student/s02_solve.html (AGENTS.md 'Definition of done'). Violations:\n"
+        + "\n".join(violations)
+    )
+
+
+def test_routes_and_pages_never_read_a_role() -> None:
+    violations = []
+    for source_file in _api_modules() + _page_modules():
+        for node in ast.walk(_parse(source_file)):
+            if isinstance(node, ast.Attribute) and node.attr in ROLE_ATTRIBUTES:
+                violations.append(f"{source_file}:{node.lineno}: .{node.attr}")
+
+    assert not violations, (
+        "Authorization lives in the service; routes and pages never read a "
+        "role (AGENTS.md 'Definition of done'). Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_core_never_uses_depends() -> None:
+    violations = []
+    for source_file in sorted(CORE_ROOT.rglob("*.py")):
+        for node in ast.walk(_parse(source_file)):
+            is_name = isinstance(node, ast.Name) and node.id == "Depends"
+            is_attribute = isinstance(node, ast.Attribute) and node.attr == "Depends"
+            if is_name or is_attribute:
+                violations.append(f"{source_file}:{node.lineno}")
+
+    assert not violations, (
+        "Services come off request.app.state and the actor from "
+        "current_actor(request), never Depends() (AGENTS.md 'Stack'). "
+        "Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_classroom_use_cases_take_the_actor_first() -> None:
+    violations = []
+    for slice_name in ACTOR_SLICES:
+        service_file = CORE_ROOT / slice_name / "service.py"
+        if not service_file.exists():
+            continue
+        for node in ast.walk(_parse(service_file)):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for method in node.body:
+                if not isinstance(method, ast.FunctionDef):
+                    continue
+                if method.name.startswith("_"):
+                    continue
+                parameters = [argument.arg for argument in method.args.args]
+                if parameters[1:2] != ["actor"]:
+                    violations.append(
+                        f"{service_file}:{method.lineno}: {node.name}.{method.name}"
+                    )
+
+    assert not violations, (
+        "Every public use case in a classroom slice takes `actor` right after "
+        "self (AGENTS.md 'Definition of done'). Violations:\n" + "\n".join(violations)
     )

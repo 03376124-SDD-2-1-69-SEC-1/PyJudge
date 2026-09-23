@@ -18,6 +18,21 @@ def test_core_never_imports_ai() -> None:
         assert "greader.ai" not in source_file.read_text(), source_file
 
 
+def test_core_never_imports_integrations() -> None:
+    """Judge0 and email adapters are picked by main.py only (ADR-0007)."""
+    violations = [
+        str(source_file)
+        for source_file in sorted(CORE_ROOT.rglob("*.py"))
+        if "greader.integrations" in source_file.read_text()
+    ]
+
+    assert not violations, (
+        "core/ must reach Judge0/email through its own Protocol, never "
+        "greader.integrations (AGENTS.md 'Ports and adapters'). Violations:\n"
+        + "\n".join(violations)
+    )
+
+
 def test_core_never_imports_an_orm_or_storage_client() -> None:
     """`core/` sees a Protocol and a dataclass, never SQLModel or boto3."""
     forbidden = ("sqlmodel", "sqlalchemy", "boto3", "botocore", "greader.database")
