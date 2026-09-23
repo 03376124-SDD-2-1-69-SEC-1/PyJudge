@@ -236,7 +236,7 @@ everywhere. See `tests/conftest.py`.
 - routes hold no business rules or SQL
 - authorization lives in the service: every use case touching classroom data
   takes `actor: Actor` first and raises `PermissionDeniedError`; routes and
-  pages never read a role. A handler gets the actor with
+  pages never branch on a role (serializing one is fine). A handler gets the actor with
   `current_actor(request)`, never `Depends()`. Non-member → 404, wrong role
   in own Classroom → 403
 - HTML pages live in `core/<slice>/pages.py` (no `/api` prefix); only

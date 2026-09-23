@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Sign up · GReader{% endblock %}
+{% block content %}
+<section data-page="G-03" class="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8">
+  <h1 class="text-2xl font-bold">Create an account</h1>
+
+  {% if error == "not_kmitl_email" %}
+  <p role="alert" data-state="G-03a">Use your @kmitl.ac.th address to sign up.</p>
+  {% elif error == "already_registered" %}
+  <p role="alert" data-state="G-03b">This email is already registered. <a href="/login">Log in</a></p>
+  {% elif error == "password_too_short" %}
+  <p role="alert">Password must be at least 8 characters.</p>
+  {% elif error == "password_mismatch" %}
+  <p role="alert">Passwords do not match.</p>
+  {% elif error == "faculty_required" %}
+  <p role="alert">Choose your faculty to request instructor rights.</p>
+  {% elif error == "full_name_required" %}
+  <p role="alert">Full name is required.</p>
+  {% endif %}
+
+  <form method="post" action="/signup" class="mt-6 grid gap-4">
+    <label>Full name <input name="full_name" value="{{ form.full_name }}" required></label>
+    <label>Email <input type="email" name="email" value="{{ form.email }}" placeholder="name@kmitl.ac.th" required></label>
+    <small>Only @kmitl.ac.th addresses are allowed.</small>
+    <label>Password <input type="password" name="password" minlength="8" required></label>
+    <label>Confirm password <input type="password" name="confirm_password" minlength="8" required></label>
+    <label><input type="checkbox" name="wants_instructor" {% if form.wants_instructor == "on" %}checked{% endif %}> I am an instructor <small>(needs admin approval)</small></label>
+    <label>Faculty <small>(instructors only)</small>
+      <select name="faculty">
+        <option value="">—</option>
+        {% for name in faculties %}<option {% if form.faculty == name %}selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit">Sign up</button>
+  </form>
+  <p class="mt-4 text-sm">Already have an account? <a href="/login">Log in</a></p>
+</section>
+{% endblock %}

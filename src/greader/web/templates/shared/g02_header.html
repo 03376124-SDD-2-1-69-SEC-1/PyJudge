@@ -1,0 +1,37 @@
+{# G-02 header, 02a notifications dropdown, 02b mobile menu. Popovers, no JS. #}
+<header class="border-b border-slate-200 bg-white" data-page="G-02">
+  <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-4">
+    <nav aria-label="Breadcrumb" class="flex items-center gap-2">
+      <a class="font-semibold tracking-tight" href="/classes">GReader</a>
+      {% block breadcrumb %}{% if breadcrumb is defined %}<span>/ {{ breadcrumb }}</span>{% endif %}{% endblock %}
+    </nav>
+    <nav aria-label="Account" class="flex items-center gap-4">
+      {% if actor.owns_classrooms %}<a href="/documents">My documents</a>{% endif %}
+      <button type="button" popovertarget="notifications" aria-label="Notifications">
+        Notifications{% if unread_count is defined and unread_count %} <span>{{ unread_count }}</span>{% endif %}
+      </button>
+      <button type="button" popovertarget="account-menu">{{ actor.full_name }} ▾</button>
+      <button type="button" popovertarget="mobile-menu" aria-label="Menu">☰</button>
+    </nav>
+  </div>
+  <div id="notifications" popover data-page="G-02a">
+    <h2>Notifications</h2>
+    {% if notifications is defined and notifications %}
+      <form method="post" action="/notifications/read-all"><button type="submit">Mark all read</button></form>
+      <ul>{% for item in notifications %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% else %}
+      <p>No notifications.</p>
+    {% endif %}
+  </div>
+  <div id="account-menu" popover>
+    <p>{{ actor.full_name }}<br><small>{{ actor.email }}</small></p>
+    <form method="post" action="/logout"><button type="submit">Log out</button></form>
+  </div>
+  <div id="mobile-menu" popover data-page="G-02b">
+    <nav aria-label="Mobile">
+      <a href="/classes">My classrooms</a>
+      {% if actor.owns_classrooms %}<a href="/documents">My documents</a>{% endif %}
+      <form method="post" action="/logout"><button type="submit">Log out</button></form>
+    </nav>
+  </div>
+</header>

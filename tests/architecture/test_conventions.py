@@ -158,12 +158,27 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
 # says which one. Expected first entry for ALLOWED_TIMESTAMP_FIELDS:
 # `approved_at` on a draft, once GReader's approval flow needs it -- unlike
 # `created_at`/`updated_at`, that's a business fact, not row bookkeeping.
-ALLOWED_TIMESTAMP_FIELDS: set[str] = set()  # empty on purpose
+ALLOWED_TIMESTAMP_FIELDS: set[str] = {
+    # auth (ADR-0007 §1): verify_email refuses a link after 24 h and
+    # resolve_session refuses an expired session.
+    "expires_at",
+    # auth: resolve_session writes it at most hourly; A-01 "Last active".
+    "last_active_at",
+    # auth: A-01 pending Instructor requests, "Requested" column.
+    "requested_at",
+}
 # `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
 # `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
 # Citation carries them as a business fact about itself (which source chunk it
 # quotes), not as a column that exists only to satisfy a table (OPS-12).
-ALLOWED_ID_SUFFIX_FIELDS = {"artifact_id", "chunk_id", "source_id"}
+ALLOWED_ID_SUFFIX_FIELDS = {
+    "artifact_id",
+    "chunk_id",
+    "source_id",
+    # auth (ADR-0007 §9.5): whose account a Session, token or Instructor
+    # request is, and who an Actor is -- every authorization check reads it.
+    "user_id",
+}
 
 
 def _dataclass_field_names(tree: ast.Module) -> list[tuple[str, str, int]]:
@@ -402,16 +417,33 @@ def test_templates_live_in_a_page_group() -> None:
     )
 
 
-def test_routes_and_pages_never_read_a_role() -> None:
+def _decision_nodes(tree: ast.Module) -> list[ast.AST]:
+    """Expressions a handler branches on: comparisons and conditions."""
+    nodes: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Compare):
+            nodes.append(node)
+        elif isinstance(node, (ast.If, ast.IfExp, ast.While, ast.Assert)):
+            nodes.append(node.test)
+        elif isinstance(node, ast.Match):
+            nodes.append(node.subject)
+        elif isinstance(node, ast.comprehension):
+            nodes.extend(node.ifs)
+    return nodes
+
+
+def test_routes_and_pages_never_branch_on_a_role() -> None:
+    """Serializing a role is fine; deciding on one belongs to the service."""
     violations = []
     for source_file in _api_modules() + _page_modules():
-        for node in ast.walk(_parse(source_file)):
-            if isinstance(node, ast.Attribute) and node.attr in ROLE_ATTRIBUTES:
-                violations.append(f"{source_file}:{node.lineno}: .{node.attr}")
+        for decision in _decision_nodes(_parse(source_file)):
+            for node in ast.walk(decision):
+                if isinstance(node, ast.Attribute) and node.attr in ROLE_ATTRIBUTES:
+                    violations.append(f"{source_file}:{node.lineno}: .{node.attr}")
 
     assert not violations, (
-        "Authorization lives in the service; routes and pages never read a "
-        "role (AGENTS.md 'Definition of done'). Violations:\n" + "\n".join(violations)
+        "Authorization lives in the service; routes and pages never branch on "
+        "a role (AGENTS.md 'Definition of done'). Violations:\n" + "\n".join(violations)
     )
 
 

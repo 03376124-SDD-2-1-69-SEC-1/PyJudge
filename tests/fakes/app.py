@@ -12,11 +12,15 @@ from fastapi import FastAPI
 from greader.ai.app.repository import VectorRepository
 from greader.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
 from greader.core.assignments.ports import AssignmentRepository
+from greader.core.auth.pages import DemoAccount
+from greader.core.auth.ports import AuthRepository, Clock
 from greader.core.generation.ports import GenerationClient, GenerationRepository
 from greader.core.topics.ports import TopicRepository
 from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
+from greader.integrations.email import StubEmailSender
 from greader.main import create_app
 from tests.fakes.assignments import FakeAssignmentRepository
+from tests.fakes.auth import FakeAuthRepository, FakeClock
 from tests.fakes.generation import FakeGenerationRepository
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
@@ -50,6 +54,10 @@ def build_app(
     generation_client: GenerationClient | None = None,
     generation_repository: GenerationRepository | None = None,
     vector_repository: VectorRepository | None = None,
+    auth_repository: AuthRepository | None = None,
+    verification_mailer: StubEmailSender | None = None,
+    clock: Clock | None = None,
+    demo_accounts: tuple[DemoAccount, ...] | None = None,
     max_upload_size_bytes: int = DEFAULT_MAX_UPLOAD_SIZE_BYTES,
 ) -> FastAPI:
     """Return an app whose every port is backed by a fake."""
@@ -65,6 +73,12 @@ def build_app(
         generation_repository = FakeGenerationRepository()
     if vector_repository is None:
         vector_repository = FakeVectorRepository()
+    if auth_repository is None:
+        auth_repository = FakeAuthRepository()
+    if verification_mailer is None:
+        verification_mailer = StubEmailSender()
+    if clock is None:
+        clock = FakeClock()
 
     return create_app(
         settings=fake_settings(max_upload_size_bytes=max_upload_size_bytes),
@@ -75,4 +89,8 @@ def build_app(
         generation_client=generation_client,
         generation_repository=generation_repository,
         vector_repository=vector_repository,
+        auth_repository=auth_repository,
+        verification_mailer=verification_mailer,
+        clock=clock,
+        demo_accounts=demo_accounts,
     )
