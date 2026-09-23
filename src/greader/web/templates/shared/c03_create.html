@@ -1,0 +1,21 @@
+{# C-03 create modal; C-03a is the banner shown after the redirect. #}
+{% if created %}
+<section role="status" data-state="C-03a">
+  <h2>{{ created.course_name }} · Sec {{ created.section }} created</h2>
+  <p>Share this code with your students.</p>
+  <p><strong>{{ created.join_code }}</strong></p>
+  <a href="/classes">Back to classrooms</a>
+  <a href="/classes/{{ created.id }}">Go to classroom</a>
+</section>
+{% endif %}
+<div id="create-classroom" popover data-page="C-03">
+  <h2>Create a classroom</h2>
+  <form method="post" action="/classes">
+    <label>Course code <input name="course_code" placeholder="01076001" required></label>
+    <label>Course name <input name="course_name" placeholder="Programming I" required></label>
+    <label>Section <input name="section" placeholder="1" required></label>
+    <label>Semester <input name="semester" placeholder="1/2569" required></label>
+    <button type="button" popovertarget="create-classroom" popovertargetaction="hide">Cancel</button>
+    <button type="submit">Create</button>
+  </form>
+</div>

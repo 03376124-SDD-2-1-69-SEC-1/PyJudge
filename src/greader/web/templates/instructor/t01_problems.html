@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ view.classroom.course_name }} · GReader{% endblock %}
+{% block content %}
+<section data-page="T-01" data-tab="problems">
+  {% include "instructor/t01_tabs.html" %}
+  <a href="/classes/{{ view.classroom.id }}/generate">+ Create problem with AI</a>
+  {% if view.student_count == 0 %}
+  <div data-state="T-01a">
+    <h2>Invite your students</h2>
+    <p>Share this join code — nobody has joined yet.</p>
+    <p><strong>{{ view.classroom.join_code or "Joining is disabled" }}</strong></p>
+  </div>
+  {% endif %}
+  <div data-state="T-01b">
+    <h2>No problems in this classroom</h2>
+    <p>Generate one from your uploaded lecture notes, or upload a PDF first.</p>
+    <a href="/documents">Upload documents</a>
+  </div>
+</section>
+{% endblock %}

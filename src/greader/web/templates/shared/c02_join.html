@@ -1,0 +1,20 @@
+{# C-02 join modal; C-02a shows inline (no JS can open a popover on load). #}
+{% if join_error %}
+<section role="alert" data-state="C-02a">
+  <h2>Join a classroom</h2>
+  <p>No classroom has this code. Check it with your instructor.</p>
+  <form method="post" action="/classes/join">
+    <label>Join code <input name="join_code" maxlength="6" minlength="6" autocomplete="off" required></label>
+    <button type="submit">Join</button>
+  </form>
+</section>
+{% endif %}
+<div id="join-classroom" popover data-page="C-02">
+  <h2>Join a classroom</h2>
+  <form method="post" action="/classes/join">
+    <label>Join code <input name="join_code" maxlength="6" minlength="6" autocomplete="off" required></label>
+    <small>6 characters, from your instructor.</small>
+    <button type="button" popovertarget="join-classroom" popovertargetaction="hide">Cancel</button>
+    <button type="submit">Join</button>
+  </form>
+</div>

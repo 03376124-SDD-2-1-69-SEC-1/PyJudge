@@ -34,6 +34,10 @@ from greader.core.auth.pages import router as auth_page_router
 from greader.core.auth.ports import AuthRepository, Clock, VerificationMailer
 from greader.core.auth.routes import router as auth_router
 from greader.core.auth.service import AuthService
+from greader.core.classrooms.pages import router as classroom_page_router
+from greader.core.classrooms.ports import ClassroomRepository, ClassroomStats
+from greader.core.classrooms.routes import router as classroom_router
+from greader.core.classrooms.service import ClassroomService
 from greader.core.generation.ports import GenerationClient, GenerationRepository
 from greader.core.generation.routes import router as generation_router
 from greader.core.generation.service import GenerationService
@@ -81,6 +85,8 @@ def create_app(
     auth_repository: AuthRepository | None = None,
     verification_mailer: VerificationMailer | None = None,
     clock: Clock | None = None,
+    classroom_repository: ClassroomRepository | None = None,
+    classroom_stats: ClassroomStats | None = None,
     demo_accounts: tuple[DemoAccount, ...] | None = None,
 ) -> FastAPI:
     """Build the application, wiring SQL adapters for anything not supplied."""
@@ -125,8 +131,17 @@ def create_app(
         auth_repository = PendingRepository("auth")
     if verification_mailer is None:
         verification_mailer = StubEmailSender()
-    application.state.auth_service = AuthService(
-        auth_repository, verification_mailer, clock
+    auth_service = AuthService(auth_repository, verification_mailer, clock)
+    application.state.auth_service = auth_service
+
+    if classroom_repository is None:
+        classroom_repository = PendingRepository("classrooms")
+    # Card numbers come from assignments and submissions, which have no
+    # tables yet either.
+    if classroom_stats is None:
+        classroom_stats = PendingRepository("classroom stats")
+    application.state.classroom_service = ClassroomService(
+        classroom_repository, auth_service, classroom_stats, clock
     )
 
     if topic_repository is None:
@@ -172,6 +187,8 @@ def create_app(
     application.include_router(vector_router)
     application.include_router(auth_router)
     application.include_router(auth_page_router)
+    application.include_router(classroom_router)
+    application.include_router(classroom_page_router)
 
     @application.exception_handler(NotAuthenticatedError)
     def not_authenticated(request: Request, error: NotAuthenticatedError) -> Response:

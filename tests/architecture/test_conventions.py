@@ -166,6 +166,8 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "last_active_at",
     # auth: A-01 pending Instructor requests, "Requested" column.
     "requested_at",
+    # classrooms: T-01 Members "Joined" column and its ordering.
+    "joined_at",
 }
 # `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
 # `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
@@ -178,6 +180,12 @@ ALLOWED_ID_SUFFIX_FIELDS = {
     # auth (ADR-0007 §9.5): whose account a Session, token or Instructor
     # request is, and who an Actor is -- every authorization check reads it.
     "user_id",
+    # classrooms (ADR-0007 §9.6): ClassroomService._owned compares
+    # instructor_id with the Actor, and _visible looks up a Membership by
+    # classroom_id + student_id -- the 404/403 rule reads all three.
+    "instructor_id",
+    "classroom_id",
+    "student_id",
 }
 
 

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Summary · {{ view.classroom.course_name }} · GReader{% endblock %}
+{% block content %}
+<section data-page="T-01" data-tab="summary">
+  {% include "instructor/t01_tabs.html" %}
+  <p>Students {{ view.student_count }}</p>
+  <p>Most-failed problems and the score table appear once problems are published.</p>
+</section>
+{% endblock %}

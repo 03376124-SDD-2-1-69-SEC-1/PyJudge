@@ -14,6 +14,7 @@ from greader.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
 from greader.core.assignments.ports import AssignmentRepository
 from greader.core.auth.pages import DemoAccount
 from greader.core.auth.ports import AuthRepository, Clock
+from greader.core.classrooms.ports import ClassroomRepository, ClassroomStats
 from greader.core.generation.ports import GenerationClient, GenerationRepository
 from greader.core.topics.ports import TopicRepository
 from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
@@ -21,6 +22,7 @@ from greader.integrations.email import StubEmailSender
 from greader.main import create_app
 from tests.fakes.assignments import FakeAssignmentRepository
 from tests.fakes.auth import FakeAuthRepository, FakeClock
+from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
 from tests.fakes.generation import FakeGenerationRepository
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
@@ -57,6 +59,8 @@ def build_app(
     auth_repository: AuthRepository | None = None,
     verification_mailer: StubEmailSender | None = None,
     clock: Clock | None = None,
+    classroom_repository: ClassroomRepository | None = None,
+    classroom_stats: ClassroomStats | None = None,
     demo_accounts: tuple[DemoAccount, ...] | None = None,
     max_upload_size_bytes: int = DEFAULT_MAX_UPLOAD_SIZE_BYTES,
 ) -> FastAPI:
@@ -79,6 +83,10 @@ def build_app(
         verification_mailer = StubEmailSender()
     if clock is None:
         clock = FakeClock()
+    if classroom_repository is None:
+        classroom_repository = FakeClassroomRepository()
+    if classroom_stats is None:
+        classroom_stats = FakeClassroomStats()
 
     return create_app(
         settings=fake_settings(max_upload_size_bytes=max_upload_size_bytes),
@@ -92,5 +100,7 @@ def build_app(
         auth_repository=auth_repository,
         verification_mailer=verification_mailer,
         clock=clock,
+        classroom_repository=classroom_repository,
+        classroom_stats=classroom_stats,
         demo_accounts=demo_accounts,
     )

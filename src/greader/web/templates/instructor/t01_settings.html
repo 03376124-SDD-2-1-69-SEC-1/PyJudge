@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ view.classroom.course_name }} · GReader{% endblock %}
+{% block content %}
+<section data-page="T-01" data-tab="settings">
+  {% include "instructor/t01_tabs.html" %}
+  <form method="post" action="/classes/{{ view.classroom.id }}/settings" class="grid gap-4">
+    <label>Course code <input name="course_code" value="{{ view.classroom.course_code }}" required></label>
+    <label>Course name <input name="course_name" value="{{ view.classroom.course_name }}" required></label>
+    <label>Section <input name="section" value="{{ view.classroom.section }}" required></label>
+    <label>Semester <input name="semester" value="{{ view.classroom.semester }}" required></label>
+    <button type="submit">Save changes</button>
+  </form>
+  {% if view.classroom.archived %}
+  <form method="post" action="/classes/{{ view.classroom.id }}/unarchive"><button type="submit">Unarchive classroom</button></form>
+  {% else %}
+  <form method="post" action="/classes/{{ view.classroom.id }}/archive"><button type="submit">Archive classroom</button></form>
+  {% endif %}
+  <section>
+    <h2>Join code</h2>
+    <p><strong>{{ view.classroom.join_code or "Joining is disabled" }}</strong></p>
+    <form method="post" action="/classes/{{ view.classroom.id }}/join-code/regenerate"><button type="submit">Regenerate</button></form>
+    {% if view.classroom.join_code %}
+    <form method="post" action="/classes/{{ view.classroom.id }}/join-code/disable"><button type="submit">Disable joining</button></form>
+    {% endif %}
+    <p>Regenerating invalidates the old code. Students already in the class keep access.</p>
+  </section>
+</section>
+{% endblock %}

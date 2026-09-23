@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Members · {{ view.classroom.course_name }} · GReader{% endblock %}
+{% block content %}
+<section data-page="T-01" data-tab="members">
+  {% include "instructor/t01_tabs.html" %}
+  <p>{{ members | length }} students</p>
+  <table>
+    <thead><tr><th>Name</th><th>Student ID</th><th>Email</th><th>Joined</th><th></th></tr></thead>
+    <tbody>
+      {% for member in members %}
+      <tr>
+        <td>{{ member.full_name }}</td>
+        <td>{{ member.student_number or "—" }}</td>
+        <td>{{ member.email }}</td>
+        <td>{{ member.joined_at.strftime("%d %b") }}</td>
+        <td>
+          <form method="post" action="/classes/{{ view.classroom.id }}/members/{{ member.user_id }}/remove">
+            <button type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
