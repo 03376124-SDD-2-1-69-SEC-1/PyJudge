@@ -307,9 +307,8 @@ def test_http_client_tests_live_under_integration() -> None:
 # --- ADR-0007: classroom-centric flow ------------------------------------------
 
 TEMPLATE_ROOT = SRC_ROOT / "web" / "templates"
-# Templates that predate the page-group layout. home.html goes away when the
-# classroom pages land; do not add to this set.
-TOP_LEVEL_TEMPLATES = {"base.html", "home.html"}
+# The one template outside a page group: the layout every page extends.
+TOP_LEVEL_TEMPLATES = {"base.html"}
 # Page group directory -> the page-ID letters it may hold (G/C shared, S, T, A).
 TEMPLATE_GROUPS = {
     "shared": ("g", "c"),
@@ -322,9 +321,9 @@ TEMPLATE_NAME = re.compile(r"^([a-z])\d{2}[a-z]?_[a-z0-9_]+\.html$")
 COMPONENTS_DIR = "_components"
 COMPONENT_NAME = re.compile(r"^[a-z][a-z0-9_]*\.html$")
 RAW_CONTROL = re.compile(r"<(button|input|select|textarea)\b", re.IGNORECASE)
-# main.py still renders the placeholder home page; it moves into a pages.py
-# with the classroom pages. Do not add to this set.
-LEGACY_TEMPLATE_RENDERERS = {MAIN_PY}
+# Files outside core/<slice>/pages.py allowed to render templates. Empty since
+# `/` became a redirect in core/auth/pages.py; keep it that way.
+LEGACY_TEMPLATE_RENDERERS: set[Path] = set()
 # Slices whose every public use case takes the Actor first. A slice listed here
 # is checked as soon as its service.py exists; assignments and generation join
 # when their use cases gain an actor.
@@ -523,4 +522,81 @@ def test_templates_build_controls_only_through_component_macros() -> None:
         "Use the macros in web/templates/_components/forms.html (field, button, "
         "hidden, ...) instead of raw form controls (AGENTS.md 'Definition of "
         "done'). Violations:\n" + "\n".join(violations)
+    )
+
+
+POST_FORM = re.compile(r"<form\b[^>]*method=\"post\"[^>]*>(.*?)</form>", re.S | re.I)
+FORMS_IMPORT = re.compile(
+    r'\{%\s*from\s+"_components/forms\.html"\s+import\s+([^%]*?)%\}'
+)
+
+
+def test_every_post_form_carries_the_csrf_field() -> None:
+    """core/auth/csrf.py rejects a form post without its page's token."""
+    violations = []
+    for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
+        for match in POST_FORM.finditer(template.read_text()):
+            if "csrf_field()" not in match.group(1):
+                line = template.read_text()[: match.start()].count("\n") + 1
+                violations.append(f"{template.relative_to(TEMPLATE_ROOT)}:{line}")
+
+    assert not violations, (
+        'Put {{ csrf_field() }} inside every <form method="post"> (or use '
+        "action_form). Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_forms_macros_are_imported_with_context() -> None:
+    """csrf_field() reads `request`, which a context-free import cannot see."""
+    violations = []
+    for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
+        for match in FORMS_IMPORT.finditer(template.read_text()):
+            if not match.group(1).rstrip().endswith("with context"):
+                violations.append(str(template.relative_to(TEMPLATE_ROOT)))
+
+    assert not violations, (
+        "Import _components/forms.html macros `with context`. Violations:\n"
+        + "\n".join(violations)
+    )
+
+
+def _is_post_route(decorator: ast.expr) -> bool:
+    return (
+        isinstance(decorator, ast.Call)
+        and isinstance(decorator.func, ast.Attribute)
+        and decorator.func.attr == "post"
+    )
+
+
+def test_every_post_page_handler_checks_csrf_first() -> None:
+    violations = []
+    for page_module in _page_modules():
+        for node in ast.walk(_parse(page_module)):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            if not any(_is_post_route(d) for d in node.decorator_list):
+                continue
+            parameters = {argument.arg for argument in node.args.args}
+            body = [
+                statement
+                for statement in node.body
+                if not (
+                    isinstance(statement, ast.Expr)
+                    and isinstance(statement.value, ast.Constant)
+                )
+            ]
+            first = body[0] if body else None
+            calls_check = (
+                isinstance(first, ast.Expr)
+                and isinstance(first.value, ast.Call)
+                and isinstance(first.value.func, ast.Name)
+                and first.value.func.id == "require_csrf"
+            )
+            if "csrf_token" not in parameters or not calls_check:
+                violations.append(f"{page_module}:{node.lineno}: {node.name}")
+
+    assert not violations, (
+        "Every POST page handler takes `csrf_token` and calls "
+        "require_csrf(request, csrf_token) as its first statement. "
+        "Violations:\n" + "\n".join(violations)
     )

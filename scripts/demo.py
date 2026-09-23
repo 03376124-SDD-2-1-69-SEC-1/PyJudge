@@ -187,6 +187,8 @@ def build_demo_app(seed: DemoSeed | None = None) -> FastAPI:
     """The demo application; `seed` is exposed so tests can inspect it."""
     if seed is None:
         seed = DemoSeed()
+    # build_app already passes secure_cookies=False: the demo runs on plain
+    # http://127.0.0.1, where some browsers refuse Secure cookies.
     return build_app(
         auth_repository=seed.users,
         clock=seed.clock,

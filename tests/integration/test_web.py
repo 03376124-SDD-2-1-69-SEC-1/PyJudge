@@ -12,18 +12,6 @@ STATIC_DIR = Path("src/greader/web/static")
 
 
 @pytest.mark.anyio
-async def test_home_uses_shared_layout_without_authored_javascript() -> None:
-    transport = ASGITransport(app=build_app())
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.get("/")
-
-    assert response.status_code == 200
-    assert "GReader Team Scaffold" in response.text
-    assert 'href="/docs"' in response.text
-    assert "<script" not in response.text.lower()
-
-
-@pytest.mark.anyio
 async def test_stylesheet_url_carries_the_file_version() -> None:
     """A rebuilt app.css must reach the browser without a manual cache clear."""
     stylesheet = STATIC_DIR / "css" / "app.css"

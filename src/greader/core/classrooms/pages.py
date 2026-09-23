@@ -11,6 +11,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from greader.core.auth.csrf import require_csrf
 from greader.core.auth.current import current_actor
 from greader.core.auth.models import Actor, PermissionDeniedError
 from greader.core.classrooms.models import (
@@ -100,8 +101,10 @@ def create_submit(
     course_name: Annotated[str, Form()],
     section: Annotated[str, Form()],
     semester: Annotated[str, Form()],
+    csrf_token: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
     """C-03 submit."""
+    require_csrf(request, csrf_token)
     classroom = _service(request).create(
         current_actor(request),
         course_code=course_code,
@@ -114,9 +117,12 @@ def create_submit(
 
 @router.post("/classes/join", response_model=None)
 def join_submit(
-    request: Request, join_code: Annotated[str, Form()]
+    request: Request,
+    join_code: Annotated[str, Form()],
+    csrf_token: Annotated[str, Form()] = "",
 ) -> RedirectResponse | HTMLResponse:
     """C-02 submit; C-02a on an invalid code."""
+    require_csrf(request, csrf_token)
     actor = current_actor(request)
     try:
         classroom = _service(request).join(actor, join_code)
@@ -170,7 +176,9 @@ def settings_submit(
     course_name: Annotated[str, Form()],
     section: Annotated[str, Form()],
     semester: Annotated[str, Form()],
+    csrf_token: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
+    require_csrf(request, csrf_token)
     _owner_action(
         lambda service, actor: service.update(
             actor,
@@ -186,13 +194,19 @@ def settings_submit(
 
 
 @router.post("/classes/{classroom_id}/archive")
-def archive_submit(request: Request, classroom_id: int) -> RedirectResponse:
+def archive_submit(
+    request: Request, classroom_id: int, csrf_token: Annotated[str, Form()] = ""
+) -> RedirectResponse:
+    require_csrf(request, csrf_token)
     _owner_action(lambda service, actor: service.archive(actor, classroom_id), request)
     return _see_other(f"/classes/{classroom_id}?tab=settings")
 
 
 @router.post("/classes/{classroom_id}/unarchive")
-def unarchive_submit(request: Request, classroom_id: int) -> RedirectResponse:
+def unarchive_submit(
+    request: Request, classroom_id: int, csrf_token: Annotated[str, Form()] = ""
+) -> RedirectResponse:
+    require_csrf(request, csrf_token)
     _owner_action(
         lambda service, actor: service.unarchive(actor, classroom_id), request
     )
@@ -200,7 +214,10 @@ def unarchive_submit(request: Request, classroom_id: int) -> RedirectResponse:
 
 
 @router.post("/classes/{classroom_id}/join-code/regenerate")
-def regenerate_submit(request: Request, classroom_id: int) -> RedirectResponse:
+def regenerate_submit(
+    request: Request, classroom_id: int, csrf_token: Annotated[str, Form()] = ""
+) -> RedirectResponse:
+    require_csrf(request, csrf_token)
     _owner_action(
         lambda service, actor: service.regenerate_join_code(actor, classroom_id),
         request,
@@ -209,7 +226,10 @@ def regenerate_submit(request: Request, classroom_id: int) -> RedirectResponse:
 
 
 @router.post("/classes/{classroom_id}/join-code/disable")
-def disable_submit(request: Request, classroom_id: int) -> RedirectResponse:
+def disable_submit(
+    request: Request, classroom_id: int, csrf_token: Annotated[str, Form()] = ""
+) -> RedirectResponse:
+    require_csrf(request, csrf_token)
     _owner_action(
         lambda service, actor: service.disable_join_code(actor, classroom_id), request
     )
@@ -218,8 +238,12 @@ def disable_submit(request: Request, classroom_id: int) -> RedirectResponse:
 
 @router.post("/classes/{classroom_id}/members/{user_id}/remove")
 def remove_member_submit(
-    request: Request, classroom_id: int, user_id: int
+    request: Request,
+    classroom_id: int,
+    user_id: int,
+    csrf_token: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
+    require_csrf(request, csrf_token)
     try:
         _owner_action(
             lambda service, actor: service.remove_member(actor, classroom_id, user_id),

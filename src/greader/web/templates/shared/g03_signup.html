@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_components/forms.html" import field, select_field, checkbox, button %}
+{% from "_components/forms.html" import csrf_field, field, select_field, checkbox, button with context %}
 {% from "_components/ui.html" import alert %}
 {% block title %}Sign up · GReader{% endblock %}
 {% block main %}
@@ -20,6 +20,7 @@
     {% endcall %}
   {% endif %}
   <form method="post" action="/signup" class="flex flex-col gap-4">
+    {{ csrf_field() }}
     {{ field("full_name", "Full name", value=form.full_name, placeholder="Somchai Prasert", required=true, autocomplete="name") }}
     <div{% if error == "not_kmitl_email" %} data-state="G-03a"{% elif error == "already_registered" %} data-state="G-03b"{% endif %}>
       {{ field("email", "Email", type="email", value=form.email, placeholder="name@kmitl.ac.th", hint="" if email_error else "Only @kmitl.ac.th addresses are allowed.", error=email_error, required=true, autocomplete="email") }}

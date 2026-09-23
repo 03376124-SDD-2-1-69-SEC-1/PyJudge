@@ -1,4 +1,4 @@
-{% from "_components/forms.html" import link_button %}
+{% from "_components/forms.html" import link_button with context %}
 {% from "_components/ui.html" import page_header %}
 {% call page_header(view.classroom.course_name ~ " · Sec " ~ view.classroom.section,
                     view.student_count ~ " students · semester " ~ view.classroom.semester ~ (" · archived" if view.classroom.archived else "")) %}

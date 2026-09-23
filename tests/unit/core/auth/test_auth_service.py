@@ -6,6 +6,7 @@ from datetime import timedelta
 import pytest
 
 from greader.core.auth.models import (
+    Actor,
     InstructorRequestStatus,
     Landing,
     NotAuthenticatedError,
@@ -321,3 +322,28 @@ def test_password_hash_round_trips_and_uses_a_fresh_salt() -> None:
     assert verify_password(PASSWORD, first)
     assert not verify_password("wrong", first)
     assert first != hash_password(PASSWORD)
+
+
+def test_each_session_has_its_own_csrf_token_until_logout(
+    service: AuthService, repository: FakeAuthRepository
+) -> None:
+    seed_user(repository, email="a@kmitl.ac.th", full_name="A")
+    first = service.log_in(email="a@kmitl.ac.th", password=DEFAULT_PASSWORD).token
+    second = service.log_in(email="a@kmitl.ac.th", password=DEFAULT_PASSWORD).token
+
+    assert service.csrf_token_for(first) != service.csrf_token_for(second)
+    service.log_out(first)
+    with pytest.raises(NotAuthenticatedError):
+        service.csrf_token_for(first)
+
+
+@pytest.mark.parametrize(
+    ("role", "landing"),
+    [(Role.ADMIN, Landing.ADMIN_SETTINGS), (Role.STUDENT, Landing.CLASSROOMS)],
+)
+def test_landing_for_follows_the_role(
+    service: AuthService, role: Role, landing: Landing
+) -> None:
+    actor = Actor(user_id=1, role=role, full_name="A", email="a@kmitl.ac.th")
+
+    assert service.landing_for(actor) is landing

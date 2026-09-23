@@ -261,6 +261,10 @@ everywhere. See `tests/conftest.py`.
   `web/templates/_components/forms.html`, and layout pieces (page header, tabs,
   badge, empty state, modal) through `_components/ui.html`; style with the
   tokens in `input.css`, then rebuild `app.css`
+- every `<form method="post">` renders `{{ csrf_field() }}` (import the forms
+  macros `with context`), and every POST page handler takes `csrf_token` and
+  calls `require_csrf(request, csrf_token)` first (`core/auth/csrf.py`); the
+  tests post forms through `tests/integration/forms.py`
 - integration tests cover each page route for every role: 200 with the right
   template for the allowed role, 403/404 for the others
 - unit test at the service/repository seam, integration test at the HTTP layer

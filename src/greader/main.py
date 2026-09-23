@@ -28,7 +28,12 @@ from greader.core.assignments.ports import AssignmentRepository
 from greader.core.assignments.routes import router as assignment_router
 from greader.core.assignments.service import AssignmentService
 from greader.core.assignments.testcase_routes import router as test_case_router
-from greader.core.auth.models import NotAuthenticatedError, PermissionDeniedError
+from greader.core.auth.csrf import csrf_token
+from greader.core.auth.models import (
+    CsrfTokenError,
+    NotAuthenticatedError,
+    PermissionDeniedError,
+)
 from greader.core.auth.pages import DemoAccount
 from greader.core.auth.pages import router as auth_page_router
 from greader.core.auth.ports import AuthRepository, Clock, VerificationMailer
@@ -100,6 +105,7 @@ def create_app(
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
     demo_accounts: tuple[DemoAccount, ...] | None = None,
+    secure_cookies: bool | None = None,
 ) -> FastAPI:
     """Build the application, wiring SQL adapters for anything not supplied."""
     # Resolved lazily and at most once each, so an app built entirely from
@@ -129,11 +135,17 @@ def create_app(
 
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
     templates.env.globals["asset_url"] = asset_url
+    templates.env.globals["csrf_token"] = csrf_token
     application.state.templates = templates
     # The "log in as" list on G-01 exists only when scripts/demo.py passes it.
     if demo_accounts is None:
         demo_accounts = ()
     application.state.demo_accounts = demo_accounts
+    # Cookies are Secure unless a caller on plain HTTP (scripts/demo.py, the
+    # tests) turns it off explicitly.
+    if secure_cookies is None:
+        secure_cookies = True
+    application.state.secure_cookies = secure_cookies
 
     if clock is None:
         clock = SystemClock()
@@ -225,6 +237,14 @@ def create_app(
             )
         return HTMLResponse("<h1>403 · Not allowed</h1>", status_code=403)
 
+    @application.exception_handler(CsrfTokenError)
+    def csrf_rejected(request: Request, error: CsrfTokenError) -> Response:
+        """A form posted without its page's token (core/auth/csrf.py)."""
+        return HTMLResponse(
+            "<h1>403 · This form expired</h1><p>Go back, reload and try again.</p>",
+            status_code=403,
+        )
+
     @application.exception_handler(SliceNotPersistedError)
     def slice_not_persisted(
         request: Request, error: SliceNotPersistedError
@@ -249,11 +269,6 @@ def create_app(
                 }
             },
         )
-
-    @application.get("/")
-    def home(request: Request):
-        """Render the shared layout example."""
-        return templates.TemplateResponse(request, "home.html")
 
     @application.get("/health")
     def health() -> dict[str, str]:

@@ -1,4 +1,8 @@
-"""HTML pages G-01 login, G-03 sign-up, G-04 verify (ADR-0007 route contract)."""
+"""HTML pages G-01 login, G-03 sign-up, G-04 verify, and `/` (ADR-0007).
+
+Every POST handler calls `require_csrf` first; anonymous pages set the
+`greader_csrf` cookie their forms are checked against.
+"""
 
 from dataclasses import dataclass
 from typing import Annotated
@@ -7,8 +11,9 @@ from fastapi import APIRouter, Form, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from greader.core.auth.current import SESSION_COOKIE, auth_service
-from greader.core.auth.models import Landing
+from greader.core.auth.csrf import require_csrf, set_anonymous_csrf_cookie
+from greader.core.auth.current import SESSION_COOKIE, auth_service, current_actor
+from greader.core.auth.models import Landing, NotAuthenticatedError
 from greader.core.auth.routes import set_session_cookie
 from greader.core.auth.service import (
     AccountDeactivatedError,
@@ -63,36 +68,63 @@ def _demo_accounts(request: Request) -> tuple[DemoAccount, ...]:
     return request.app.state.demo_accounts
 
 
+def _anonymous(request: Request, response: HTMLResponse) -> HTMLResponse:
+    set_anonymous_csrf_cookie(request, response)
+    return response
+
+
 def _login_page(
     request: Request, *, email: str = "", error: str = "", status_code: int = 200
 ) -> HTMLResponse:
-    return _templates(request).TemplateResponse(
+    return _anonymous(
         request,
-        "shared/g01_login.html",
-        {"email": email, "error": error, "demo_accounts": _demo_accounts(request)},
-        status_code=status_code,
+        _templates(request).TemplateResponse(
+            request,
+            "shared/g01_login.html",
+            {"email": email, "error": error, "demo_accounts": _demo_accounts(request)},
+            status_code=status_code,
+        ),
     )
 
 
 def _signup_page(
     request: Request, *, form: dict[str, str], error: str = "", status_code: int = 200
 ) -> HTMLResponse:
-    return _templates(request).TemplateResponse(
+    return _anonymous(
         request,
-        "shared/g03_signup.html",
-        {"form": form, "error": error, "faculties": FACULTIES},
-        status_code=status_code,
+        _templates(request).TemplateResponse(
+            request,
+            "shared/g03_signup.html",
+            {"form": form, "error": error, "faculties": FACULTIES},
+            status_code=status_code,
+        ),
     )
 
 
 def _verify_page(
     request: Request, *, state: str, email: str = "", status_code: int = 200
 ) -> HTMLResponse:
-    return _templates(request).TemplateResponse(
+    return _anonymous(
         request,
-        "shared/g04_verify.html",
-        {"state": state, "email": email},
-        status_code=status_code,
+        _templates(request).TemplateResponse(
+            request,
+            "shared/g04_verify.html",
+            {"state": state, "email": email},
+            status_code=status_code,
+        ),
+    )
+
+
+@router.get("/")
+def root(request: Request) -> RedirectResponse:
+    """A logged-in account goes to its landing, everyone else to G-01."""
+    try:
+        actor = current_actor(request)
+    except NotAuthenticatedError:
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    landing = auth_service(request).landing_for(actor)
+    return RedirectResponse(
+        LANDING_URLS[landing], status_code=status.HTTP_303_SEE_OTHER
     )
 
 
@@ -107,8 +139,10 @@ def login_submit(
     request: Request,
     email: Annotated[str, Form()],
     password: Annotated[str, Form()],
+    csrf_token: Annotated[str, Form()] = "",
 ) -> Response:
     """G-01 submit: 01a wrong password, 01b email not verified."""
+    require_csrf(request, csrf_token)
     try:
         result = auth_service(request).log_in(email=email, password=password)
     except InvalidCredentialsError:
@@ -122,12 +156,15 @@ def login_submit(
     response = RedirectResponse(
         LANDING_URLS[result.landing], status_code=status.HTTP_303_SEE_OTHER
     )
-    set_session_cookie(response, result.token)
+    set_session_cookie(request, response, result.token)
     return response
 
 
 @router.post("/logout")
-def logout_submit(request: Request) -> RedirectResponse:
+def logout_submit(
+    request: Request, csrf_token: Annotated[str, Form()] = ""
+) -> RedirectResponse:
+    require_csrf(request, csrf_token)
     token = request.cookies.get(SESSION_COOKIE)
     if token is not None:
         auth_service(request).log_out(token)
@@ -151,8 +188,10 @@ def signup_submit(
     confirm_password: Annotated[str, Form()],
     wants_instructor: Annotated[str, Form()] = "",
     faculty: Annotated[str, Form()] = "",
+    csrf_token: Annotated[str, Form()] = "",
 ) -> HTMLResponse:
     """G-03 submit: 03a not a KMITL email, 03b already registered; success → G-04a."""
+    require_csrf(request, csrf_token)
     form = {
         "full_name": full_name,
         "email": email,
@@ -201,7 +240,12 @@ def verify_page(request: Request, token: str = "") -> HTMLResponse:
 
 
 @router.post("/verify/resend", response_class=HTMLResponse)
-def verify_resend(request: Request, email: Annotated[str, Form()]) -> HTMLResponse:
+def verify_resend(
+    request: Request,
+    email: Annotated[str, Form()],
+    csrf_token: Annotated[str, Form()] = "",
+) -> HTMLResponse:
     """G-01b / G-04c "Send a new link"."""
+    require_csrf(request, csrf_token)
     auth_service(request).resend_verification(email)
     return _verify_page(request, state="waiting", email=email)

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_components/forms.html" import field, button, hidden %}
+{% from "_components/forms.html" import csrf_field, field, button, hidden with context %}
 {% from "_components/ui.html" import alert %}
 {% block title %}Log in · GReader{% endblock %}
 {% block main %}
@@ -13,6 +13,7 @@
     {% call alert(state="G-01b") %}
       <span class="flex-1">This email is not verified yet.</span>
       <form method="post" action="/verify/resend">
+        {{ csrf_field() }}
         {{ hidden("email", email) }}
         {{ button("Resend link", size="sm") }}
       </form>
@@ -22,6 +23,7 @@
   {% endif %}
 
   <form method="post" action="/login" class="flex flex-col gap-4">
+    {{ csrf_field() }}
     {{ field("email", "Email", type="email", value=email, placeholder="name@kmitl.ac.th", required=true, autocomplete="username") }}
     {% if error == "wrong_password" %}
     <div data-state="G-01a">
@@ -41,6 +43,7 @@
       {% for account in demo_accounts %}
       <li>
         <form method="post" action="/login">
+          {{ csrf_field() }}
           {{ hidden("email", account.email) }}
           {{ hidden("password", account.password) }}
           {{ button(account.label, size="sm", block=true, class="justify-start") }}

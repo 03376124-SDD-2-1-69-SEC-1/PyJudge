@@ -160,12 +160,10 @@ class AuthService:
                 token_hash=_digest(token),
                 user_id=user.id,
                 expires_at=self._clock.now() + SESSION_TTL,
+                csrf_token=secrets.token_urlsafe(32),
             )
         )
-        landing = (
-            Landing.ADMIN_SETTINGS if user.role is Role.ADMIN else Landing.CLASSROOMS
-        )
-        return LoginResult(token=token, user=user, landing=landing)
+        return LoginResult(token=token, user=user, landing=_landing(user.role))
 
     def log_out(self, token: str) -> None:
         session = self._repository.find_session(_digest(token))
@@ -175,10 +173,8 @@ class AuthService:
 
     def resolve_session(self, token: str) -> Actor:
         """Turn a session cookie into the Actor, or raise NotAuthenticatedError."""
-        session = self._repository.find_session(_digest(token))
+        session = self._live_session(token)
         now = self._clock.now()
-        if session is None or session.revoked or session.expires_at <= now:
-            raise NotAuthenticatedError
         user = self._repository.get_user(session.user_id)
         if user is None or not user.is_active:
             raise NotAuthenticatedError
@@ -190,6 +186,14 @@ class AuthService:
         return Actor(
             user_id=user.id, role=user.role, full_name=user.full_name, email=user.email
         )
+
+    def csrf_token_for(self, token: str) -> str:
+        """The synchronizer token of a live session, or NotAuthenticatedError."""
+        return self._live_session(token).csrf_token
+
+    def landing_for(self, actor: Actor) -> Landing:
+        """Where `/` sends a logged-in account."""
+        return _landing(actor.role)
 
     def me(self, actor: Actor) -> User:
         return self._require_user(actor.user_id)
@@ -235,11 +239,25 @@ class AuthService:
             verify_path=f"/verify?token={token}",
         )
 
+    def _live_session(self, token: str) -> Session:
+        session = self._repository.find_session(_digest(token))
+        if (
+            session is None
+            or session.revoked
+            or session.expires_at <= self._clock.now()
+        ):
+            raise NotAuthenticatedError
+        return session
+
     def _require_user(self, user_id: int) -> User:
         user = self._repository.get_user(user_id)
         if user is None:
             raise NotAuthenticatedError
         return user
+
+
+def _landing(role: Role) -> Landing:
+    return Landing.ADMIN_SETTINGS if role is Role.ADMIN else Landing.CLASSROOMS
 
 
 def hash_password(password: str) -> str:

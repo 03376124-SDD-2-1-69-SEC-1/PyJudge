@@ -4,6 +4,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from scripts.demo import DemoSeed, build_demo_app
 
+from tests.integration.forms import post_form
+
 
 @pytest.mark.anyio
 async def test_every_verified_demo_account_logs_in_and_lands() -> None:
@@ -15,8 +17,11 @@ async def test_every_verified_demo_account_logs_in_and_lands() -> None:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://testserver"
         ) as client:
-            login = await client.post(
-                "/login", data={"email": account.email, "password": account.password}
+            login = await post_form(
+                client,
+                "/login",
+                {"email": account.email, "password": account.password},
+                page="/login",
             )
             landing = await client.get(login.headers["location"])
 

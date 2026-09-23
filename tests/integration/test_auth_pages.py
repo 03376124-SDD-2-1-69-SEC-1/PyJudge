@@ -10,6 +10,7 @@ from greader.core.auth.pages import DemoAccount
 from greader.integrations.email import StubEmailSender
 from tests.fakes.app import build_app
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, FakeClock, seed_user
+from tests.integration.forms import post_form
 
 
 def _client(app) -> AsyncClient:
@@ -56,8 +57,11 @@ async def test_login_form_redirects_by_role_and_sets_the_cookie(
     repository = FakeAuthRepository()
     seed_user(repository, email="u@kmitl.ac.th", full_name="U", role=role)
     async with _client(build_app(auth_repository=repository)) as client:
-        response = await client.post(
-            "/login", data={"email": "u@kmitl.ac.th", "password": DEFAULT_PASSWORD}
+        response = await post_form(
+            client,
+            "/login",
+            {"email": "u@kmitl.ac.th", "password": DEFAULT_PASSWORD},
+            page="/login",
         )
 
     assert response.status_code == 303
@@ -71,11 +75,17 @@ async def test_login_form_shows_01a_and_01b() -> None:
     repository = FakeAuthRepository()
     seed_user(repository, email="new@kmitl.ac.th", full_name="N", verified=False)
     async with _client(build_app(auth_repository=repository)) as client:
-        wrong = await client.post(
-            "/login", data={"email": "new@kmitl.ac.th", "password": "nope"}
+        wrong = await post_form(
+            client,
+            "/login",
+            {"email": "new@kmitl.ac.th", "password": "nope"},
+            page="/login",
         )
-        unverified = await client.post(
-            "/login", data={"email": "new@kmitl.ac.th", "password": DEFAULT_PASSWORD}
+        unverified = await post_form(
+            client,
+            "/login",
+            {"email": "new@kmitl.ac.th", "password": DEFAULT_PASSWORD},
+            page="/login",
         )
 
     assert 'data-state="G-01a"' in wrong.text
@@ -106,7 +116,7 @@ async def test_signup_form_success_shows_04a_then_the_link_verifies() -> None:
         "confirm_password": "correct horse",
     }
     async with _client(build_app(verification_mailer=mailer)) as client:
-        waiting = await client.post("/signup", data=form)
+        waiting = await post_form(client, "/signup", form, page="/signup")
         verified = await client.get(mailer.sent[-1][1])
 
     assert 'data-state="G-04a"' in waiting.text
@@ -128,7 +138,7 @@ async def test_signup_form_shows_03a_and_03b(email: str, state: str) -> None:
         "confirm_password": "correct horse",
     }
     async with _client(build_app(auth_repository=repository)) as client:
-        response = await client.post("/signup", data=form)
+        response = await post_form(client, "/signup", form, page="/signup")
 
     assert response.status_code == 422
     assert f'data-state="{state}"' in response.text
@@ -145,7 +155,7 @@ async def test_verify_page_shows_04c_for_an_expired_link() -> None:
         "confirm_password": "correct horse",
     }
     async with _client(build_app(verification_mailer=mailer, clock=clock)) as client:
-        await client.post("/signup", data=form)
+        await post_form(client, "/signup", form, page="/signup")
         clock.advance(timedelta(hours=25))
         response = await client.get(mailer.sent[-1][1])
 
@@ -158,10 +168,13 @@ async def test_logout_clears_the_session() -> None:
     repository = FakeAuthRepository()
     seed_user(repository, email="u@kmitl.ac.th", full_name="U")
     async with _client(build_app(auth_repository=repository)) as client:
-        await client.post(
-            "/login", data={"email": "u@kmitl.ac.th", "password": DEFAULT_PASSWORD}
+        await post_form(
+            client,
+            "/login",
+            {"email": "u@kmitl.ac.th", "password": DEFAULT_PASSWORD},
+            page="/login",
         )
-        logout = await client.post("/logout")
+        logout = await post_form(client, "/logout", {}, page="/classes")
         me = await client.get("/api/v1/auth/me")
 
     assert logout.headers["location"] == "/login"

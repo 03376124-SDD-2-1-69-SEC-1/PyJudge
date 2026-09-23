@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_components/forms.html" import field, button, action_form %}
+{% from "_components/forms.html" import csrf_field, field, button, action_form with context %}
 {% block title %}Settings · {{ view.classroom.course_name }} · GReader{% endblock %}
 {% block content %}
 <section data-page="T-01" data-tab="settings">
@@ -7,6 +7,7 @@
   <div class="grid gap-4 lg:grid-cols-3">
     <div class="flex flex-col gap-4">
       <form id="classroom-settings" method="post" action="/classes/{{ view.classroom.id }}/settings" class="flex flex-col gap-4">
+        {{ csrf_field() }}
         {{ field("course_code", "Course code", value=view.classroom.course_code, required=true) }}
         {{ field("course_name", "Course name", value=view.classroom.course_name, required=true) }}
         <div class="grid grid-cols-2 gap-4">

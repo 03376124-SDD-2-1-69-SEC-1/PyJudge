@@ -60,13 +60,15 @@ def _fail(status_code: int, code: str, message: str) -> NoReturn:
     )
 
 
-def set_session_cookie(response: Response, token: str) -> None:
+def set_session_cookie(request: Request, response: Response, token: str) -> None:
+    """HttpOnly, SameSite=Lax, and Secure unless create_app(secure_cookies=False)."""
     response.set_cookie(
         SESSION_COOKIE,
         token,
         max_age=int(SESSION_TTL.total_seconds()),
         httponly=True,
         samesite="lax",
+        secure=request.app.state.secure_cookies,
     )
 
 
@@ -130,7 +132,7 @@ def log_in(
         _fail(403, "email_not_verified", "This email is not verified yet")
     except AccountDeactivatedError:
         _fail(403, "account_deactivated", "This account is deactivated")
-    set_session_cookie(response, result.token)
+    set_session_cookie(request, response, result.token)
     return LoginResponse(user=user_response(result.user), landing=result.landing.value)
 
 

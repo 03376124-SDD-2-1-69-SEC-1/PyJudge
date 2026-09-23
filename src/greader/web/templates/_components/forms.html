@@ -1,8 +1,9 @@
 {#
   Form controls. Pages import these instead of writing <input>/<button>
-  (tests/architecture enforces it):
+  (tests/architecture enforces it). Import WITH CONTEXT so csrf_field() can
+  see the request:
 
-    {% from "_components/forms.html" import field, button %}
+    {% from "_components/forms.html" import field, button with context %}
     {{ field("email", "Email", type="email", value=email, error=error_text) }}
     {{ button("Log in", variant="primary", block=true) }}
 
@@ -56,6 +57,11 @@
 </label>
 {%- endmacro %}
 
+{#- Every POST form carries this first; core/auth/csrf.py checks it. -#}
+{% macro csrf_field() -%}
+<input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+{%- endmacro %}
+
 {% macro hidden(name, value) -%}
 <input type="hidden" name="{{ name }}" value="{{ value }}">
 {%- endmacro %}
@@ -78,6 +84,7 @@ btn{% if variant != "secondary" %} btn-{{ variant }}{% endif %}{% if size %} btn
 {#- A POST form with one button, e.g. "Archive classroom". -#}
 {% macro action_form(action, label, variant="secondary", size="", class="") -%}
 <form method="post" action="{{ action }}" class="inline">
+  {{ csrf_field() }}
   {{ button(label, variant=variant, size=size, class=class) }}
 </form>
 {%- endmacro %}

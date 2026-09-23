@@ -187,6 +187,16 @@ There is no admin dashboard.
    `PermissionDeniedError`. Routes and pages never read a role.
 6. A non-member gets the same 404 as a missing id. A member in the wrong
    role (a Student on an instructor page) gets 403.
+7. CSRF (added 2026-09-24): logged-in form posts carry the synchronizer
+   token stored on the Session; anonymous forms (login, sign-up, resend
+   link) carry a token from the `greader_csrf` cookie (double-submit). One
+   check, `require_csrf`, runs first in every POST page handler; a mismatch
+   is 403. The JSON API relies on FastAPI parsing bodies only with
+   `Content-Type: application/json` and on allowing no CORS origins.
+8. Cookies are `HttpOnly`, `SameSite=Lax` and `Secure`; only
+   `scripts/demo.py` and the tests turn `Secure` off (plain HTTP).
+9. `/` redirects a logged-in account to its landing and everyone else to
+   `/login`.
 
 ## 10. Code structure
 

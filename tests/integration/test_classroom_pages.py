@@ -6,6 +6,7 @@ from httpx import ASGITransport, AsyncClient
 from greader.core.auth.models import Role
 from tests.fakes.app import build_app
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
+from tests.integration.forms import post_form
 
 FORM = {
     "course_code": "01076001",
@@ -51,18 +52,23 @@ class Campus:
         client = AsyncClient(
             transport=ASGITransport(app=self.app), base_url="http://testserver"
         )
-        await client.post("/login", data={"email": email, "password": DEFAULT_PASSWORD})
+        await post_form(
+            client,
+            "/login",
+            {"email": email, "password": DEFAULT_PASSWORD},
+            page="/login",
+        )
         return client
 
     async def classroom(self) -> tuple[int, str]:
         """Create a classroom as TEACHER with STUDENT joined; (id, join code)."""
         teacher = await self.client_for(TEACHER)
-        created = await teacher.post("/classes", data=FORM)
+        created = await post_form(teacher, "/classes", FORM, page="/classes")
         classroom_id = int(created.headers["location"].split("created=")[1])
         banner = await teacher.get(created.headers["location"])
         code = banner.text.split('class="join-code select-all">')[1].split("<")[0]
         student = await self.client_for(STUDENT)
-        await student.post("/classes/join", data={"join_code": code})
+        await post_form(student, "/classes/join", {"join_code": code}, page="/classes")
         return classroom_id, code
 
 
@@ -107,7 +113,7 @@ async def test_create_shows_c03a_with_the_join_code() -> None:
     campus = Campus()
     teacher = await campus.client_for(TEACHER)
 
-    created = await teacher.post("/classes", data=FORM)
+    created = await post_form(teacher, "/classes", FORM, page="/classes")
     banner = await teacher.get(created.headers["location"])
 
     assert created.status_code == 303
@@ -120,8 +126,12 @@ async def test_join_lands_in_s01_and_a_bad_code_shows_c02a() -> None:
     classroom_id, code = await campus.classroom()
     other = await campus.client_for(OTHER_STUDENT)
 
-    joined = await other.post("/classes/join", data={"join_code": code.lower()})
-    bad = await other.post("/classes/join", data={"join_code": "ZZZZZZ"})
+    joined = await post_form(
+        other, "/classes/join", {"join_code": code.lower()}, page="/classes"
+    )
+    bad = await post_form(
+        other, "/classes/join", {"join_code": "ZZZZZZ"}, page="/classes"
+    )
 
     assert joined.headers["location"] == f"/classes/{classroom_id}"
     assert bad.status_code == 422
@@ -183,7 +193,9 @@ async def test_member_cannot_post_instructor_actions() -> None:
     classroom_id, _ = await campus.classroom()
     student = await campus.client_for(STUDENT)
 
-    response = await student.post(f"/classes/{classroom_id}/archive")
+    response = await post_form(
+        student, f"/classes/{classroom_id}/archive", {}, page="/classes"
+    )
 
     assert response.status_code == 403
 
@@ -196,7 +208,11 @@ async def test_outsiders_get_404(email: str) -> None:
     outsider = await campus.client_for(email)
 
     assert (await outsider.get(f"/classes/{classroom_id}")).status_code == 404
-    assert (await outsider.post(f"/classes/{classroom_id}/archive")).status_code == 404
+    assert (
+        await post_form(
+            outsider, f"/classes/{classroom_id}/archive", {}, page="/classes"
+        )
+    ).status_code == 404
 
 
 @pytest.mark.anyio
@@ -205,10 +221,15 @@ async def test_owner_settings_forms_redirect_back() -> None:
     classroom_id, code = await campus.classroom()
     teacher = await campus.client_for(TEACHER)
 
-    saved = await teacher.post(
-        f"/classes/{classroom_id}/settings", data={**FORM, "course_name": "Prog I"}
+    saved = await post_form(
+        teacher,
+        f"/classes/{classroom_id}/settings",
+        {**FORM, "course_name": "Prog I"},
+        page="/classes",
     )
-    regenerated = await teacher.post(f"/classes/{classroom_id}/join-code/regenerate")
+    regenerated = await post_form(
+        teacher, f"/classes/{classroom_id}/join-code/regenerate", {}, page="/classes"
+    )
     settings = await teacher.get(f"/classes/{classroom_id}?tab=settings")
 
     assert saved.headers["location"] == f"/classes/{classroom_id}?tab=settings"
@@ -225,7 +246,12 @@ async def test_owner_removes_a_member_from_the_members_tab() -> None:
     members = await teacher.get(f"/classes/{classroom_id}?tab=members")
     user_id = members.text.split("/members/")[1].split("/remove")[0]
 
-    removed = await teacher.post(f"/classes/{classroom_id}/members/{user_id}/remove")
+    removed = await post_form(
+        teacher,
+        f"/classes/{classroom_id}/members/{user_id}/remove",
+        {},
+        page="/classes",
+    )
     student = await campus.client_for(STUDENT)
 
     assert removed.headers["location"] == f"/classes/{classroom_id}?tab=members"

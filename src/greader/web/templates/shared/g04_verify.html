@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_components/forms.html" import field, button, hidden, link_button %}
+{% from "_components/forms.html" import csrf_field, field, button, hidden, link_button with context %}
 {% block title %}Verify email · GReader{% endblock %}
 {% block main %}
 <main class="page-narrow items-center text-center" data-page="G-04">
@@ -32,6 +32,7 @@
 
   {% if state != "verified" %}
   <form method="post" action="/verify/resend" class="flex w-full flex-col gap-3 text-left">
+    {{ csrf_field() }}
     {% if email %}
       {{ hidden("email", email) }}
       <div class="text-center">{{ button("Send a new link" if state != "waiting" else "Resend link", variant="primary" if state == "expired" else "secondary") }}</div>

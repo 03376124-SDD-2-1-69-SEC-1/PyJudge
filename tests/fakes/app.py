@@ -103,4 +103,6 @@ def build_app(
         classroom_repository=classroom_repository,
         classroom_stats=classroom_stats,
         demo_accounts=demo_accounts,
+        # httpx talks plain HTTP to the ASGI app and drops Secure cookies.
+        secure_cookies=False,
     )

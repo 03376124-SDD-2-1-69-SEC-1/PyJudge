@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_components/forms.html" import action_form %}
+{% from "_components/forms.html" import action_form with context %}
 {% from "_components/ui.html" import empty_state %}
 {% block title %}Members · {{ view.classroom.course_name }} · GReader{% endblock %}
 {% block content %}

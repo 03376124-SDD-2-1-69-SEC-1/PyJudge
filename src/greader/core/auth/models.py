@@ -39,6 +39,10 @@ class PermissionDeniedError(Exception):
     """The Actor is known but may not do this: 403."""
 
 
+class CsrfTokenError(Exception):
+    """A form post without the token its page was rendered with: 403."""
+
+
 @dataclass(frozen=True, slots=True)
 class User:
     """An account. `id` is `None` only before the repository persisted it."""
@@ -94,11 +98,16 @@ class UserSummary:
 
 @dataclass(frozen=True, slots=True)
 class Session:
-    """A login. Only the SHA-256 of the cookie token is stored."""
+    """A login. Only the SHA-256 of the cookie token is stored.
+
+    `csrf_token` is the synchronizer token every form posted during this
+    session must echo back; it is minted with the session and dies with it.
+    """
 
     token_hash: str
     user_id: int
     expires_at: datetime
+    csrf_token: str
     revoked: bool = False
     id: int | None = None
 
