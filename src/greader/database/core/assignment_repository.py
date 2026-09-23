@@ -10,7 +10,7 @@ from __future__ import annotations
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
-from greader.core.assignments.models import Assignment, TestCase
+from greader.core.assignments.models import Assignment, TestCase, TestCaseKind
 from greader.database.core.tables import Assignment as AssignmentRow
 from greader.database.core.tables import TestCase as TestCaseRow
 from greader.database.session import SessionFactory
@@ -36,7 +36,9 @@ def _to_domain(row: AssignmentRow) -> Assignment:
                 id=child.id,
                 input_data=child.input_data,
                 expected_output=child.expected_output,
-                is_hidden=child.is_hidden,
+                # The table has only is_hidden until OPS-15 adds kind and note;
+                # this adapter is not wired meanwhile (ADR-0007 §10.4).
+                kind=TestCaseKind.HIDDEN if child.is_hidden else TestCaseKind.SAMPLE,
                 order_index=child.order_index,
             )
             for child in children
@@ -49,7 +51,7 @@ def _new_child_row(assignment_id: int, test_case: TestCase) -> TestCaseRow:
         assignment_id=assignment_id,
         input_data=test_case.input_data,
         expected_output=test_case.expected_output,
-        is_hidden=test_case.is_hidden,
+        is_hidden=not test_case.visible_to_students,
         order_index=test_case.order_index,
     )
 
@@ -141,7 +143,7 @@ class SQLAssignmentRepository:
                 child = stored_children[test_case.id]
                 child.input_data = test_case.input_data
                 child.expected_output = test_case.expected_output
-                child.is_hidden = test_case.is_hidden
+                child.is_hidden = not test_case.visible_to_students
                 child.order_index = test_case.order_index
 
             session.commit()

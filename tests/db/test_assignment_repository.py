@@ -8,7 +8,12 @@ database facts a fake cannot prove.
 import pytest
 from sqlalchemy import text
 
-from greader.core.assignments.models import Assignment, Difficulty, TestCase
+from greader.core.assignments.models import (
+    Assignment,
+    Difficulty,
+    TestCase,
+    TestCaseKind,
+)
 from greader.database.core.assignment_repository import SQLAssignmentRepository
 from greader.database.session import SessionFactory
 from tests.contracts.assignment_repository import AssignmentRepositoryContract
@@ -42,7 +47,7 @@ def test_test_case_round_trips_through_postgres(
                 TestCase(
                     input_data="1 2",
                     expected_output="3",
-                    is_hidden=True,
+                    kind=TestCaseKind.HIDDEN,
                     order_index=2,
                 )
             ],
@@ -55,7 +60,7 @@ def test_test_case_round_trips_through_postgres(
     (test_case,) = fetched.test_cases
     assert test_case.input_data == "1 2"
     assert test_case.expected_output == "3"
-    assert test_case.is_hidden is True
+    assert test_case.kind is TestCaseKind.HIDDEN
     assert test_case.order_index == 2
     assert fetched.metadata == {"topic": "arithmetic"}
 

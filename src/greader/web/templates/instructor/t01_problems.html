@@ -16,9 +16,31 @@
     </div>
   </div>
   {% endif %}
-  {% call empty_state("No problems in this classroom", "Generate one from your uploaded lecture notes, or upload a PDF first.", state="T-01b") %}
-    {{ link_button("/documents", "Upload documents") }}
-    {{ link_button("/classes/" ~ view.classroom.id ~ "/generate", "+ Create problem with AI", variant="primary") }}
-  {% endcall %}
+
+  {% if problems.problems %}
+  <p class="eyebrow mb-2">Published · {{ problems.problems | length }}</p>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Problem</th><th>Difficulty</th><th>Deadline</th><th>Submitted</th><th>Avg score</th><th></th></tr></thead>
+      <tbody>
+        {% for row in problems.problems %}
+        <tr>
+          <td>{{ row.number }} · {{ row.assignment.title }}</td>
+          <td>{{ row.assignment.difficulty.value | capitalize }}</td>
+          <td>{{ row.posting.schedule.deadline | local("%-d %b") }}{% if row.posting.closed_at %} · closed{% endif %}</td>
+          <td>{{ row.summary.submitted }}/{{ problems.student_count }}</td>
+          <td>{% if row.summary.avg_score is not none %}{{ "%.1f" | format(row.summary.avg_score) }}{% else %}—{% endif %}</td>
+          <td class="text-right"><a class="link" href="/classes/{{ view.classroom.id }}/assignments/{{ row.assignment.id }}">Results</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {% call empty_state("No problems in this classroom", "Generate one from your uploaded lecture notes, or upload a PDF first.", state="T-01b") %}
+      {{ link_button("/documents", "Upload documents") }}
+      {{ link_button("/classes/" ~ view.classroom.id ~ "/generate", "+ Create problem with AI", variant="primary") }}
+    {% endcall %}
+  {% endif %}
 </section>
 {% endblock %}

@@ -11,7 +11,12 @@ from fastapi import FastAPI
 
 from greader.ai.app.repository import VectorRepository
 from greader.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
-from greader.core.assignments.ports import AssignmentRepository
+from greader.core.assignments.ports import (
+    AssignmentRepository,
+    PostingRepository,
+    PostingStats,
+    VersionRepository,
+)
 from greader.core.auth.pages import DemoAccount
 from greader.core.auth.ports import AuthRepository, Clock
 from greader.core.classrooms.ports import ClassroomRepository, ClassroomStats
@@ -20,7 +25,12 @@ from greader.core.topics.ports import TopicRepository
 from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from greader.integrations.email import StubEmailSender
 from greader.main import create_app
-from tests.fakes.assignments import FakeAssignmentRepository
+from tests.fakes.assignments import (
+    FakeAssignmentRepository,
+    FakePostingRepository,
+    FakePostingStats,
+    FakeVersionRepository,
+)
 from tests.fakes.auth import FakeAuthRepository, FakeClock
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
 from tests.fakes.generation import FakeGenerationRepository
@@ -51,6 +61,9 @@ def build_app(
     *,
     topic_repository: TopicRepository | None = None,
     assignment_repository: AssignmentRepository | None = None,
+    version_repository: VersionRepository | None = None,
+    posting_repository: PostingRepository | None = None,
+    posting_stats: PostingStats | None = None,
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
@@ -69,6 +82,12 @@ def build_app(
         topic_repository = FakeTopicRepository()
     if assignment_repository is None:
         assignment_repository = FakeAssignmentRepository()
+    if version_repository is None:
+        version_repository = FakeVersionRepository()
+    if posting_repository is None:
+        posting_repository = FakePostingRepository()
+    if posting_stats is None:
+        posting_stats = FakePostingStats()
     if knowledge_document_repository is None:
         knowledge_document_repository = FakeKnowledgeDocumentRepository()
     if object_storage is None:
@@ -92,6 +111,9 @@ def build_app(
         settings=fake_settings(max_upload_size_bytes=max_upload_size_bytes),
         topic_repository=topic_repository,
         assignment_repository=assignment_repository,
+        version_repository=version_repository,
+        posting_repository=posting_repository,
+        posting_stats=posting_stats,
         knowledge_document_repository=knowledge_document_repository,
         object_storage=object_storage,
         generation_client=generation_client,

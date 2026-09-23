@@ -168,6 +168,11 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "requested_at",
     # classrooms: T-01 Members "Joined" column and its ordering.
     "joined_at",
+    # assignments: Posting.is_closed reads closed_at; published_at orders the
+    # problem numbers on T-01/S-01; changed_at is T-02b's "Changed" column.
+    "closed_at",
+    "published_at",
+    "changed_at",
 }
 # `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
 # `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
@@ -186,6 +191,12 @@ ALLOWED_ID_SUFFIX_FIELDS = {
     "instructor_id",
     "classroom_id",
     "student_id",
+    # assignments: AssignmentService._owned_assignment compares owner_id with
+    # the Actor; Versions and Postings are listed by assignment_id; topic_id
+    # is the one Topic T-03/T-04 pick (ADR-0007 §3.5).
+    "owner_id",
+    "assignment_id",
+    "topic_id",
 }
 
 

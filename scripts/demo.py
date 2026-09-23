@@ -15,11 +15,23 @@ pending adapters that answer 503 until OPS-15 (ADR-0007 §10.4).
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import uvicorn
 from fastapi import FastAPI
 
-from greader.core.auth.models import InstructorRequest, Role, User
+from greader.core.assignments.models import (
+    Difficulty,
+    PostingSummary,
+    Schedule,
+    StudentStanding,
+    StudentState,
+    TestCase,
+    TestCaseKind,
+)
+from greader.core.assignments.service import AssignmentContent
+from greader.core.auth.models import Actor, InstructorRequest, Role, User
 from greader.core.auth.pages import DemoAccount
 from greader.core.classrooms.models import (
     Classroom,
@@ -30,8 +42,11 @@ from greader.core.classrooms.models import (
 )
 from greader.integrations.clock import SystemClock
 from tests.fakes.app import build_app
+from tests.fakes.assignments import FakePostingStats
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
+
+BANGKOK = ZoneInfo("Asia/Bangkok")
 
 STUDENTS = [
     ("66010001", "Nattapong Suwan"),
@@ -45,6 +60,76 @@ STUDENTS = [
     ("66010009", "Pakorn Lert"),
     ("66010010", "Wipada Sook"),
 ]
+# The prototype's six Programming I problems: title, difficulty, deadline
+# (Bangkok date, 23:59), one sample test, one hidden test.
+PROBLEMS = [
+    ("Sum of a list", Difficulty.EASY, (9, 10), ("3\n1 2 3", "6"), ("0\n", "0")),
+    ("Reverse a string", Difficulty.EASY, (9, 17), ("hello", "olleh"), ("a", "a")),
+    (
+        "Count word frequency",
+        Difficulty.MEDIUM,
+        (9, 24),
+        ("the cat the", "the 2\ncat 1"),
+        ("", ""),
+    ),
+    (
+        "Binary search on sorted input",
+        Difficulty.MEDIUM,
+        (10, 1),
+        ("5\n1 3 5 7 9\n7", "3"),
+        ("4\n2 4 6 8\n5", "-1"),
+    ),
+    (
+        "Matrix transpose",
+        Difficulty.HARD,
+        (10, 8),
+        ("2 2\n1 2\n3 4", "1 3\n2 4"),
+        ("1 1\n5", "5"),
+    ),
+    (
+        "Stack with min()",
+        Difficulty.HARD,
+        (10, 15),
+        ("push 3\nmin", "3"),
+        ("min", "EMPTY"),
+    ),
+]
+DATA_STRUCTURES = [
+    ("Reverse a linked list", Difficulty.MEDIUM, (10, 5), ("1 2 3", "3 2 1"), ("", "")),
+    (
+        "Balanced parentheses",
+        Difficulty.EASY,
+        (10, 12),
+        ("(()())", "YES"),
+        ("(()", "NO"),
+    ),
+    (
+        "Queue with two stacks",
+        Difficulty.HARD,
+        (10, 19),
+        ("enq 1\ndeq", "1"),
+        ("deq", "EMPTY"),
+    ),
+]
+# T-01/S-01 numbers per problem until the submissions slice computes them:
+# (submitted, avg score, fail rate), then per-student scores for Sec 1.
+SEC1_SUMMARIES = [
+    (6, 9.4, 0.06),
+    (6, 9.0, 0.11),
+    (5, 7.1, 0.32),
+    (4, 6.3, 0.46),
+    (1, None, 0.28),
+    (0, None, None),
+]
+SEC1_SCORES = [  # student index -> score per problem (None = not started)
+    [10, 10, 6, 4, None, None],
+    [10, 9, 10, 10, 8, None],
+    [8, 10, 7, 0, None, None],
+    [10, 10, 9, 8, None, None],
+    [10, 10, 5, None, None, None],
+    [9, None, None, None, None, None],
+]
+
 # Students who signed up with "I am an instructor" and wait in A-01.
 REQUESTERS = [
     ("anan.t@kmitl.ac.th", "Anan Thong", "Information Technology"),
@@ -61,6 +146,7 @@ class DemoSeed:
         self.users = FakeAuthRepository()
         self.classrooms = FakeClassroomRepository()
         self.stats = FakeClassroomStats()
+        self.posting_stats = FakePostingStats()
         self.accounts: list[DemoAccount] = []
         self._seed_accounts()
         self._seed_classrooms()
@@ -117,13 +203,13 @@ class DemoSeed:
         )
 
     def _seed_classrooms(self) -> None:
-        programming_1 = self._classroom(
+        programming_1 = self.programming_1 = self._classroom(
             self.somchai, "01076001", "Programming I", "1", "X7K29B", self.students[:6]
         )
-        programming_2 = self._classroom(
+        programming_2 = self.programming_2 = self._classroom(
             self.somchai, "01076002", "Programming I", "2", "Q4M8TD", self.students[6:]
         )
-        data_structures = self._classroom(
+        data_structures = self.data_structures = self._classroom(
             self.warunee,
             "01076011",
             "Data Structures",
@@ -140,7 +226,7 @@ class DemoSeed:
             problem_count=6, avg_pass_rate=0.65
         )
         self.stats.instructor_cards[data_structures.id] = InstructorCardStats(
-            problem_count=9, draft_count=2, avg_pass_rate=0.54
+            problem_count=3, avg_pass_rate=0.54
         )
         nattapong = self.students[0]
         self.stats.progress[nattapong.id] = StudentProgress(
@@ -183,10 +269,85 @@ class DemoSeed:
         return classroom
 
 
+def _actor(user: User) -> Actor:
+    return Actor(
+        user_id=user.id, role=user.role, full_name=user.full_name, email=user.email
+    )
+
+
+def _deadline(month_day: tuple[int, int]) -> datetime:
+    month, day = month_day
+    return datetime(2026, month, day, 23, 59, tzinfo=BANGKOK).astimezone(UTC)
+
+
+def _publish_problems(
+    app: FastAPI, owner: User, problems: list, classroom_ids: list[int]
+) -> list[int]:
+    """Publish through the real use case; return the Sec-order posting ids."""
+    service = app.state.assignment_service
+    posting_ids = []
+    for title, difficulty, deadline, sample, hidden in problems:
+        published = service.publish(
+            _actor(owner),
+            AssignmentContent(
+                title=title,
+                problem_statement=f"{title}: read the input and print the answer.",
+                difficulty=difficulty,
+                test_cases=[
+                    TestCase(input_data=sample[0], expected_output=sample[1]),
+                    TestCase(
+                        input_data=hidden[0],
+                        expected_output=hidden[1],
+                        kind=TestCaseKind.HIDDEN,
+                        note="edge",
+                    ),
+                ],
+            ),
+            Schedule(deadline=_deadline(deadline)),
+            classroom_ids,
+        )
+        posting_ids.append([p.id for p in published.postings])
+    return posting_ids
+
+
+def _seed_coursework(app: FastAPI, seed: DemoSeed) -> None:
+    postings = _publish_problems(
+        app,
+        seed.somchai,
+        PROBLEMS,
+        [seed.programming_1.id, seed.programming_2.id],
+    )
+    _publish_problems(app, seed.warunee, DATA_STRUCTURES, [seed.data_structures.id])
+    sec1_students = seed.students[:6]
+    for index, (submitted, avg, fail) in enumerate(SEC1_SUMMARIES):
+        sec1_posting = postings[index][0]
+        seed.posting_stats.summaries[sec1_posting] = PostingSummary(
+            submitted=submitted, avg_score=avg
+        )
+        if fail is not None:
+            seed.posting_stats.fail_rates[sec1_posting] = fail
+        for student, scores in zip(sec1_students, SEC1_SCORES, strict=True):
+            score = scores[index]
+            if score is None:
+                continue
+            state = StudentState.PASSED if score == 10 else StudentState.PARTIAL
+            if student is seed.students[0] and index == 3:
+                state = StudentState.RESUBMIT_NEEDED
+            seed.posting_stats.standings[(sec1_posting, student.id)] = StudentStanding(
+                state=state, score=score
+            )
+
+
 def build_demo_app(seed: DemoSeed | None = None) -> FastAPI:
     """The demo application; `seed` is exposed so tests can inspect it."""
     if seed is None:
         seed = DemoSeed()
+    app = _build(seed)
+    _seed_coursework(app, seed)
+    return app
+
+
+def _build(seed: DemoSeed) -> FastAPI:
     # build_app already passes secure_cookies=False: the demo runs on plain
     # http://127.0.0.1, where some browsers refuse Secure cookies.
     return build_app(
@@ -194,6 +355,7 @@ def build_demo_app(seed: DemoSeed | None = None) -> FastAPI:
         clock=seed.clock,
         classroom_repository=seed.classrooms,
         classroom_stats=seed.stats,
+        posting_stats=seed.posting_stats,
         demo_accounts=tuple(seed.accounts),
     )
 

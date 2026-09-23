@@ -1,208 +1,571 @@
-"""Assignment use cases independent from HTTP and database technology."""
+"""Assignment use cases: publish, Postings, Versions (ADR-0007 §3).
+
+Every public method takes the Actor first. Visibility follows ADR-0007 §9.6:
+a Classroom the Actor neither owns nor belongs to is ClassroomNotVisibleError
+(404); a Member asking for an Instructor use case is PermissionDeniedError (403).
+"""
 
 from __future__ import annotations
 
-from greader.core.assignments.models import Assignment, Difficulty, TestCase
-from greader.core.assignments.ports import AssignmentRepository
+from dataclasses import dataclass, field, replace
+from datetime import datetime
+
+from greader.core.assignments.models import (
+    Assignment,
+    AssignmentVersion,
+    Difficulty,
+    FailRate,
+    InstructorProblem,
+    InstructorProblemList,
+    InstructorSummary,
+    JudgingSettings,
+    Posting,
+    ProblemFilter,
+    PublishedAssignment,
+    Schedule,
+    ScoreRow,
+    StudentProblem,
+    StudentProblemList,
+    StudentStanding,
+    StudentState,
+    StudentSummary,
+    TestCase,
+)
+from greader.core.assignments.ports import (
+    AssignmentRepository,
+    ClassroomAccess,
+    Clock,
+    PostingRepository,
+    PostingStats,
+    VersionRepository,
+)
+from greader.core.auth.models import Actor, PermissionDeniedError, Role
+from greader.core.classrooms.models import ClassroomRole
+
+FIRST_VERSION_REASON = "Published"
+MOST_FAILED_LIMIT = 5
 
 
 class AssignmentNotFoundError(Exception):
-    """Raised when a requested Assignment does not exist."""
+    """Missing, or not visible to this Actor."""
+
+
+class ClassroomNotVisibleError(Exception):
+    """The Classroom is missing or the Actor is not in it (404)."""
+
+
+class PostingNotFoundError(Exception):
+    """The Assignment is not published to this Classroom."""
+
+
+class VersionNotFoundError(Exception):
+    pass
 
 
 class TestCaseNotFoundError(Exception):
-    """Raised when a requested TestCase does not exist on its Assignment."""
+    pass
+
+
+class _Unset:
+    """Marks a PATCH field left out of the request body."""
+
+
+UNSET = _Unset()
+
+
+@dataclass(frozen=True, slots=True)
+class AssignmentContent:
+    """What T-04 steps 1-3 collect about the content itself."""
+
+    title: str
+    problem_statement: str
+    difficulty: Difficulty
+    test_cases: list[TestCase] = field(default_factory=list)
+    topic_id: int | None = None
+    settings: JudgingSettings = field(default_factory=JudgingSettings)
 
 
 class AssignmentService:
-    """Coordinate Assignment use cases through a repository seam."""
+    def __init__(
+        self,
+        assignments: AssignmentRepository,
+        versions: VersionRepository,
+        postings: PostingRepository,
+        classrooms: ClassroomAccess,
+        stats: PostingStats,
+        clock: Clock,
+    ) -> None:
+        self._assignments = assignments
+        self._versions = versions
+        self._postings = postings
+        self._classrooms = classrooms
+        self._stats = stats
+        self._clock = clock
 
-    def __init__(self, repo: AssignmentRepository) -> None:
-        """Initialize the service with an Assignment repository."""
-        self._repo = repo
+    # ---- Publishing ------------------------------------------------------
 
-    def list(self) -> list[Assignment]:
-        """Return every Assignment."""
-        return self._repo.list()
+    def publish(
+        self,
+        actor: Actor,
+        content: AssignmentContent,
+        schedule: Schedule,
+        classroom_ids: list[int],
+        artifact_id: int | None = None,
+    ) -> PublishedAssignment:
+        """T-04 step 4: create the Assignment, Version 1, one Posting per Classroom."""
+        if actor.role is not Role.INSTRUCTOR:
+            raise PermissionDeniedError
+        _validate_content(content)
+        _validate_schedule(schedule)
+        if not classroom_ids:
+            raise ValueError("choose at least one classroom")
+        for classroom_id in classroom_ids:
+            self._require_owner(actor, classroom_id)
 
-    def get(self, assignment_id: int) -> Assignment:
-        """Return one Assignment or raise when it does not exist."""
-        assignment = self._repo.get(assignment_id)
+        now = self._clock.now()
+        assignment = self._assignments.create(
+            Assignment(
+                title=content.title.strip(),
+                problem_statement=content.problem_statement.strip(),
+                difficulty=content.difficulty,
+                test_cases=_ordered(content.test_cases),
+                topic_id=content.topic_id,
+                settings=content.settings,
+                owner_id=actor.user_id,
+                artifact_id=artifact_id,
+                current_version=1,
+            )
+        )
+        self._versions.append(_snapshot(assignment, FIRST_VERSION_REASON, now))
+        postings = [
+            self._postings.create(
+                Posting(
+                    classroom_id=classroom_id,
+                    assignment_id=assignment.id,
+                    schedule=schedule,
+                    published_at=now,
+                )
+            )
+            for classroom_id in sorted(set(classroom_ids))
+        ]
+        return PublishedAssignment(assignment=assignment, postings=postings)
+
+    # ---- Classroom views (T-01, S-01) -----------------------------------
+
+    def problems(
+        self,
+        actor: Actor,
+        classroom_id: int,
+        problem_filter: ProblemFilter = ProblemFilter.ALL,
+    ) -> InstructorProblemList | StudentProblemList:
+        """T-01 Problems for the owner, S-01 Problems (filtered) for a Member."""
+        role = self._visible_role(actor, classroom_id)
+        numbered = self._numbered_postings(classroom_id)
+        if role is ClassroomRole.OWNER:
+            return InstructorProblemList(
+                student_count=len(self._classrooms.member_ids(actor, classroom_id)),
+                problems=[
+                    InstructorProblem(
+                        number=number,
+                        posting=posting,
+                        assignment=assignment,
+                        summary=self._stats.posting_summary(posting.id),
+                    )
+                    for number, posting, assignment in numbered
+                ],
+            )
+        now = self._clock.now()
+        rows = [
+            StudentProblem(
+                number=number,
+                posting=posting,
+                assignment=assignment,
+                standing=self._student_standing(posting, actor.user_id, now),
+            )
+            for number, posting, assignment in numbered
+        ]
+        return StudentProblemList(
+            problems=[row for row in rows if _matches(row, problem_filter)],
+            total=len(rows),
+        )
+
+    def summary(
+        self, actor: Actor, classroom_id: int
+    ) -> InstructorSummary | StudentSummary:
+        """T-01 Summary for the owner, S-01 Summary for a Member."""
+        role = self._visible_role(actor, classroom_id)
+        numbered = self._numbered_postings(classroom_id)
+        postings = [posting for _, posting, _ in numbered]
+        if role is ClassroomRole.OWNER:
+            return self._instructor_summary(actor, classroom_id, numbered)
+        standings = [self._stats.standing(p.id, actor.user_id) for p in postings]
+        scores = [s.score for s in standings if s.score is not None]
+        return StudentSummary(
+            solved=sum(1 for s in standings if s.state is not StudentState.NOT_STARTED),
+            passed=sum(1 for s in standings if s.state is StudentState.PASSED),
+            total=len(postings),
+            avg_score=sum(scores) / len(scores) if scores else None,
+        )
+
+    def problem(
+        self, actor: Actor, classroom_id: int, assignment_id: int
+    ) -> InstructorProblem | StudentProblem:
+        """One Posting in a Classroom, shaped for the Actor's role."""
+        role = self._visible_role(actor, classroom_id)
+        posting = self._posting(classroom_id, assignment_id)
+        number = next(
+            n for n, p, _ in self._numbered_postings(classroom_id) if p.id == posting.id
+        )
+        assignment = self._assignment(assignment_id)
+        if role is ClassroomRole.OWNER:
+            return InstructorProblem(
+                number=number,
+                posting=posting,
+                assignment=assignment,
+                summary=self._stats.posting_summary(posting.id),
+            )
+        return StudentProblem(
+            number=number,
+            posting=posting,
+            assignment=assignment,
+            standing=self._student_standing(posting, actor.user_id, self._clock.now()),
+        )
+
+    # ---- Posting settings ------------------------------------------------
+
+    def update_posting(
+        self,
+        actor: Actor,
+        classroom_id: int,
+        assignment_id: int,
+        *,
+        deadline: datetime | _Unset = UNSET,
+        max_score: int | _Unset = UNSET,
+        allow_late: bool | _Unset = UNSET,
+        allow_resubmission: bool | _Unset = UNSET,
+    ) -> Posting:
+        self._require_owner(actor, classroom_id)
+        posting = self._posting(classroom_id, assignment_id)
+        current = posting.schedule
+        schedule = Schedule(
+            deadline=current.deadline if isinstance(deadline, _Unset) else deadline,
+            max_score=current.max_score if isinstance(max_score, _Unset) else max_score,
+            allow_late=current.allow_late
+            if isinstance(allow_late, _Unset)
+            else allow_late,
+            allow_resubmission=current.allow_resubmission
+            if isinstance(allow_resubmission, _Unset)
+            else allow_resubmission,
+        )
+        _validate_schedule(schedule)
+        return self._postings.update(replace(posting, schedule=schedule))
+
+    def close(self, actor: Actor, classroom_id: int, assignment_id: int) -> Posting:
+        """T-02 "Close submissions"."""
+        self._require_owner(actor, classroom_id)
+        posting = self._posting(classroom_id, assignment_id)
+        if posting.closed_at is not None:
+            return posting
+        return self._postings.update(replace(posting, closed_at=self._clock.now()))
+
+    def unpost(self, actor: Actor, classroom_id: int, assignment_id: int) -> None:
+        self._require_owner(actor, classroom_id)
+        self._postings.delete(self._posting(classroom_id, assignment_id).id)
+
+    # ---- Content and Versions ----------------------------------------------
+
+    def get(self, actor: Actor, assignment_id: int) -> Assignment:
+        """The owner, or a Member of a Classroom it is posted to."""
+        assignment = self._assignment(assignment_id)
+        if assignment.owner_id == actor.user_id:
+            return assignment
+        for posting in self._postings.list_for_assignment(assignment_id):
+            if self._classrooms.role_of(actor, posting.classroom_id) is not (
+                ClassroomRole.OUTSIDER
+            ):
+                return assignment
+        raise AssignmentNotFoundError
+
+    def edit(
+        self,
+        actor: Actor,
+        assignment_id: int,
+        *,
+        reason: str,
+        title: str | _Unset = UNSET,
+        problem_statement: str | _Unset = UNSET,
+        difficulty: Difficulty | _Unset = UNSET,
+        topic_id: int | None | _Unset = UNSET,
+        test_cases: list[TestCase] | _Unset = UNSET,
+        settings: JudgingSettings | _Unset = UNSET,
+        extend_deadlines: dict[int, datetime] | None = None,
+    ) -> Assignment:
+        """T-05: a new Version for every Posting; deadlines move only where chosen."""
+        current = self._owned_assignment(actor, assignment_id)
+        if not reason.strip():
+            raise ValueError("a reason for the change is required")
+        merged = replace(
+            current,
+            title=current.title if isinstance(title, _Unset) else title.strip(),
+            problem_statement=current.problem_statement
+            if isinstance(problem_statement, _Unset)
+            else problem_statement.strip(),
+            difficulty=current.difficulty
+            if isinstance(difficulty, _Unset)
+            else difficulty,
+            topic_id=current.topic_id if isinstance(topic_id, _Unset) else topic_id,
+            test_cases=current.test_cases
+            if isinstance(test_cases, _Unset)
+            else _ordered(test_cases),
+            settings=current.settings if isinstance(settings, _Unset) else settings,
+            current_version=current.current_version + 1,
+        )
+        _validate_content(
+            AssignmentContent(
+                title=merged.title,
+                problem_statement=merged.problem_statement,
+                difficulty=merged.difficulty,
+                test_cases=merged.test_cases,
+            )
+        )
+        if extend_deadlines is None:
+            extend_deadlines = {}
+        own_postings = {
+            p.id: p for p in self._postings.list_for_assignment(assignment_id)
+        }
+        unknown = set(extend_deadlines) - set(own_postings)
+        if unknown:
+            raise PostingNotFoundError
+        updated = self._assignments.update(merged)
+        self._versions.append(_snapshot(updated, reason.strip(), self._clock.now()))
+        for posting_id, deadline in extend_deadlines.items():
+            posting = own_postings[posting_id]
+            self._postings.update(
+                replace(posting, schedule=replace(posting.schedule, deadline=deadline))
+            )
+        return updated
+
+    def versions(self, actor: Actor, assignment_id: int) -> list[AssignmentVersion]:
+        """T-02b Version history, newest first."""
+        self._owned_assignment(actor, assignment_id)
+        return sorted(
+            self._versions.list_for(assignment_id),
+            key=lambda version: version.number,
+            reverse=True,
+        )
+
+    def version(
+        self, actor: Actor, assignment_id: int, number: int
+    ) -> AssignmentVersion:
+        self._owned_assignment(actor, assignment_id)
+        found = self._versions.get(assignment_id, number)
+        if found is None:
+            raise VersionNotFoundError
+        return found
+
+    def postings_of(self, actor: Actor, assignment_id: int) -> list[Posting]:
+        """Every Posting of an owned Assignment (T-05a lists them)."""
+        self._owned_assignment(actor, assignment_id)
+        return self._postings.list_for_assignment(assignment_id)
+
+    # ---- Test cases (each write is a new Version) --------------------------
+
+    def test_cases(self, actor: Actor, assignment_id: int) -> list[TestCase]:
+        return self._owned_assignment(actor, assignment_id).test_cases
+
+    def test_case(
+        self, actor: Actor, assignment_id: int, test_case_id: int
+    ) -> TestCase:
+        return _find(self.test_cases(actor, assignment_id), test_case_id)
+
+    def add_test_case(
+        self, actor: Actor, assignment_id: int, test_case: TestCase, *, reason: str
+    ) -> TestCase:
+        current = self._owned_assignment(actor, assignment_id)
+        known = {tc.id for tc in current.test_cases}
+        updated = self.edit(
+            actor,
+            assignment_id,
+            reason=reason,
+            test_cases=[*current.test_cases, replace(test_case, id=None)],
+        )
+        (added,) = [tc for tc in updated.test_cases if tc.id not in known]
+        return added
+
+    def replace_test_case(
+        self,
+        actor: Actor,
+        assignment_id: int,
+        test_case_id: int,
+        test_case: TestCase,
+        *,
+        reason: str,
+    ) -> TestCase:
+        current = self._owned_assignment(actor, assignment_id)
+        _find(current.test_cases, test_case_id)
+        updated = self.edit(
+            actor,
+            assignment_id,
+            reason=reason,
+            test_cases=[
+                replace(test_case, id=test_case_id) if tc.id == test_case_id else tc
+                for tc in current.test_cases
+            ],
+        )
+        return _find(updated.test_cases, test_case_id)
+
+    def delete_test_case(
+        self, actor: Actor, assignment_id: int, test_case_id: int, *, reason: str
+    ) -> None:
+        current = self._owned_assignment(actor, assignment_id)
+        _find(current.test_cases, test_case_id)
+        self.edit(
+            actor,
+            assignment_id,
+            reason=reason,
+            test_cases=[tc for tc in current.test_cases if tc.id != test_case_id],
+        )
+
+    # ---- Internals ----------------------------------------------------------
+
+    def _visible_role(self, actor: Actor, classroom_id: int) -> ClassroomRole:
+        role = self._classrooms.role_of(actor, classroom_id)
+        if role is ClassroomRole.OUTSIDER:
+            raise ClassroomNotVisibleError
+        return role
+
+    def _require_owner(self, actor: Actor, classroom_id: int) -> None:
+        if self._visible_role(actor, classroom_id) is not ClassroomRole.OWNER:
+            raise PermissionDeniedError
+
+    def _assignment(self, assignment_id: int) -> Assignment:
+        assignment = self._assignments.get(assignment_id)
         if assignment is None:
             raise AssignmentNotFoundError
         return assignment
 
-    def create(
-        self,
-        title: str,
-        problem_statement: str,
-        difficulty: Difficulty,
-        metadata: dict[str, object] | None = None,
-    ) -> Assignment:
-        """Create and persist an Assignment."""
-        assignment = Assignment(
-            title=title,
-            problem_statement=problem_statement,
-            difficulty=difficulty,
-            metadata=metadata if metadata is not None else {},
+    def _owned_assignment(self, actor: Actor, assignment_id: int) -> Assignment:
+        assignment = self.get(actor, assignment_id)
+        if assignment.owner_id != actor.user_id:
+            raise PermissionDeniedError
+        return assignment
+
+    def _posting(self, classroom_id: int, assignment_id: int) -> Posting:
+        posting = self._postings.find(classroom_id, assignment_id)
+        if posting is None:
+            raise PostingNotFoundError
+        return posting
+
+    def _numbered_postings(
+        self, classroom_id: int
+    ) -> list[tuple[int, Posting, Assignment]]:
+        postings = sorted(
+            self._postings.list_for_classroom(classroom_id),
+            key=lambda posting: (posting.published_at, posting.id),
         )
-        return self._repo.create(assignment)
-
-    def replace(
-        self,
-        assignment_id: int,
-        title: str,
-        problem_statement: str,
-        difficulty: Difficulty,
-        metadata: dict[str, object],
-    ) -> Assignment:
-        """Replace every client-writable field of an Assignment.
-
-        Test cases and `artifact_id` are not client-writable through this use
-        case, so they are carried over from the stored entity.
-        """
-        existing = self.get(assignment_id)
-        return self._repo.update(
-            Assignment(
-                id=assignment_id,
-                title=title,
-                problem_statement=problem_statement,
-                difficulty=difficulty,
-                metadata=metadata,
-                artifact_id=existing.artifact_id,
-                test_cases=existing.test_cases,
-            )
-        )
-
-    def patch(
-        self,
-        assignment_id: int,
-        title: str | None = None,
-        problem_statement: str | None = None,
-        difficulty: Difficulty | None = None,
-        metadata: dict[str, object] | None = None,
-    ) -> Assignment:
-        """Update supplied fields while retaining all omitted values."""
-        existing = self.get(assignment_id)
-        return self._repo.update(
-            Assignment(
-                id=assignment_id,
-                title=title if title is not None else existing.title,
-                problem_statement=problem_statement
-                if problem_statement is not None
-                else existing.problem_statement,
-                difficulty=difficulty
-                if difficulty is not None
-                else existing.difficulty,
-                metadata=metadata if metadata is not None else existing.metadata,
-                artifact_id=existing.artifact_id,
-                test_cases=existing.test_cases,
-            )
-        )
-
-    def delete(self, assignment_id: int) -> None:
-        """Delete an Assignment or raise when it does not exist."""
-        if not self._repo.delete(assignment_id):
-            raise AssignmentNotFoundError
-
-    def add_test_case(
-        self,
-        assignment_id: int,
-        input_data: str,
-        expected_output: str,
-        is_hidden: bool,
-        order_index: int,
-    ) -> TestCase:
-        """Append a TestCase to an Assignment and persist the aggregate.
-
-        The id comes from the repository, not from here: a service-side counter
-        would disagree with the sequence the database uses and would reuse an id
-        after a delete.
-        """
-        existing = self.get(assignment_id)
-        new_test_case = TestCase(
-            input_data=input_data,
-            expected_output=expected_output,
-            is_hidden=is_hidden,
-            order_index=order_index,
-        )
-        updated = self._save_test_cases(existing, [*existing.test_cases, new_test_case])
-
-        known_ids = {test_case.id for test_case in existing.test_cases}
-        # Exactly one test case must be new. Unpacking fails loudly if the
-        # adapter returned anything else, instead of guessing which one it is.
-        (added,) = [tc for tc in updated.test_cases if tc.id not in known_ids]
-        return added
-
-    def list_test_cases(self, assignment_id: int) -> list[TestCase]:
-        """Return every TestCase belonging to an Assignment."""
-        return self.get(assignment_id).test_cases
-
-    def get_test_case(self, assignment_id: int, test_case_id: int) -> TestCase:
-        """Return one TestCase or raise when it does not exist."""
-        return self._find_test_case(self.get(assignment_id), test_case_id)
-
-    def update_test_case(
-        self,
-        assignment_id: int,
-        test_case_id: int,
-        input_data: str | None = None,
-        expected_output: str | None = None,
-        is_hidden: bool | None = None,
-        order_index: int | None = None,
-    ) -> TestCase:
-        """Update supplied TestCase fields while retaining omitted values."""
-        existing_assignment = self.get(assignment_id)
-        existing_test_case = self._find_test_case(existing_assignment, test_case_id)
-        updated_test_case = TestCase(
-            id=existing_test_case.id,
-            input_data=input_data
-            if input_data is not None
-            else existing_test_case.input_data,
-            expected_output=expected_output
-            if expected_output is not None
-            else existing_test_case.expected_output,
-            is_hidden=is_hidden
-            if is_hidden is not None
-            else existing_test_case.is_hidden,
-            order_index=order_index
-            if order_index is not None
-            else existing_test_case.order_index,
-        )
-        replacement = [
-            updated_test_case if tc.id == test_case_id else tc
-            for tc in existing_assignment.test_cases
+        return [
+            (number, posting, self._assignment(posting.assignment_id))
+            for number, posting in enumerate(postings, start=1)
         ]
-        updated = self._save_test_cases(existing_assignment, replacement)
-        return self._find_test_case(updated, test_case_id)
 
-    def delete_test_case(self, assignment_id: int, test_case_id: int) -> None:
-        """Delete a TestCase or raise when it does not exist."""
-        existing_assignment = self.get(assignment_id)
-        remaining = [
-            tc for tc in existing_assignment.test_cases if tc.id != test_case_id
-        ]
-        if len(remaining) == len(existing_assignment.test_cases):
-            raise TestCaseNotFoundError
-        self._save_test_cases(existing_assignment, remaining)
+    def _student_standing(
+        self, posting: Posting, student_id: int, now: datetime
+    ) -> StudentStanding:
+        standing = self._stats.standing(posting.id, student_id)
+        if standing.state is StudentState.NOT_STARTED and posting.is_closed(now):
+            return replace(standing, state=StudentState.CLOSED)
+        return standing
 
-    def _find_test_case(self, assignment: Assignment, test_case_id: int) -> TestCase:
-        for test_case in assignment.test_cases:
-            if test_case.id == test_case_id:
-                return test_case
-        raise TestCaseNotFoundError
-
-    def _save_test_cases(
-        self, assignment: Assignment, test_cases: list[TestCase]
-    ) -> Assignment:
-        return self._repo.update(
-            Assignment(
-                id=assignment.id,
-                title=assignment.title,
-                problem_statement=assignment.problem_statement,
-                difficulty=assignment.difficulty,
-                metadata=assignment.metadata,
-                artifact_id=assignment.artifact_id,
-                test_cases=test_cases,
+    def _instructor_summary(
+        self,
+        actor: Actor,
+        classroom_id: int,
+        numbered: list[tuple[int, Posting, Assignment]],
+    ) -> InstructorSummary:
+        members = self._classrooms.member_names(actor, classroom_id)
+        postings = [posting for _, posting, _ in numbered]
+        passed = 0
+        never_submitted = 0
+        rows = []
+        for student_id, name in members:
+            standings = [self._stats.standing(p.id, student_id) for p in postings]
+            passed += sum(1 for s in standings if s.state is StudentState.PASSED)
+            if postings and all(s.state is StudentState.NOT_STARTED for s in standings):
+                never_submitted += 1
+            rows.append(
+                ScoreRow(
+                    student_name=name,
+                    scores=[self._stats.score(p.id, student_id) for p in postings],
+                )
             )
+        slots = len(members) * len(postings)
+        rates = []
+        for _, posting, assignment in numbered:
+            rate = self._stats.fail_rate(posting.id)
+            if rate is not None:
+                rates.append(FailRate(title=assignment.title, rate=rate))
+        rates.sort(key=lambda item: item.rate, reverse=True)
+        return InstructorSummary(
+            student_count=len(members),
+            problem_count=len(postings),
+            avg_pass_rate=passed / slots if slots else None,
+            never_submitted=never_submitted,
+            most_failed=rates[:MOST_FAILED_LIMIT],
+            problem_titles=[a.title for _, _, a in numbered],
+            score_table=rows,
         )
+
+
+def _validate_content(content: AssignmentContent) -> None:
+    if not content.title.strip():
+        raise ValueError("a title is required")
+    if not content.problem_statement.strip():
+        raise ValueError("a description is required")
+    if not content.test_cases:
+        raise ValueError("add at least one test case")
+    if content.settings.time_limit_ms <= 0:
+        raise ValueError("the time limit must be positive")
+
+
+def _validate_schedule(schedule: Schedule) -> None:
+    if schedule.max_score <= 0:
+        raise ValueError("the max score must be positive")
+
+
+def _ordered(test_cases: list[TestCase]) -> list[TestCase]:
+    return [
+        replace(test_case, order_index=index)
+        for index, test_case in enumerate(test_cases)
+    ]
+
+
+def _snapshot(assignment: Assignment, reason: str, now: datetime) -> AssignmentVersion:
+    return AssignmentVersion(
+        assignment_id=assignment.id,
+        number=assignment.current_version,
+        title=assignment.title,
+        problem_statement=assignment.problem_statement,
+        difficulty=assignment.difficulty,
+        settings=assignment.settings,
+        reason=reason,
+        changed_at=now,
+        test_cases=list(assignment.test_cases),
+    )
+
+
+_UNSTARTED = {StudentState.NOT_STARTED, StudentState.CLOSED}
+
+
+def _matches(row: StudentProblem, problem_filter: ProblemFilter) -> bool:
+    if problem_filter is ProblemFilter.NOT_STARTED:
+        return row.standing.state in _UNSTARTED
+    if problem_filter is ProblemFilter.SUBMITTED:
+        return row.standing.state not in _UNSTARTED
+    return True
+
+
+def _find(test_cases: list[TestCase], test_case_id: int) -> TestCase:
+    for test_case in test_cases:
+        if test_case.id == test_case_id:
+            return test_case
+    raise TestCaseNotFoundError

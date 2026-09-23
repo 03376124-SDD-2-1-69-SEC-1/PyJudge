@@ -1,12 +1,13 @@
 {% extends "base.html" %}
+{% from "_components/ui.html" import stat_box %}
 {% block title %}Summary · {{ view.classroom.course_name }} · GReader{% endblock %}
 {% block content %}
 <section data-page="S-01" data-tab="summary">
   {% include "student/s01_tabs.html" %}
-  <div class="grid max-w-2xl grid-cols-3 gap-4">
-    <div class="box"><p class="eyebrow">Solved</p><p class="h1">0 / 0</p></div>
-    <div class="box"><p class="eyebrow">All tests passed</p><p class="h1">0 / 0</p></div>
-    <div class="box"><p class="eyebrow">Average score</p><p class="h1">—</p></div>
+  <div class="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
+    {{ stat_box("Solved", summary.solved ~ " / " ~ summary.total) }}
+    {{ stat_box("All tests passed", summary.passed ~ " / " ~ summary.total) }}
+    {{ stat_box("Average score", ("%.1f" | format(summary.avg_score)) if summary.avg_score is not none else "—") }}
   </div>
   <p class="sub mt-3">Counts cover this classroom only.</p>
 </section>

@@ -8,6 +8,14 @@ from datetime import datetime
 from enum import StrEnum
 
 
+class ClassroomRole(StrEnum):
+    """How an Actor relates to a Classroom."""
+
+    OWNER = "owner"
+    MEMBER = "member"
+    OUTSIDER = "outsider"
+
+
 class ClassroomFilter(StrEnum):
     """C-01 filter chips."""
 

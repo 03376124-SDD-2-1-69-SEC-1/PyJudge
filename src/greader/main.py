@@ -9,7 +9,9 @@ environment variable is missing. There is no in-memory mode — a test that want
 one passes a fake from `tests/fakes/` explicitly.
 """
 
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -24,7 +26,15 @@ from greader.ai.app.schemas import ApplicationErrorResponse
 from greader.ai.app.service import VectorService
 from greader.ai.client import StubGenerationClient
 from greader.config import Settings, get_settings
-from greader.core.assignments.ports import AssignmentRepository
+from greader.core.assignments.ports import (
+    AssignmentRepository,
+    PostingRepository,
+    PostingStats,
+    VersionRepository,
+)
+from greader.core.assignments.routes import (
+    classroom_router as assignment_classroom_router,
+)
 from greader.core.assignments.routes import router as assignment_router
 from greader.core.assignments.service import AssignmentService
 from greader.core.assignments.testcase_routes import router as test_case_router
@@ -52,7 +62,6 @@ from greader.core.topics.service import TopicService
 from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from greader.core.uploads.routes import router as upload_router
 from greader.core.uploads.service import UploadService
-from greader.database.core.assignment_repository import SQLAssignmentRepository
 from greader.database.core.generation_repository import SQLGenerationRepository
 from greader.database.core.knowledge_document_repository import (
     SQLKnowledgeDocumentRepository,
@@ -77,6 +86,14 @@ _TEMPLATE_DIR = _WEB_DIR / "templates"
 _STATIC_DIR = _WEB_DIR / "static"
 
 
+DISPLAY_ZONE = ZoneInfo("Asia/Bangkok")
+
+
+def local_time(value: datetime, pattern: str = "%-d %b, %H:%M") -> str:
+    """Render a stored UTC time in Bangkok time for templates (`|local`)."""
+    return value.astimezone(DISPLAY_ZONE).strftime(pattern)
+
+
 def asset_url(path: str) -> str:
     """Return `/static/<path>?v=<mtime>` so a rebuilt file gets a new URL.
 
@@ -94,6 +111,9 @@ def create_app(
     settings: Settings | None = None,
     topic_repository: TopicRepository | None = None,
     assignment_repository: AssignmentRepository | None = None,
+    version_repository: VersionRepository | None = None,
+    posting_repository: PostingRepository | None = None,
+    posting_stats: PostingStats | None = None,
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
@@ -136,6 +156,7 @@ def create_app(
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
     templates.env.globals["asset_url"] = asset_url
     templates.env.globals["csrf_token"] = csrf_token
+    templates.env.filters["local"] = local_time
     application.state.templates = templates
     # The "log in as" list on G-01 exists only when scripts/demo.py passes it.
     if demo_accounts is None:
@@ -165,17 +186,35 @@ def create_app(
     # tables yet either.
     if classroom_stats is None:
         classroom_stats = PendingRepository("classroom stats")
-    application.state.classroom_service = ClassroomService(
+    classroom_service = ClassroomService(
         classroom_repository, auth_service, classroom_stats, clock
+    )
+    application.state.classroom_service = classroom_service
+
+    # The ADR-0007 shape (owner, topic, kind/note, Versions, Postings) has no
+    # columns until OPS-15; database/core/assignment_repository.py still has
+    # the old shape and is not wired meanwhile.
+    if assignment_repository is None:
+        assignment_repository = PendingRepository("assignments")
+    if version_repository is None:
+        version_repository = PendingRepository("assignment versions")
+    if posting_repository is None:
+        posting_repository = PendingRepository("postings")
+    # Numbers from Submissions; the submissions slice will provide them.
+    if posting_stats is None:
+        posting_stats = PendingRepository("posting stats")
+    application.state.assignment_service = AssignmentService(
+        assignment_repository,
+        version_repository,
+        posting_repository,
+        classroom_service,
+        posting_stats,
+        clock,
     )
 
     if topic_repository is None:
         topic_repository = SQLTopicRepository(use_session_factory())
     application.state.topic_service = TopicService(topic_repository)
-
-    if assignment_repository is None:
-        assignment_repository = SQLAssignmentRepository(use_session_factory())
-    application.state.assignment_service = AssignmentService(assignment_repository)
 
     if object_storage is None:
         storage_settings = use_settings()
@@ -206,6 +245,7 @@ def create_app(
 
     application.include_router(topic_router)
     application.include_router(assignment_router)
+    application.include_router(assignment_classroom_router)
     application.include_router(test_case_router)
     application.include_router(generation_router)
     application.include_router(upload_router)
