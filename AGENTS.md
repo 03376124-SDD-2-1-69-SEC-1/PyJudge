@@ -14,10 +14,11 @@ setup and background live in `README.md` and `docs/adr/`.
 | Area                      | State                                                          | Owner            |
 | ------------------------- | -------------------------------------------------------------- | ---------------- |
 | `core/topics`             | Working. **The reference slice — copy its shape.**             | shared           |
-| `core/assignments`        | Working with SQL adapter; Versions and Postings to add (0007)  | Assignment owner |
-| `core/generation`         | Working with SQL adapter; Drafts and Quota to add (0007)       | TBD              |
+| `core/assignments`        | ADR-0007 shape (Versions, Postings) on fakes; 503 until OPS-15 | Assignment owner |
+| `core/generation`         | Drafts, T-03/T-04, daily Quota on fakes; 503 until OPS-15      | TBD              |
 | `core/uploads`            | Working; to be renamed `core/documents` (0007)                 | TBD              |
-| `core/auth`, `classrooms`, `submissions`, `notifications`, `admin` | Planned (0007). No tables yet; handlers return 503 until the schema task lands | TBD |
+| `core/auth`, `classrooms` | Working on fakes (demo mode); 503 in production until OPS-15     | TBD              |
+| `core/submissions`, `notifications`, `admin` | Planned (0007)                              | TBD              |
 | `database/`               | 9 tables live on Neon; classroom tables pending an OPS task    | DB owner         |
 | `ai/`                     | In progress                                                    | AI owner         |
 | `web/templates/base.html` | Shared layout                                                  | Design           |
