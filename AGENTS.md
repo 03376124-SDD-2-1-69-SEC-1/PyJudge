@@ -197,7 +197,17 @@ uv run fastapi dev src/greader/main.py
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .   # `ruff format .` to fix
+
+uv run python -m scripts.demo  # demo mode, http://127.0.0.1:8000/login
 ```
+
+**Demo mode** (`scripts/demo.py`) runs the app on the in-memory fakes from
+`tests/fakes/` with a seed mirroring `docs/wireframes/`, so pages are clickable
+before OPS-15 creates the tables. G-01 lists every seeded account under "log in
+as"; verification links are logged, not emailed; data is lost on restart. It
+lives outside `src/` because fakes may not ship in the package. When a slice
+lands, extend `DemoSeed` so its pages have data. `fastapi dev` still wires the
+real adapters, and every classroom slice answers 503 there until OPS-15.
 
 `tests/unit/` domain + service · `tests/integration/` HTTP via ASGI transport ·
 `tests/architecture/` import direction and the no-JavaScript rule ·
