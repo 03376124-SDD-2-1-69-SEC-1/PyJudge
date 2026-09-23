@@ -1,11 +1,9 @@
 {% extends "base.html" %}
+{% from "_components/ui.html" import empty_state %}
 {% block title %}{{ view.classroom.course_name }} · GReader{% endblock %}
 {% block content %}
 <section data-page="S-01" data-tab="problems">
   {% include "student/s01_tabs.html" %}
-  <div data-state="S-01a">
-    <h2>No problems yet</h2>
-    <p>Your instructor has not published a problem in this classroom.</p>
-  </div>
+  {{ empty_state("No problems yet", "Your instructor has not published a problem in this classroom.", state="S-01a") }}
 </section>
 {% endblock %}

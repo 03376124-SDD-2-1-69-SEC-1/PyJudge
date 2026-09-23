@@ -60,7 +60,7 @@ class Campus:
         created = await teacher.post("/classes", data=FORM)
         classroom_id = int(created.headers["location"].split("created=")[1])
         banner = await teacher.get(created.headers["location"])
-        code = banner.text.split("<strong>")[1].split("</strong>")[0]
+        code = banner.text.split('class="join-code select-all">')[1].split("<")[0]
         student = await self.client_for(STUDENT)
         await student.post("/classes/join", data={"join_code": code})
         return classroom_id, code

@@ -58,6 +58,7 @@ def _picker_page(
     classroom_filter: ClassroomFilter,
     created_id: int | None = None,
     join_error: bool = False,
+    join_code: str = "",
 ) -> HTMLResponse:
     service = _service(request)
     picker = service.picker(actor, classroom_filter)
@@ -71,6 +72,7 @@ def _picker_page(
             request, "shared/c01_instructor.html", context
         )
     context["join_error"] = join_error
+    context["join_code"] = join_code
     return _templates(request).TemplateResponse(
         request,
         "shared/c01_student.html",
@@ -120,7 +122,11 @@ def join_submit(
         classroom = _service(request).join(actor, join_code)
     except InvalidJoinCodeError:
         return _picker_page(
-            request, actor, classroom_filter=ClassroomFilter.ALL, join_error=True
+            request,
+            actor,
+            classroom_filter=ClassroomFilter.ALL,
+            join_error=True,
+            join_code=join_code,
         )
     return _see_other(f"/classes/{classroom.id}")
 

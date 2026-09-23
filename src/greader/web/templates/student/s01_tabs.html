@@ -1,9 +1,4 @@
-<header>
-  <h1 class="text-2xl font-bold">{{ view.classroom.course_name }} · Sec {{ view.classroom.section }}</h1>
-  <p>{{ view.instructor_name }} · semester {{ view.classroom.semester }}</p>
-</header>
-<nav aria-label="Classroom tabs">
-  {% for value, label in [("problems", "Problems"), ("summary", "Summary")] %}
-  <a href="/classes/{{ view.classroom.id }}?tab={{ value }}" {% if tab == value %}aria-current="page"{% endif %}>{{ label }}</a>
-  {% endfor %}
-</nav>
+{% from "_components/ui.html" import page_header, tabs %}
+{% set base = "/classes/" ~ view.classroom.id %}
+{{ page_header(view.classroom.course_name ~ " · Sec " ~ view.classroom.section, view.instructor_name ~ " · semester " ~ view.classroom.semester) }}
+{{ tabs([("problems", "Problems", base ~ "?tab=problems"), ("summary", "Summary", base ~ "?tab=summary")], tab, label="Classroom tabs") }}

@@ -1,26 +1,32 @@
 {% extends "base.html" %}
+{% from "_components/forms.html" import action_form %}
+{% from "_components/ui.html" import empty_state %}
 {% block title %}Members · {{ view.classroom.course_name }} · GReader{% endblock %}
 {% block content %}
 <section data-page="T-01" data-tab="members">
   {% include "instructor/t01_tabs.html" %}
-  <p>{{ members | length }} students</p>
-  <table>
-    <thead><tr><th>Name</th><th>Student ID</th><th>Email</th><th>Joined</th><th></th></tr></thead>
-    <tbody>
-      {% for member in members %}
-      <tr>
-        <td>{{ member.full_name }}</td>
-        <td>{{ member.student_number or "—" }}</td>
-        <td>{{ member.email }}</td>
-        <td>{{ member.joined_at.strftime("%d %b") }}</td>
-        <td>
-          <form method="post" action="/classes/{{ view.classroom.id }}/members/{{ member.user_id }}/remove">
-            <button type="submit">Remove</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="mb-4 flex items-center justify-end">
+    <span class="text-xxs text-soft">{{ members | length }} students</span>
+  </div>
+  {% if members %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Student ID</th><th>Email</th><th>Joined</th><th></th></tr></thead>
+      <tbody>
+        {% for member in members %}
+        <tr>
+          <td>{{ member.full_name }}</td>
+          <td>{{ member.student_number or "—" }}</td>
+          <td>{{ member.email }}</td>
+          <td>{{ member.joined_at.strftime("%-d %b") }}</td>
+          <td class="text-right">{{ action_form("/classes/" ~ view.classroom.id ~ "/members/" ~ member.user_id ~ "/remove", "Remove", variant="ghost", size="sm") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty_state("No students yet", "Share the join code from Classroom settings.", art="people") }}
+  {% endif %}
 </section>
 {% endblock %}

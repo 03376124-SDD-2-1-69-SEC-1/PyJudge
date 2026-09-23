@@ -3,7 +3,11 @@
 {% block content %}
 <section data-page="S-01" data-tab="summary">
   {% include "student/s01_tabs.html" %}
-  <p>Your solved and passed counts appear once problems are published.</p>
-  <p>Counts cover this classroom only.</p>
+  <div class="grid max-w-2xl grid-cols-3 gap-4">
+    <div class="box"><p class="eyebrow">Solved</p><p class="h1">0 / 0</p></div>
+    <div class="box"><p class="eyebrow">All tests passed</p><p class="h1">0 / 0</p></div>
+    <div class="box"><p class="eyebrow">Average score</p><p class="h1">—</p></div>
+  </div>
+  <p class="sub mt-3">Counts cover this classroom only.</p>
 </section>
 {% endblock %}

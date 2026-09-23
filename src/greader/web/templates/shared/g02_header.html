@@ -1,37 +1,50 @@
-{# G-02 header, 02a notifications dropdown, 02b mobile menu. Popovers, no JS. #}
-<header class="border-b border-slate-200 bg-white" data-page="G-02">
-  <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-4">
-    <nav aria-label="Breadcrumb" class="flex items-center gap-2">
-      <a class="font-semibold tracking-tight" href="/classes">GReader</a>
-      {% block breadcrumb %}{% if breadcrumb is defined %}<span>/ {{ breadcrumb }}</span>{% endif %}{% endblock %}
-    </nav>
-    <nav aria-label="Account" class="flex items-center gap-4">
-      {% if actor.owns_classrooms %}<a href="/documents">My documents</a>{% endif %}
-      <button type="button" popovertarget="notifications" aria-label="Notifications">
-        Notifications{% if unread_count is defined and unread_count %} <span>{{ unread_count }}</span>{% endif %}
-      </button>
-      <button type="button" popovertarget="account-menu">{{ actor.full_name }} ▾</button>
-      <button type="button" popovertarget="mobile-menu" aria-label="Menu">☰</button>
-    </nav>
-  </div>
-  <div id="notifications" popover data-page="G-02a">
-    <h2>Notifications</h2>
-    {% if notifications is defined and notifications %}
-      <form method="post" action="/notifications/read-all"><button type="submit">Mark all read</button></form>
-      <ul>{% for item in notifications %}<li>{{ item }}</li>{% endfor %}</ul>
-    {% else %}
-      <p>No notifications.</p>
-    {% endif %}
-  </div>
-  <div id="account-menu" popover>
-    <p>{{ actor.full_name }}<br><small>{{ actor.email }}</small></p>
-    <form method="post" action="/logout"><button type="submit">Log out</button></form>
-  </div>
-  <div id="mobile-menu" popover data-page="G-02b">
-    <nav aria-label="Mobile">
-      <a href="/classes">My classrooms</a>
-      {% if actor.owns_classrooms %}<a href="/documents">My documents</a>{% endif %}
-      <form method="post" action="/logout"><button type="submit">Log out</button></form>
-    </nav>
+{# G-02 header; 02a notifications dropdown; 02b mobile menu. Popovers, no JS. #}
+{% from "_components/forms.html" import action_form, toggle %}
+{% from "_components/ui.html" import short_name %}
+<header class="site-header" data-page="G-02">
+  <a class="logo" href="/classes">GReader</a>
+  {% if breadcrumb is defined %}<span class="crumb">/ {{ breadcrumb }}</span>{% endif %}
+  <div class="ml-auto flex items-center gap-5">
+    {% if actor.owns_classrooms %}<a class="link hidden sm:inline" href="/documents">My documents</a>{% endif %}
+    {% call toggle("notifications", aria_label="Notifications") %}
+      <span class="icon-dot">{% if unread_count is defined and unread_count %}<span class="count">{{ unread_count }}</span>{% endif %}</span>
+    {% endcall %}
+    {% call toggle("account-menu", class="hidden items-center gap-2 sm:flex") %}
+      <span class="icon-dot"></span><span>{{ short_name(actor.full_name) }} ▾</span>
+    {% endcall %}
+    {% call toggle("mobile-menu", aria_label="Menu", class="sm:hidden") %}
+      <span class="inline-block h-[18px] w-[18px] border border-line bg-pap"></span>
+    {% endcall %}
   </div>
 </header>
+
+<div id="notifications" popover class="dropdown" data-page="G-02a">
+  <div class="flex items-center justify-between border-b border-hair px-3.5 py-3">
+    <strong>Notifications</strong>
+    {% if notifications is defined and notifications %}
+    {{ action_form("/notifications/read-all", "Mark all read", variant="ghost", size="sm") }}
+    {% endif %}
+  </div>
+  {% if notifications is defined and notifications %}
+    {% for item in notifications %}
+    <a class="dropdown-item" href="{{ item.href }}"><strong>{{ item.title }}</strong><br><span class="sub">{{ item.detail }}</span></a>
+    {% endfor %}
+  {% else %}
+    <p class="px-3.5 py-4 muted">No notifications yet.</p>
+  {% endif %}
+</div>
+
+<div id="account-menu" popover class="dropdown w-64">
+  <div class="dropdown-item"><strong>{{ actor.full_name }}</strong><br><span class="sub">{{ actor.email }}</span></div>
+  {{ action_form("/logout", "Log out", variant="plain", class="dropdown-item cursor-pointer text-mid") }}
+</div>
+
+<div id="mobile-menu" popover class="mobile-menu" data-page="G-02b">
+  <nav aria-label="Mobile">
+    <a class="dropdown-item" href="/classes">Classrooms</a>
+    {% if breadcrumb is defined %}<span class="dropdown-item">{{ breadcrumb }}</span>{% endif %}
+    {% if actor.owns_classrooms %}<a class="dropdown-item" href="/documents">My documents</a>{% endif %}
+    <span class="dropdown-item">{{ short_name(actor.full_name) }}</span>
+    {{ action_form("/logout", "Log out", variant="plain", class="dropdown-item cursor-pointer text-soft") }}
+  </nav>
+</div>

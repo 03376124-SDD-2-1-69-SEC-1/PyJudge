@@ -318,6 +318,10 @@ TEMPLATE_GROUPS = {
     "admin": ("a",),
 }
 TEMPLATE_NAME = re.compile(r"^([a-z])\d{2}[a-z]?_[a-z0-9_]+\.html$")
+# Jinja macros every page imports (field, button, tabs, badge, ...).
+COMPONENTS_DIR = "_components"
+COMPONENT_NAME = re.compile(r"^[a-z][a-z0-9_]*\.html$")
+RAW_CONTROL = re.compile(r"<(button|input|select|textarea)\b", re.IGNORECASE)
 # main.py still renders the placeholder home page; it moves into a pages.py
 # with the classroom pages. Do not add to this set.
 LEGACY_TEMPLATE_RENDERERS = {MAIN_PY}
@@ -405,6 +409,12 @@ def test_templates_live_in_a_page_group() -> None:
     violations = []
     for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
         relative = template.relative_to(TEMPLATE_ROOT)
+        if relative.parts[0] == COMPONENTS_DIR:
+            if not COMPONENT_NAME.match(relative.name) or len(relative.parts) != 2:
+                violations.append(
+                    f"{relative}: component files are _components/<name>.html"
+                )
+            continue
         if len(relative.parts) == 1:
             if relative.name not in TOP_LEVEL_TEMPLATES:
                 violations.append(f"{relative}: not in a page group directory")
@@ -494,4 +504,23 @@ def test_classroom_use_cases_take_the_actor_first() -> None:
     assert not violations, (
         "Every public use case in a classroom slice takes `actor` right after "
         "self (AGENTS.md 'Definition of done'). Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_templates_build_controls_only_through_component_macros() -> None:
+    """Buttons and inputs come from _components/forms.html, so they look alike."""
+    violations = []
+    for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
+        relative = template.relative_to(TEMPLATE_ROOT)
+        if relative.parts[0] == COMPONENTS_DIR:
+            continue
+        for lineno, line in enumerate(template.read_text().splitlines(), start=1):
+            match = RAW_CONTROL.search(line)
+            if match:
+                violations.append(f"{relative}:{lineno}: <{match.group(1)}>")
+
+    assert not violations, (
+        "Use the macros in web/templates/_components/forms.html (field, button, "
+        "hidden, ...) instead of raw form controls (AGENTS.md 'Definition of "
+        "done'). Violations:\n" + "\n".join(violations)
     )

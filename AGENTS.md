@@ -199,6 +199,10 @@ uv run ruff check .
 uv run ruff format --check .   # `ruff format .` to fix
 
 uv run python -m scripts.demo  # demo mode, http://127.0.0.1:8000/login
+
+# app.css from input.css — Tailwind v4.3.3 standalone binary, see README "Styles"
+tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css
+tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css --watch
 ```
 
 **Demo mode** (`scripts/demo.py`) runs the app on the in-memory fakes from
@@ -253,6 +257,10 @@ everywhere. See `tests/conftest.py`.
   `pages.py` renders templates. Templates live in
   `web/templates/<group>/<page-id>_<slug>.html`, group one of `shared`,
   `student`, `instructor`, `admin` (e.g. `student/s02_solve.html`)
+- templates build buttons and inputs only through the macros in
+  `web/templates/_components/forms.html`, and layout pieces (page header, tabs,
+  badge, empty state, modal) through `_components/ui.html`; style with the
+  tokens in `input.css`, then rebuild `app.css`
 - integration tests cover each page route for every role: 200 with the right
   template for the allowed role, 403/404 for the others
 - unit test at the service/repository seam, integration test at the HTTP layer

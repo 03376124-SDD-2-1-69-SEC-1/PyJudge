@@ -1,20 +1,23 @@
-{# C-02 join modal; C-02a shows inline (no JS can open a popover on load). #}
+{# C-02 join modal (popover); C-02a is the same modal rendered open with the error. #}
+{% from "_components/forms.html" import field, button, link_button %}
+{% from "_components/ui.html" import modal %}
 {% if join_error %}
-<section role="alert" data-state="C-02a">
-  <h2>Join a classroom</h2>
-  <p>No classroom has this code. Check it with your instructor.</p>
-  <form method="post" action="/classes/join">
-    <label>Join code <input name="join_code" maxlength="6" minlength="6" autocomplete="off" required></label>
-    <button type="submit">Join</button>
+  {% call modal("join-classroom-error", "Join a classroom", static=true, state="C-02a") %}
+  <form method="post" action="/classes/join" class="flex flex-col gap-3.5">
+    {{ field("join_code", "Join code", id="join-code-retry", value=join_code, input_class="input-code", error="No classroom with this code.", maxlength=6, minlength=6, autocomplete="off", required=true) }}
+    <div class="flex justify-between">
+      {{ link_button("/classes", "Cancel") }}
+      {{ button("Join", variant="primary") }}
+    </div>
   </form>
-</section>
+  {% endcall %}
 {% endif %}
-<div id="join-classroom" popover data-page="C-02">
-  <h2>Join a classroom</h2>
-  <form method="post" action="/classes/join">
-    <label>Join code <input name="join_code" maxlength="6" minlength="6" autocomplete="off" required></label>
-    <small>6 characters, from your instructor.</small>
-    <button type="button" popovertarget="join-classroom" popovertargetaction="hide">Cancel</button>
-    <button type="submit">Join</button>
-  </form>
-</div>
+{% call modal("join-classroom", "Join a classroom", page="C-02") %}
+<form method="post" action="/classes/join" class="flex flex-col gap-3.5">
+  {{ field("join_code", "Join code", input_class="input-code", hint="6 characters, from your instructor.", maxlength=6, minlength=6, autocomplete="off", required=true, placeholder="X7K29B") }}
+  <div class="flex justify-between">
+    {{ button("Cancel", type="button", popovertarget="join-classroom", popovertargetaction="hide") }}
+    {{ button("Join", variant="primary") }}
+  </div>
+</form>
+{% endcall %}

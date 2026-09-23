@@ -1,38 +1,38 @@
 {% extends "base.html" %}
+{% from "_components/forms.html" import field, select_field, checkbox, button %}
+{% from "_components/ui.html" import alert %}
 {% block title %}Sign up · GReader{% endblock %}
-{% block content %}
-<section data-page="G-03" class="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8">
-  <h1 class="text-2xl font-bold">Create an account</h1>
-
-  {% if error == "not_kmitl_email" %}
-  <p role="alert" data-state="G-03a">Use your @kmitl.ac.th address to sign up.</p>
-  {% elif error == "already_registered" %}
-  <p role="alert" data-state="G-03b">This email is already registered. <a href="/login">Log in</a></p>
-  {% elif error == "password_too_short" %}
-  <p role="alert">Password must be at least 8 characters.</p>
-  {% elif error == "password_mismatch" %}
-  <p role="alert">Passwords do not match.</p>
-  {% elif error == "faculty_required" %}
-  <p role="alert">Choose your faculty to request instructor rights.</p>
-  {% elif error == "full_name_required" %}
-  <p role="alert">Full name is required.</p>
+{% block main %}
+{% set email_error = {
+  "not_kmitl_email": "Use your @kmitl.ac.th address to sign up.",
+  "already_registered": "This email is already registered.",
+}.get(error, "") %}
+<main class="page-narrow" data-page="G-03">
+  <h1 class="h1">Create an account</h1>
+  {% if error in ("password_too_short", "password_mismatch", "faculty_required", "full_name_required") %}
+    {% call alert(tone="danger") %}
+      {{ {
+        "password_too_short": "Password must be at least 8 characters.",
+        "password_mismatch": "Passwords do not match.",
+        "faculty_required": "Choose your faculty to request instructor rights.",
+        "full_name_required": "Full name is required.",
+      }[error] }}
+    {% endcall %}
   {% endif %}
-
-  <form method="post" action="/signup" class="mt-6 grid gap-4">
-    <label>Full name <input name="full_name" value="{{ form.full_name }}" required></label>
-    <label>Email <input type="email" name="email" value="{{ form.email }}" placeholder="name@kmitl.ac.th" required></label>
-    <small>Only @kmitl.ac.th addresses are allowed.</small>
-    <label>Password <input type="password" name="password" minlength="8" required></label>
-    <label>Confirm password <input type="password" name="confirm_password" minlength="8" required></label>
-    <label><input type="checkbox" name="wants_instructor" {% if form.wants_instructor == "on" %}checked{% endif %}> I am an instructor <small>(needs admin approval)</small></label>
-    <label>Faculty <small>(instructors only)</small>
-      <select name="faculty">
-        <option value="">—</option>
-        {% for name in faculties %}<option {% if form.faculty == name %}selected{% endif %}>{{ name }}</option>{% endfor %}
-      </select>
-    </label>
-    <button type="submit">Sign up</button>
+  <form method="post" action="/signup" class="flex flex-col gap-4">
+    {{ field("full_name", "Full name", value=form.full_name, placeholder="Somchai Prasert", required=true, autocomplete="name") }}
+    <div{% if error == "not_kmitl_email" %} data-state="G-03a"{% elif error == "already_registered" %} data-state="G-03b"{% endif %}>
+      {{ field("email", "Email", type="email", value=form.email, placeholder="name@kmitl.ac.th", hint="" if email_error else "Only @kmitl.ac.th addresses are allowed.", error=email_error, required=true, autocomplete="email") }}
+      {% if error == "already_registered" %}<p class="mt-1 text-xs"><a class="link" href="/login">Log in instead</a></p>{% endif %}
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2">
+      {{ field("password", "Password", type="password", minlength=8, required=true, autocomplete="new-password") }}
+      {{ field("confirm_password", "Confirm password", type="password", minlength=8, required=true, autocomplete="new-password") }}
+    </div>
+    {{ checkbox("wants_instructor", "I am an instructor", checked=form.wants_instructor == "on", note="(needs admin approval)") }}
+    {{ select_field("faculty", "Faculty (instructors only)", faculties, selected=form.faculty, blank="—") }}
+    {{ button("Sign up", variant="primary", block=true) }}
   </form>
-  <p class="mt-4 text-sm">Already have an account? <a href="/login">Log in</a></p>
-</section>
+  <p class="text-center text-xs text-mid">Already have an account? <a class="link" href="/login">Log in</a></p>
+</main>
 {% endblock %}

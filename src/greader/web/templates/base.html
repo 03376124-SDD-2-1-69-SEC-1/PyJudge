@@ -6,23 +6,17 @@
   <meta name="description" content="GReader — programming classrooms at KMITL">
   {% block head %}{% endblock %}
   <title>{% block title %}GReader{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+Thai:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
-<body class="bg-slate-50 text-slate-950">
-  {% if actor is defined %}
-    {% include "shared/g02_header.html" %}
-  {% else %}
-  <header class="border-b border-slate-200 bg-white">
-    <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-      <a class="font-semibold tracking-tight" href="/">GReader</a>
-      <nav aria-label="Primary navigation">
-        <a class="text-sm font-medium text-blue-700 hover:text-blue-900" href="/docs">API Docs</a>
-      </nav>
-    </div>
-  </header>
-  {% endif %}
-  <main class="mx-auto max-w-5xl px-6 py-12">
+<body class="min-h-screen bg-pap text-ink">
+  {% if actor is defined %}{% include "shared/g02_header.html" %}{% endif %}
+  {% block main %}
+  <main class="page">
     {% block content %}{% endblock %}
   </main>
+  {% endblock %}
 </body>
 </html>
