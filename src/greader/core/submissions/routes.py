@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from greader.core.assignments.models import TestCaseKind
 from greader.core.auth.current import current_actor
 from greader.core.submissions.models import (
+    ClassroomArchivedError,
     EmptyCodeError,
     PostingClosedError,
     ResubmissionNotAllowedError,
@@ -43,6 +44,8 @@ def domain_errors() -> Iterator[None]:
         yield
     except NOT_VISIBLE:
         _fail(status.HTTP_404_NOT_FOUND, "not_found", "Not found")
+    except ClassroomArchivedError:
+        _fail(status.HTTP_409_CONFLICT, "classroom_archived", "Classroom is archived")
     except PostingClosedError:
         _fail(status.HTTP_409_CONFLICT, "posting_closed", "Submissions are closed")
     except ResubmissionNotAllowedError:

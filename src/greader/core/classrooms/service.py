@@ -240,6 +240,10 @@ class ClassroomService:
             return ClassroomRole.OWNER
         return ClassroomRole.MEMBER
 
+    def is_archived(self, actor: Actor, classroom_id: int) -> bool:
+        """Archived Classrooms take no Submissions (ADR-0007 §2); owner or Member."""
+        return self._visible(actor, classroom_id).archived
+
     def member_ids(self, actor: Actor, classroom_id: int) -> list[int]:
         """Every Member's user id; the owning Instructor only."""
         classroom = self._owned(actor, classroom_id)

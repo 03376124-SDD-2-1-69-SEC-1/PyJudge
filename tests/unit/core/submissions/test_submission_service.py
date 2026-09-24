@@ -21,6 +21,7 @@ from greader.core.auth.models import Actor, PermissionDeniedError, Role
 from greader.core.auth.service import AuthService
 from greader.core.classrooms.service import ClassroomService
 from greader.core.submissions.models import (
+    ClassroomArchivedError,
     EmptyCodeError,
     Execution,
     ExecutionStatus,
@@ -28,7 +29,9 @@ from greader.core.submissions.models import (
     PostingClosedError,
     ResubmissionNotAllowedError,
     StudentSolveView,
+    Submission,
     SubmissionNotFoundError,
+    TestResult,
     Verdict,
 )
 from greader.core.submissions.service import (
@@ -288,3 +291,100 @@ def test_get_submission_is_for_its_student_or_the_instructor(world: World) -> No
     assert world.service.get(world.student, submission.id) == submission
     with pytest.raises(SubmissionNotFoundError):
         world.service.get(world.other, submission.id)
+
+
+def test_archived_classroom_refuses_run_and_submit(world: World) -> None:
+    aid = world.publish()
+    world.classrooms.archive(world.teacher, world.room.id)
+
+    with pytest.raises(ClassroomArchivedError):
+        world.submit(aid)
+    with pytest.raises(ClassroomArchivedError):
+        world.service.run(world.student, world.room.id, aid, "print(1)")
+    view = world.service.page(world.student, world.room.id, aid)
+    assert view.archived and view.closed and not view.can_submit
+
+
+# ---- PostingStats aggregation, independent of the demo seed ---------------
+
+
+def _graded(
+    student_id: int, passed: int, total: int, *, at: int, late: bool = False
+) -> Submission:
+    results = tuple(
+        TestResult(
+            position=n,
+            ordinal=n,
+            kind=TestCaseKind.SAMPLE,
+            note="",
+            verdict=Verdict.PASSED if n <= passed else Verdict.WRONG_ANSWER,
+            time_seconds=0.0,
+            expected_output="",
+            actual_output="",
+            error="",
+        )
+        for n in range(1, total + 1)
+    )
+    return Submission(
+        posting_id=1,
+        classroom_id=1,
+        assignment_id=1,
+        student_id=student_id,
+        version_number=1,
+        code="",
+        language="python3",
+        submitted_at=NOW + timedelta(minutes=at),
+        is_late=late,
+        score=score_for(results, 10),
+        max_score=10,
+        attempt=at,
+        results=results,
+    )
+
+
+def _stats(*submissions: Submission) -> SubmissionPostingStats:
+    repository = FakeSubmissionRepository()
+    for submission in submissions:
+        repository.add(submission)
+    return SubmissionPostingStats(repository, FakeAssignmentRepository())
+
+
+def test_stats_use_each_students_latest_submission_only() -> None:
+    # Student 1 scored 10 first, then 3 later: the later 3 counts.
+    stats = _stats(
+        _graded(1, 3, 3, at=1), _graded(2, 1, 3, at=2), _graded(1, 1, 3, at=3)
+    )
+
+    assert stats.score(1, 1) == 3
+    assert stats.posting_summary(1).submitted == 2
+    assert stats.standing(1, 1).state is StudentState.PARTIAL
+
+
+def test_stats_order_by_submitted_at_not_insertion() -> None:
+    stats = _stats(_graded(1, 1, 3, at=5), _graded(1, 3, 3, at=1))
+
+    assert stats.score(1, 1) == 3
+
+
+def test_scores_round_down_and_the_average_rounds_to_one_decimal() -> None:
+    # 2/3 of 10 -> 6 (floor), 1/3 -> 3, 3/3 -> 10; average 19/3 = 6.33 -> 6.3.
+    stats = _stats(
+        _graded(1, 2, 3, at=1), _graded(2, 1, 3, at=2), _graded(3, 3, 3, at=3)
+    )
+
+    assert [stats.score(1, s) for s in (1, 2, 3)] == [6, 3, 10]
+    assert stats.posting_summary(1).avg_score == 6.3
+
+
+def test_fail_rate_is_students_failing_any_test_over_students_who_submitted() -> None:
+    stats = _stats(
+        _graded(1, 3, 3, at=1),
+        _graded(2, 2, 3, at=2),
+        _graded(3, 0, 3, at=3),
+        _graded(4, 3, 3, at=4, late=True),
+    )
+
+    assert stats.fail_rate(1) == 2 / 4
+    assert stats.standing(1, 4).state is StudentState.LATE
+    assert stats.fail_rate(99) is None
+    assert stats.posting_summary(99).avg_score is None

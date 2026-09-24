@@ -18,7 +18,7 @@
   {% endif %}
   {% if view.closed %}
     {% call alert(state="S-02f") %}
-      <span class="flex-1">Closed{% if problem.posting.closed_at %} on {{ problem.posting.closed_at | local }}{% else %} on {{ problem.posting.schedule.deadline | local }}{% endif %}. Submissions are no longer accepted.</span>
+      <span class="flex-1">{% if view.archived %}This classroom is archived. Submissions are no longer accepted.{% else %}Closed{% if problem.posting.closed_at %} on {{ problem.posting.closed_at | local }}{% else %} on {{ problem.posting.schedule.deadline | local }}{% endif %}. Submissions are no longer accepted.{% endif %}</span>
       {% if view.counted %}<span>Final score {{ view.counted.score }}/{{ view.counted.max_score }} · attempt {{ view.counted.attempt }}</span>{% endif %}
     {% endcall %}
   {% endif %}

@@ -136,6 +136,7 @@ class StudentSolveView:
     counted: Submission | None
     update: AssignmentVersion | None
     closed: bool
+    archived: bool
     can_submit: bool
 
 
@@ -198,6 +199,10 @@ class SubmissionNotFoundError(LookupError):
 
 class PostingClosedError(Exception):
     """The Posting accepts no more Submissions or Runs."""
+
+
+class ClassroomArchivedError(PostingClosedError):
+    """An Archived Classroom takes no Submissions or Runs (ADR-0007 §2)."""
 
 
 class ResubmissionNotAllowedError(Exception):

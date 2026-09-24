@@ -51,7 +51,7 @@ from tests.fakes.generation import (
     FakeGenerationClient,
     binary_search_response,
 )
-from tests.fakes.submissions import FakeSubmissionRepository, LocalPythonRunner
+from tests.fakes.submissions import FakeSubmissionRepository, LocalUnsafeRunner
 
 BANGKOK = ZoneInfo("Asia/Bangkok")
 
@@ -201,8 +201,9 @@ class DemoSeed:
         self.classrooms = FakeClassroomRepository()
         self.stats = FakeClassroomStats()
         self.submissions = FakeSubmissionRepository()
-        # Run and Submit execute with this machine's Python (demo only).
-        self.code_runner = LocalPythonRunner()
+        # Run and Submit execute with this machine's Python, unsandboxed;
+        # LocalUnsafeRunner refuses to exist when ENV=production.
+        self.code_runner = LocalUnsafeRunner()
         self.drafts = FakeDraftRepository()
         self.documents = FakeDocumentCatalog()
         # Every T-03 "Generate" answers with the prototype's binary-search draft.
@@ -529,6 +530,10 @@ def _build(seed: DemoSeed) -> FastAPI:
 
 
 def main() -> None:
+    if os.environ.get("ENV", "").strip().lower() == "production":
+        raise SystemExit(
+            "scripts.demo runs student code unsandboxed; not in production"
+        )
     port = int(os.environ.get("GREADER_DEMO_PORT", "8000"))
     uvicorn.run(build_demo_app(), host="127.0.0.1", port=port)
 

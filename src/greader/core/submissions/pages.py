@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from greader.core.auth.csrf import require_csrf
 from greader.core.auth.current import current_actor
 from greader.core.submissions.models import (
+    ClassroomArchivedError,
     EmptyCodeError,
     InstructorResultsView,
     InstructorTab,
@@ -22,6 +23,7 @@ from greader.core.submissions.service import NOT_VISIBLE, SubmissionService
 router = APIRouter(tags=["pages"], include_in_schema=False)
 
 _REFUSALS = {
+    ClassroomArchivedError: "This classroom is archived. Submissions are closed.",
     EmptyCodeError: "Write some code first.",
     PostingClosedError: "Submissions are closed for this problem.",
     ResubmissionNotAllowedError: "This problem allows one submission only.",

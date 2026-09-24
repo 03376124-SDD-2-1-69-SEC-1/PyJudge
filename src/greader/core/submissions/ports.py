@@ -57,6 +57,8 @@ class Roster(Protocol):
         self, actor: Actor, classroom_id: int
     ) -> list[tuple[int, str]]: ...
 
+    def is_archived(self, actor: Actor, classroom_id: int) -> bool: ...
+
 
 class AssignmentLookup(Protocol):
     """Reads an Assignment's current Version number for PostingStats."""

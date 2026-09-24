@@ -264,3 +264,22 @@ async def test_api_hides_other_students_submissions(demo: Demo) -> None:
     response = await other.get(f"/api/v1/submissions/{created.json()['id']}")
 
     assert response.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_archived_classroom_shows_s02f_and_refuses_submit(demo: Demo) -> None:
+    teacher = await demo.client(demo.seed.somchai.email)
+    student = await demo.client(demo.seed.students[1].email)
+    url = demo.url(BS)
+    settings = f"/classes/{demo.sec1}?tab=settings"
+    await post_form(teacher, f"/classes/{demo.sec1}/archive", {}, page=settings)
+
+    page = await student.get(url)
+    refused = await student.post(
+        "/api/v1/classrooms" + url.removeprefix("/classes") + "/submissions",
+        json={"code": "print(3)"},
+    )
+
+    assert "This classroom is archived" in page.text and "readonly" in page.text
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "classroom_archived"

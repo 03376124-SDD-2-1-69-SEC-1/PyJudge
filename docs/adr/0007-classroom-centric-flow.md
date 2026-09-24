@@ -119,7 +119,9 @@ Terms used below are defined in `CONTEXT.md`.
    synchronously with a timeout.
 6. **Late**: a Submission after the deadline on a Posting that allows late
    work. It is accepted and flagged, with no automatic penalty.
-7. **Closed**: a Posting closes when the Instructor clicks Close
+7. **Archived** Classrooms refuse Run and Submit (page: S-02f with an
+   "archived" notice, 409; API: 409 `classroom_archived`), added 2026-09-24.
+8. **Closed**: a Posting closes when the Instructor clicks Close
    submissions, or at the deadline when allow late is off. Allow
    resubmission off means one Submit only. A closed Posting shows S-02f,
    read-only.
@@ -349,6 +351,17 @@ keys.
   require_citations).
 - `knowledge_documents`: `uploaded_by` becomes NOT NULL; add `page_count`,
   `progress`, `error_code`.
+
+## Open questions
+
+1. **What executes student code in production?** (raised 2026-09-24) The
+   `CodeRunner` port is fixed; the adapter is not. Production wires
+   `integrations/judge0.StubCodeRunner`, which runs nothing. The demo's
+   `LocalUnsafeRunner` (in `tests/fakes/`, never shipped) runs code with the
+   local Python behind a timeout, CPU/memory rlimits and a temp dir, and
+   refuses to start when `ENV=production`; it is not a sandbox. Candidates:
+   self-hosted Judge0 CE (§5.5), or another isolate/nsjail-based service.
+   S-02a and asynchronous Submit wait for this decision.
 
 ## Consequences
 

@@ -17,6 +17,7 @@ from greader.core.assignments.service import (
 )
 from greader.core.auth.models import Actor, PermissionDeniedError
 from greader.core.submissions.models import (
+    ClassroomArchivedError,
     EmptyCodeError,
     Execution,
     ExecutionStatus,
@@ -145,7 +146,7 @@ class SubmissionService:
     ) -> RunReport:
         """Sample Test Cases only; not graded, not stored (ADR-0007 §5.3)."""
         problem = self._student_problem(actor, classroom_id, assignment_id)
-        self._require_open(problem)
+        self._require_open(actor, problem)
         self._require_code(code)
         samples = [
             test_case
@@ -161,7 +162,7 @@ class SubmissionService:
     ) -> Submission:
         """Grade against every Test Case and keep it; the latest one counts."""
         problem = self._student_problem(actor, classroom_id, assignment_id)
-        self._require_open(problem)
+        self._require_open(actor, problem)
         self._require_code(code)
         posting = problem.posting
         previous = self._repository.list_for_student(posting.id, actor.user_id)
@@ -198,7 +199,9 @@ class SubmissionService:
             raise PermissionDeniedError
         return problem
 
-    def _require_open(self, problem: StudentProblem) -> None:
+    def _require_open(self, actor: Actor, problem: StudentProblem) -> None:
+        if self._roster.is_archived(actor, problem.posting.classroom_id):
+            raise ClassroomArchivedError
         if problem.posting.is_closed(self._clock.now()):
             raise PostingClosedError
 
@@ -246,7 +249,8 @@ class SubmissionService:
         update = None
         if counted is not None and counted.version_number < assignment.current_version:
             update = self._problems.current_version(actor, classroom_id, assignment.id)
-        closed = posting.is_closed(self._clock.now())
+        archived = self._roster.is_archived(actor, classroom_id)
+        closed = archived or posting.is_closed(self._clock.now())
         samples = tuple(
             test_case
             for test_case in assignment.test_cases
@@ -260,6 +264,7 @@ class SubmissionService:
             counted=counted,
             update=update,
             closed=closed,
+            archived=archived,
             can_submit=not closed
             and (posting.schedule.allow_resubmission or not submissions),
         )

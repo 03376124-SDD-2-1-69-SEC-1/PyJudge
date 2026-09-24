@@ -1,8 +1,14 @@
 """In-memory SubmissionRepository and two CodeRunners for tests and the demo."""
 
+import contextlib
+import math
+import os
+import resource
 import subprocess
 import sys
+import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import replace
 
 from greader.core.submissions.models import Execution, ExecutionStatus, Submission
@@ -65,31 +71,64 @@ class ScriptedCodeRunner:
         return Execution(ExecutionStatus.OK, self.outputs.get(stdin, ""), "", 0.02)
 
 
-class LocalPythonRunner:
-    """Demo only: runs the code with this machine's Python, no sandbox.
+class UnsafeRunnerInProductionError(RuntimeError):
+    """LocalUnsafeRunner was built with ENV=production."""
 
+
+class LocalUnsafeRunner:
+    """Demo only: runs code with this machine's Python, NOT a sandbox.
+
+    Guards, none of which make it safe for untrusted code: it refuses to
+    exist when ENV=production, each run gets a fresh temp dir as its working
+    directory, a wall-clock timeout, and CPU-time and memory rlimits (POSIX).
     `scripts/demo.py` binds 127.0.0.1, so the only code it runs is what the
-    person at the keyboard typed. Never wire this outside the demo.
+    person at the keyboard typed. Production needs a sandboxed CodeRunner
+    (ADR-0007 open question 1).
     """
+
+    MEMORY_BYTES = 256 * 1024 * 1024
+
+    def __init__(self) -> None:
+        if os.environ.get("ENV", "").strip().lower() == "production":
+            raise UnsafeRunnerInProductionError(
+                "LocalUnsafeRunner runs code unsandboxed; refusing ENV=production"
+            )
 
     def run(
         self, *, code: str, language: str, stdin: str, time_limit_seconds: float
     ) -> Execution:
         started = time.perf_counter()
-        try:
-            done = subprocess.run(
-                [sys.executable, "-I", "-c", code],
-                input=stdin,
-                capture_output=True,
-                text=True,
-                timeout=time_limit_seconds,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
-            return Execution(ExecutionStatus.TIME_LIMIT, "", "", time_limit_seconds)
+        with tempfile.TemporaryDirectory(prefix="greader-run-") as workdir:
+            try:
+                done = subprocess.run(
+                    [sys.executable, "-I", "-c", code],
+                    input=stdin,
+                    capture_output=True,
+                    text=True,
+                    timeout=time_limit_seconds,
+                    check=False,
+                    cwd=workdir,
+                    env={"PATH": os.environ.get("PATH", "")},
+                    preexec_fn=self._limits(time_limit_seconds),
+                )
+            except subprocess.TimeoutExpired:
+                return Execution(ExecutionStatus.TIME_LIMIT, "", "", time_limit_seconds)
         elapsed = time.perf_counter() - started
         if done.returncode != 0:
             return Execution(
                 ExecutionStatus.RUNTIME_ERROR, done.stdout, done.stderr, elapsed
             )
         return Execution(ExecutionStatus.OK, done.stdout, done.stderr, elapsed)
+
+    def _limits(self, time_limit_seconds: float) -> Callable[[], None]:
+        cpu_seconds = math.ceil(time_limit_seconds) + 1
+
+        def apply() -> None:
+            resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
+            # macOS rejects RLIMIT_AS; the CPU limit and timeout still hold.
+            with contextlib.suppress(ValueError, OSError):
+                resource.setrlimit(
+                    resource.RLIMIT_AS, (self.MEMORY_BYTES, self.MEMORY_BYTES)
+                )
+
+        return apply
