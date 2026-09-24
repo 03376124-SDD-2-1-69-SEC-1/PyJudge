@@ -27,11 +27,11 @@
 </div>
 {%- endmacro %}
 
-{% macro textarea_field(name, label, value="", error="", hint="", id="") -%}
+{% macro textarea_field(name, label, value="", error="", hint="", id="", input_class="") -%}
 {%- set field_id = id or "f-" ~ name %}
 <div class="field">
   <label class="label" for="{{ field_id }}">{{ label }}</label>
-  <textarea class="input{% if error %} input-error{% endif %}" id="{{ field_id }}" name="{{ name }}"{{ attrs(kwargs) }}>{{ value }}</textarea>
+  <textarea class="input{% if error %} input-error{% endif %} {{ input_class }}" id="{{ field_id }}" name="{{ name }}"{{ attrs(kwargs) }}>{{ value }}</textarea>
   {% if hint %}<small class="hint">{{ hint }}</small>{% endif %}
   {% if error %}<p class="error-text">{{ error }}</p>{% endif %}
 </div>

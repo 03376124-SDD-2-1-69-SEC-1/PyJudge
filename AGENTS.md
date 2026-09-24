@@ -18,7 +18,8 @@ setup and background live in `README.md` and `docs/adr/`.
 | `core/generation`         | Drafts, T-03/T-04, daily Quota on fakes; 503 until OPS-15      | TBD              |
 | `core/uploads`            | Working; to be renamed `core/documents` (0007)                 | TBD              |
 | `core/auth`, `classrooms` | Working on fakes (demo mode); 503 in production until OPS-15     | TBD              |
-| `core/submissions`, `notifications`, `admin` | Planned (0007)                              | TBD              |
+| `core/submissions`        | S-02/T-02, Run vs Submit, PostingStats on fakes; 503 until OPS-15 | TBD              |
+| `core/notifications`, `admin` | Planned (0007)                                             | TBD              |
 | `database/`               | 9 tables live on Neon; classroom tables pending an OPS task    | DB owner         |
 | `ai/`                     | In progress                                                    | AI owner         |
 | `web/templates/base.html` | Shared layout                                                  | Design           |

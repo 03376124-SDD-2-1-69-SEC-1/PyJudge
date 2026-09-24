@@ -175,6 +175,9 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "changed_at",
     # generation: T-01 Drafts "Created" column and T-03a "Generated ...".
     "generated_at",
+    # submissions (ADR-0007 §5.6): is_late compares submitted_at with the
+    # deadline; S-02g and T-02 show it in "Submitted".
+    "submitted_at",
 }
 # `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
 # `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
@@ -198,6 +201,9 @@ ALLOWED_ID_SUFFIX_FIELDS = {
     # is the one Topic T-03/T-04 pick (ADR-0007 §3.5).
     "owner_id",
     "assignment_id",
+    # submissions: Submissions are listed by posting_id (S-02g history, T-02
+    # results, PostingStats) -- the Counted Submission is found through it.
+    "posting_id",
     "topic_id",
 }
 

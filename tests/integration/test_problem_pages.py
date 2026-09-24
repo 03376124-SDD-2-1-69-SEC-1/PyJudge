@@ -30,7 +30,7 @@ async def test_t01_problems_lists_published_rows(demo) -> None:
     assert page.status_code == 200
     assert "Published · 6" in page.text
     assert "4 · Binary search on sorted input" in page.text
-    assert "4/6" in page.text and "6.3" in page.text
+    assert "4/6" in page.text and "6.0" in page.text
     assert 'data-state="T-01b"' not in page.text
 
 
@@ -42,7 +42,7 @@ async def test_t01_summary_shows_stats_and_score_table(demo) -> None:
     page = await teacher.get(f"/classes/{seed.programming_1.id}?tab=summary")
 
     assert "Top 5 most-failed problems" in page.text
-    assert "46%" in page.text
+    assert "75%" in page.text
     assert "Pimchanok Wong" in page.text
 
 
@@ -73,7 +73,7 @@ async def test_s01_summary_counts_this_classroom(demo) -> None:
 
     assert "4 / 6" in page.text
     assert "2 / 6" in page.text
-    assert "7.5" in page.text
+    assert "7.8" in page.text
 
 
 @pytest.mark.anyio

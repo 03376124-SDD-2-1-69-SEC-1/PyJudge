@@ -1,0 +1,17 @@
+{#- Pieces shared by the T-02 tabs. -#}
+{% from "_components/forms.html" import action_form with context %}
+{% from "_components/ui.html" import page_header, tabs, badge %}
+
+{% macro t02_header(view, current, url) -%}
+{% set problem = view.problem %}
+{% call page_header(problem.number ~ " · " ~ problem.assignment.title, problem.assignment.difficulty.value | capitalize ~ " · deadline " ~ (problem.posting.schedule.deadline | local) ~ " · max score " ~ problem.posting.schedule.max_score) %}
+  {% if view.closed %}{{ badge("Closed") }}{% else %}{{ action_form(url ~ "/close", "Close submissions") }}{% endif %}
+  <a class="link text-xs" href="/classes/{{ problem.posting.classroom_id }}?tab=problems">Back to problems</a>
+{% endcall %}
+{{ tabs([("results", "Results", url), ("versions", "Version history", url ~ "?tab=versions")], current, label="Problem tabs") }}
+{%- endmacro %}
+
+{#- "Hidden 1 · empty list": the Instructor always sees kind and note. -#}
+{% macro test_name(kind, ordinal, note) -%}
+{{ kind.value | capitalize }} {{ ordinal }}{% if note %} · {{ note }}{% endif %}
+{%- endmacro %}

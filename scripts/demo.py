@@ -15,7 +15,7 @@ pending adapters that answer 503 until OPS-15 (ADR-0007 §10.4).
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import uvicorn
@@ -24,10 +24,8 @@ from fastapi import FastAPI
 from greader.core.assignments.models import (
     AssignmentContent,
     Difficulty,
-    PostingSummary,
+    PublishedAssignment,
     Schedule,
-    StudentStanding,
-    StudentState,
     TestCase,
     TestCaseKind,
 )
@@ -41,9 +39,10 @@ from greader.core.classrooms.models import (
     StudentProgress,
 )
 from greader.core.generation.models import DocumentSummary
+from greader.core.submissions.models import Submission, TestResult, Verdict
+from greader.core.submissions.service import score_for
 from greader.integrations.clock import SystemClock
 from tests.fakes.app import build_app
-from tests.fakes.assignments import FakePostingStats
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
 from tests.fakes.generation import (
@@ -52,6 +51,7 @@ from tests.fakes.generation import (
     FakeGenerationClient,
     binary_search_response,
 )
+from tests.fakes.submissions import FakeSubmissionRepository, LocalPythonRunner
 
 BANGKOK = ZoneInfo("Asia/Bangkok")
 
@@ -118,24 +118,71 @@ DATA_STRUCTURES = [
         ("deq", "EMPTY"),
     ),
 ]
-# T-01/S-01 numbers per problem until the submissions slice computes them:
-# (submitted, avg score, fail rate), then per-student scores for Sec 1.
-SEC1_SUMMARIES = [
-    (6, 9.4, 0.06),
-    (6, 9.0, 0.11),
-    (5, 7.1, 0.32),
-    (4, 6.3, 0.46),
-    (1, None, 0.28),
-    (0, None, None),
+# Binary search gets the prototype's six Test Cases (2 sample, 3 hidden,
+# 1 edge); every other problem has one sample and one hidden test.
+BINARY_SEARCH_TESTS = [
+    TestCase(input_data="5\n1 3 5 7 9\n7", expected_output="3"),
+    TestCase(input_data="4\n2 4 6 8\n5", expected_output="-1"),
+    TestCase(
+        input_data="0\n\n1",
+        expected_output="-1",
+        kind=TestCaseKind.HIDDEN,
+        note="empty list",
+    ),
+    TestCase(
+        input_data="6\n1 2 3 4 5 6\n6",
+        expected_output="5",
+        kind=TestCaseKind.HIDDEN,
+        note="last item",
+    ),
+    TestCase(
+        input_data="3\n1 3 5\n1",
+        expected_output="0",
+        kind=TestCaseKind.HIDDEN,
+        note="first item",
+    ),
+    TestCase(
+        input_data="5\n1 2 2 2 3\n2",
+        expected_output="2",
+        kind=TestCaseKind.EDGE,
+        note="duplicates",
+    ),
 ]
-SEC1_SCORES = [  # student index -> score per problem (None = not started)
-    [10, 10, 6, 4, None, None],
-    [10, 9, 10, 10, 8, None],
-    [8, 10, 7, 0, None, None],
-    [10, 10, 9, 8, None, None],
-    [10, 10, 5, None, None, None],
-    [9, None, None, None, None, None],
+BINARY_SEARCH_CODE = """def binary_search(nums, x):
+    lo, hi = 0, len(nums) - 1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if nums[mid] == x:
+            return mid
+        elif nums[mid] < x:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1
+
+
+n = int(input())
+nums = list(map(int, input().split()))
+x = int(input())
+print(binary_search(nums, x))
+"""
+# Sec 1 Submissions: per student, per problem, the tests passed on each
+# attempt (oldest first); None = never submitted. Tests pass in order, so
+# "4" on binary search passes both samples and two hidden tests.
+SEC1_ATTEMPTS = [
+    [[2], [2], [1], [2, 4, 4], None, None],
+    [[2], [1, 2], [2], [6], [1], None],
+    [[1, 2], [2], [1], [0], None, None],
+    [[2], [2], [2], [3, 5], None, None],
+    [[2], [2], [1], None, None, None],
+    [[1], None, None, None, None, None],
 ]
+# Students whose failing tests crash instead of printing a wrong answer
+# (S-02d), and the Sec 1 problem that takes late work (S-02 "Late").
+CRASHING_STUDENT = 2
+LATE_PROBLEM = 1
+BINARY_SEARCH = 3
+UPDATE_REASON = "Test case 3 had a wrong expected output."
 
 # Students who signed up with "I am an instructor" and wait in A-01.
 REQUESTERS = [
@@ -153,7 +200,9 @@ class DemoSeed:
         self.users = FakeAuthRepository()
         self.classrooms = FakeClassroomRepository()
         self.stats = FakeClassroomStats()
-        self.posting_stats = FakePostingStats()
+        self.submissions = FakeSubmissionRepository()
+        # Run and Submit execute with this machine's Python (demo only).
+        self.code_runner = LocalPythonRunner()
         self.drafts = FakeDraftRepository()
         self.documents = FakeDocumentCatalog()
         # Every T-03 "Generate" answers with the prototype's binary-search draft.
@@ -293,60 +342,137 @@ def _deadline(month_day: tuple[int, int]) -> datetime:
 
 def _publish_problems(
     app: FastAPI, owner: User, problems: list, classroom_ids: list[int]
-) -> list[int]:
-    """Publish through the real use case; return the Sec-order posting ids."""
+) -> list[PublishedAssignment]:
+    """Publish through the real use case, in problem-number order."""
     service = app.state.assignment_service
-    posting_ids = []
+    published = []
     for title, difficulty, deadline, sample, hidden in problems:
-        published = service.publish(
-            _actor(owner),
-            AssignmentContent(
-                title=title,
-                problem_statement=f"{title}: read the input and print the answer.",
-                difficulty=difficulty,
-                test_cases=[
-                    TestCase(input_data=sample[0], expected_output=sample[1]),
-                    TestCase(
-                        input_data=hidden[0],
-                        expected_output=hidden[1],
-                        kind=TestCaseKind.HIDDEN,
-                        note="edge",
-                    ),
-                ],
+        test_cases = [
+            TestCase(input_data=sample[0], expected_output=sample[1]),
+            TestCase(
+                input_data=hidden[0],
+                expected_output=hidden[1],
+                kind=TestCaseKind.HIDDEN,
+                note="edge",
             ),
-            Schedule(deadline=_deadline(deadline)),
-            classroom_ids,
+        ]
+        if title == "Binary search on sorted input":
+            test_cases = BINARY_SEARCH_TESTS
+        published.append(
+            service.publish(
+                _actor(owner),
+                AssignmentContent(
+                    title=title,
+                    problem_statement=f"{title}: read the input and print the answer.",
+                    difficulty=difficulty,
+                    test_cases=test_cases,
+                ),
+                Schedule(deadline=_deadline(deadline)),
+                classroom_ids,
+            )
         )
-        posting_ids.append([p.id for p in published.postings])
-    return posting_ids
+    return published
 
 
 def _seed_coursework(app: FastAPI, seed: DemoSeed) -> None:
-    postings = _publish_problems(
+    published = _publish_problems(
         app,
         seed.somchai,
         PROBLEMS,
         [seed.programming_1.id, seed.programming_2.id],
     )
     _publish_problems(app, seed.warunee, DATA_STRUCTURES, [seed.data_structures.id])
-    sec1_students = seed.students[:6]
-    for index, (submitted, avg, fail) in enumerate(SEC1_SUMMARIES):
-        sec1_posting = postings[index][0]
-        seed.posting_stats.summaries[sec1_posting] = PostingSummary(
-            submitted=submitted, avg_score=avg
-        )
-        if fail is not None:
-            seed.posting_stats.fail_rates[sec1_posting] = fail
-        for student, scores in zip(sec1_students, SEC1_SCORES, strict=True):
-            score = scores[index]
-            if score is None:
+    _seed_submissions(app, seed, [item.assignment.id for item in published])
+
+
+def _seed_submissions(app: FastAPI, seed: DemoSeed, assignment_ids: list[int]) -> None:
+    """Graded Sec 1 Submissions, so T-01/S-01/T-02 numbers are computed."""
+    service = app.state.assignment_service
+    somchai = _actor(seed.somchai)
+    sec1 = seed.programming_1.id
+    service.update_posting(somchai, sec1, assignment_ids[LATE_PROBLEM], allow_late=True)
+    # Binary search changed after Nattapong's last attempt: S-02e for him and
+    # two Versions on T-02b; everyone else submitted on Version 2.
+    binary_search = service.problem(somchai, sec1, assignment_ids[BINARY_SEARCH])
+    service.edit(
+        somchai,
+        binary_search.assignment.id,
+        reason=UPDATE_REASON,
+        test_cases=binary_search.assignment.test_cases,
+    )
+    now = seed.clock.now()
+    for index, assignment_id in enumerate(assignment_ids):
+        problem = service.problem(somchai, sec1, assignment_id)
+        schedule = problem.posting.schedule
+        for student_index, (student, attempts) in enumerate(
+            zip(seed.students[:6], SEC1_ATTEMPTS, strict=True)
+        ):
+            passes = attempts[index]
+            if passes is None:
                 continue
-            state = StudentState.PASSED if score == 10 else StudentState.PARTIAL
-            if student is seed.students[0] and index == 3:
-                state = StudentState.RESUBMIT_NEEDED
-            seed.posting_stats.standings[(sec1_posting, student.id)] = StudentStanding(
-                state=state, score=score
+            version = problem.assignment.current_version
+            if index == BINARY_SEARCH and student_index == 0:
+                version -= 1
+            for attempt, passed in enumerate(passes, start=1):
+                submitted_at = min(now, schedule.deadline) - timedelta(
+                    days=len(passes) - attempt + 1, hours=student_index
+                )
+                if index == LATE_PROBLEM and student_index == CRASHING_STUDENT:
+                    submitted_at = schedule.deadline + timedelta(days=2)
+                results = _results(
+                    problem.assignment.test_cases,
+                    passed,
+                    crash=student_index == CRASHING_STUDENT,
+                )
+                seed.submissions.add(
+                    Submission(
+                        posting_id=problem.posting.id,
+                        classroom_id=sec1,
+                        assignment_id=assignment_id,
+                        student_id=student.id,
+                        version_number=version,
+                        code=BINARY_SEARCH_CODE
+                        if index == BINARY_SEARCH
+                        else f"# attempt {attempt}\nprint(input())\n",
+                        language="python3",
+                        submitted_at=submitted_at,
+                        is_late=submitted_at > schedule.deadline,
+                        score=score_for(results, schedule.max_score),
+                        max_score=schedule.max_score,
+                        attempt=attempt,
+                        results=results,
+                    )
+                )
+
+
+def _results(
+    test_cases: list[TestCase], passed: int, *, crash: bool
+) -> tuple[TestResult, ...]:
+    """The first `passed` tests pass; the rest fail or crash."""
+    failing = Verdict.RUNTIME_ERROR if crash else Verdict.WRONG_ANSWER
+    kinds: dict[TestCaseKind, int] = {}
+    results = []
+    for position, test_case in enumerate(test_cases, start=1):
+        kinds[test_case.kind] = kinds.get(test_case.kind, 0) + 1
+        ok = position <= passed
+        results.append(
+            TestResult(
+                position=position,
+                ordinal=kinds[test_case.kind],
+                kind=test_case.kind,
+                note=test_case.note,
+                verdict=Verdict.PASSED if ok else failing,
+                time_seconds=0.02,
+                expected_output=test_case.expected_output,
+                actual_output=test_case.expected_output if ok else "0",
+                error=""
+                if ok or not crash
+                else "Traceback (most recent call last):\n"
+                '  File "<string>", line 7, in binary_search\n'
+                "IndexError: list index out of range",
             )
+        )
+    return tuple(results)
 
 
 def _seed_generation(app: FastAPI, seed: DemoSeed) -> None:
@@ -393,7 +519,8 @@ def _build(seed: DemoSeed) -> FastAPI:
         clock=seed.clock,
         classroom_repository=seed.classrooms,
         classroom_stats=seed.stats,
-        posting_stats=seed.posting_stats,
+        submission_repository=seed.submissions,
+        code_runner=seed.code_runner,
         draft_repository=seed.drafts,
         document_catalog=seed.documents,
         generation_client=seed.generation_client,

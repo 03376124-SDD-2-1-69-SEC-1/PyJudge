@@ -343,6 +343,18 @@ class AssignmentService:
             reverse=True,
         )
 
+    def current_version(
+        self, actor: Actor, classroom_id: int, assignment_id: int
+    ) -> AssignmentVersion:
+        """The Version a Posting shows now; S-02e reads its reason."""
+        self._visible_role(actor, classroom_id)
+        posting = self._posting(classroom_id, assignment_id)
+        assignment = self._assignment(posting.assignment_id)
+        found = self._versions.get(assignment.id, assignment.current_version)
+        if found is None:
+            raise VersionNotFoundError
+        return found
+
     def version(
         self, actor: Actor, assignment_id: int, number: int
     ) -> AssignmentVersion:

@@ -62,6 +62,14 @@ from greader.core.generation.ports import (
 from greader.core.generation.routes import classroom_router as draft_classroom_router
 from greader.core.generation.routes import router as draft_router
 from greader.core.generation.service import GenerationService
+from greader.core.submissions.pages import router as submission_page_router
+from greader.core.submissions.ports import CodeRunner, SubmissionRepository
+from greader.core.submissions.routes import (
+    classroom_router as submission_classroom_router,
+)
+from greader.core.submissions.routes import router as submission_router
+from greader.core.submissions.service import SubmissionService
+from greader.core.submissions.stats import SubmissionPostingStats
 from greader.core.topics.ports import TopicRepository
 from greader.core.topics.routes import router as topic_router
 from greader.core.topics.service import TopicService
@@ -84,6 +92,7 @@ from greader.database.session import (
 from greader.database.storage.r2 import R2ObjectStorage, build_r2_client, check_r2
 from greader.integrations.clock import SystemClock
 from greader.integrations.email import StubEmailSender
+from greader.integrations.judge0 import StubCodeRunner
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _WEB_DIR = _PACKAGE_DIR / "web"
@@ -130,6 +139,8 @@ def create_app(
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
+    submission_repository: SubmissionRepository | None = None,
+    code_runner: CodeRunner | None = None,
     demo_accounts: tuple[DemoAccount, ...] | None = None,
     secure_cookies: bool | None = None,
 ) -> FastAPI:
@@ -206,9 +217,14 @@ def create_app(
         version_repository = PendingRepository("assignment versions")
     if posting_repository is None:
         posting_repository = PendingRepository("postings")
-    # Numbers from Submissions; the submissions slice will provide them.
+    # Submissions have no table until OPS-15. T-01/S-01 numbers are computed
+    # from them unless a test injects its own PostingStats.
+    if submission_repository is None:
+        submission_repository = PendingRepository("submissions")
     if posting_stats is None:
-        posting_stats = PendingRepository("posting stats")
+        posting_stats = SubmissionPostingStats(
+            submission_repository, assignment_repository
+        )
     assignment_service = AssignmentService(
         assignment_repository,
         version_repository,
@@ -218,6 +234,12 @@ def create_app(
         clock,
     )
     application.state.assignment_service = assignment_service
+
+    if code_runner is None:
+        code_runner = StubCodeRunner()
+    application.state.submission_service = SubmissionService(
+        submission_repository, code_runner, assignment_service, classroom_service, clock
+    )
 
     # Drafts have no table until OPS-15 and the Document library arrives with
     # the documents slice; database/core/generation_repository.py holds the
@@ -273,6 +295,9 @@ def create_app(
     application.include_router(auth_page_router)
     application.include_router(classroom_router)
     application.include_router(classroom_page_router)
+    application.include_router(submission_router)
+    application.include_router(submission_classroom_router)
+    application.include_router(submission_page_router)
 
     @application.exception_handler(NotAuthenticatedError)
     def not_authenticated(request: Request, error: NotAuthenticatedError) -> Response:

@@ -25,6 +25,7 @@ from greader.core.generation.ports import (
     DraftRepository,
     GenerationClient,
 )
+from greader.core.submissions.ports import CodeRunner, SubmissionRepository
 from greader.core.topics.ports import TopicRepository
 from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from greader.integrations.email import StubEmailSender
@@ -32,12 +33,12 @@ from greader.main import create_app
 from tests.fakes.assignments import (
     FakeAssignmentRepository,
     FakePostingRepository,
-    FakePostingStats,
     FakeVersionRepository,
 )
 from tests.fakes.auth import FakeAuthRepository, FakeClock
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
 from tests.fakes.generation import FakeDocumentCatalog, FakeDraftRepository
+from tests.fakes.submissions import FakeSubmissionRepository, ScriptedCodeRunner
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
@@ -79,6 +80,8 @@ def build_app(
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
+    submission_repository: SubmissionRepository | None = None,
+    code_runner: CodeRunner | None = None,
     demo_accounts: tuple[DemoAccount, ...] | None = None,
     max_upload_size_bytes: int = DEFAULT_MAX_UPLOAD_SIZE_BYTES,
 ) -> FastAPI:
@@ -91,8 +94,10 @@ def build_app(
         version_repository = FakeVersionRepository()
     if posting_repository is None:
         posting_repository = FakePostingRepository()
-    if posting_stats is None:
-        posting_stats = FakePostingStats()
+    if submission_repository is None:
+        submission_repository = FakeSubmissionRepository()
+    if code_runner is None:
+        code_runner = ScriptedCodeRunner()
     if knowledge_document_repository is None:
         knowledge_document_repository = FakeKnowledgeDocumentRepository()
     if object_storage is None:
@@ -132,6 +137,8 @@ def build_app(
         clock=clock,
         classroom_repository=classroom_repository,
         classroom_stats=classroom_stats,
+        submission_repository=submission_repository,
+        code_runner=code_runner,
         demo_accounts=demo_accounts,
         # httpx talks plain HTTP to the ASGI app and drops Secure cookies.
         secure_cookies=False,

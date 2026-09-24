@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import link_button with context %}
+{% from "_components/ui.html" import badge, empty_state, modal, stat_box %}
+{% from "instructor/t02_parts.html" import t02_header, test_name with context %}
+{% set problem = view.problem %}
+{% set url = "/classes/" ~ problem.posting.classroom_id ~ "/assignments/" ~ problem.assignment.id %}
+{% block title %}{{ problem.assignment.title }} · Results · GReader{% endblock %}
+{% block content %}
+<section data-page="T-02" data-tab="results">
+  {{ t02_header(view, "results", url) }}
+  {% if not view.submitted %}
+    {% call empty_state("No submissions yet", "Published " ~ (problem.posting.published_at | local) ~ " · deadline " ~ (problem.posting.schedule.deadline | local) ~ " · " ~ view.rows | length ~ " students", state="T-02c") %}{% endcall %}
+  {% else %}
+  <div class="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+    {{ stat_box("Submitted", view.submitted | length ~ " / " ~ view.rows | length) }}
+    {{ stat_box("Average score", "%.1f" | format(view.average_score)) }}
+    {{ stat_box("All tests passed", view.all_passed) }}
+    {{ stat_box("Late", view.late) }}
+  </div>
+  <div class="grid gap-4 lg:grid-cols-[1fr_2fr]">
+    <section class="card gap-3" aria-labelledby="tests-title">
+      <h2 class="h2" id="tests-title">Test cases</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Test</th><th>Type</th><th class="text-right">Failing</th></tr></thead>
+          <tbody>
+            {% for failure in view.failures %}
+            <tr><td>{{ test_name(failure.kind, failure.ordinal, failure.note) }}</td><td>{{ "visible" if failure.kind.value == "sample" else failure.kind.value }}</td><td class="text-right">{% if failure.rate is none %}—{% else %}{{ "%.0f" | format(failure.rate * 100) }}%{% endif %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="card gap-3" aria-labelledby="students-title">
+      <h2 class="h2" id="students-title">Students</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Student</th><th>Submitted</th><th>Tests</th><th class="text-right">Score</th><th></th></tr></thead>
+          <tbody>
+            {% for row in view.rows if row.counted %}
+            <tr>
+              <td>{{ row.name }}</td>
+              <td>{{ row.counted.submitted_at | local }}{% if row.counted.is_late %} {{ badge("Late") }}{% endif %}{% if row.counted.version_number < problem.assignment.current_version %} {{ badge("Resubmit needed", tone="accent") }}{% endif %}</td>
+              <td>{{ row.counted.passed_count }}/{{ row.counted.results | length }}</td>
+              <td class="text-right">{{ row.counted.score }}</td>
+              <td class="text-right"><a class="link" href="{{ url }}?student={{ row.student_id }}">View code</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% set missing = view.rows | length - view.submitted | length %}
+      {% if missing %}<p class="text-xxs text-soft">{{ missing }} not submitted: {{ view.rows | rejectattr("counted") | map(attribute="name") | join(", ") }}</p>{% endif %}
+    </section>
+  </div>
+  {% endif %}
+
+  {% if panel %}
+    {% call modal("t02a", panel.name, static=true, page="T-02a", state="T-02a") %}
+      {% if panel.counted %}
+      {% set sub = panel.counted %}
+      <p class="text-xxs text-soft">attempt {{ sub.attempt }} of {{ panel.attempts }} · {{ sub.submitted_at | local }}{% if sub.is_late %} · late{% endif %}</p>
+      <p>Score {{ sub.score }}/{{ sub.max_score }} · {{ sub.passed_count }} of {{ sub.results | length }} tests · Python 3</p>
+      <pre class="code-cell box">{{ sub.code }}</pre>
+      <p class="eyebrow">Failed tests</p>
+      <ul class="flex flex-col gap-2 text-xs">
+        {% for result in sub.failed %}
+        <li>{{ test_name(result.kind, result.ordinal, result.note) }} → {{ result.verdict.value | replace("_", " ") }}{% if result.error %}: {{ result.error.strip().splitlines()[-1] }}{% endif %}</li>
+        {% else %}
+        <li class="muted">None.</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">No submissions from this student yet.</p>
+      {% endif %}
+      <div class="flex justify-end">{{ link_button(url, "Close") }}</div>
+    {% endcall %}
+  {% endif %}
+</section>
+{% endblock %}
