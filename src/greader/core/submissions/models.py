@@ -16,6 +16,7 @@ from greader.core.assignments.models import (
     TestCase,
     TestCaseKind,
 )
+from greader.core.rounding import average
 
 
 class Verdict(StrEnum):
@@ -177,10 +178,7 @@ class InstructorResultsView:
 
     @property
     def average_score(self) -> float | None:
-        scores = [row.counted.score for row in self.submitted if row.counted]
-        if not scores:
-            return None
-        return sum(scores) / len(scores)
+        return average([row.counted.score for row in self.submitted if row.counted])
 
     @property
     def all_passed(self) -> int:

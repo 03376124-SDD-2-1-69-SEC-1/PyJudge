@@ -71,15 +71,16 @@ class ScriptedCodeRunner:
         return Execution(ExecutionStatus.OK, self.outputs.get(stdin, ""), "", 0.02)
 
 
-class UnsafeRunnerInProductionError(RuntimeError):
-    """LocalUnsafeRunner was built with ENV=production."""
+class UnsafeRunnerNotAllowedError(RuntimeError):
+    """LocalUnsafeRunner was built without ALLOW_UNSAFE_RUNNER=1, or in production."""
 
 
 class LocalUnsafeRunner:
     """Demo only: runs code with this machine's Python, NOT a sandbox.
 
-    Guards, none of which make it safe for untrusted code: it refuses to
-    exist when ENV=production, each run gets a fresh temp dir as its working
+    Opt-in: it refuses to exist unless ALLOW_UNSAFE_RUNNER=1, and always
+    when ENV=production, so an unset ENV fails closed. Guards, none of which
+    make it safe for untrusted code: each run gets a fresh temp dir as its working
     directory, a wall-clock timeout, and CPU-time and memory rlimits (POSIX).
     `scripts/demo.py` binds 127.0.0.1, so the only code it runs is what the
     person at the keyboard typed. Production needs a sandboxed CodeRunner
@@ -90,8 +91,13 @@ class LocalUnsafeRunner:
 
     def __init__(self) -> None:
         if os.environ.get("ENV", "").strip().lower() == "production":
-            raise UnsafeRunnerInProductionError(
+            raise UnsafeRunnerNotAllowedError(
                 "LocalUnsafeRunner runs code unsandboxed; refusing ENV=production"
+            )
+        if os.environ.get("ALLOW_UNSAFE_RUNNER", "").strip() != "1":
+            raise UnsafeRunnerNotAllowedError(
+                "LocalUnsafeRunner runs code unsandboxed; set ALLOW_UNSAFE_RUNNER=1 "
+                "to use it in the local demo"
             )
 
     def run(

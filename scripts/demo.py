@@ -14,6 +14,7 @@ pending adapters that answer 503 until OPS-15 (ADR-0007 §10.4).
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -40,8 +41,10 @@ from greader.core.classrooms.models import (
 )
 from greader.core.generation.models import DocumentSummary
 from greader.core.submissions.models import Submission, TestResult, Verdict
+from greader.core.submissions.ports import CodeRunner
 from greader.core.submissions.service import score_for
 from greader.integrations.clock import SystemClock
+from greader.integrations.judge0 import StubCodeRunner
 from tests.fakes.app import build_app
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
@@ -69,6 +72,8 @@ STUDENTS = [
 ]
 # The prototype's six Programming I problems: title, difficulty, deadline
 # (Bangkok date, 23:59), one sample test, one hidden test.
+logger = logging.getLogger("greader.demo")
+
 PROBLEMS = [
     ("Sum of a list", Difficulty.EASY, (9, 10), ("3\n1 2 3", "6"), ("0\n", "0")),
     ("Reverse a string", Difficulty.EASY, (9, 17), ("hello", "olleh"), ("a", "a")),
@@ -201,9 +206,9 @@ class DemoSeed:
         self.classrooms = FakeClassroomRepository()
         self.stats = FakeClassroomStats()
         self.submissions = FakeSubmissionRepository()
-        # Run and Submit execute with this machine's Python, unsandboxed;
-        # LocalUnsafeRunner refuses to exist when ENV=production.
-        self.code_runner = LocalUnsafeRunner()
+        # Tests and a plain demo run no code; main() swaps in LocalUnsafeRunner
+        # when ALLOW_UNSAFE_RUNNER=1.
+        self.code_runner: CodeRunner = StubCodeRunner()
         self.drafts = FakeDraftRepository()
         self.documents = FakeDocumentCatalog()
         # Every T-03 "Generate" answers with the prototype's binary-search draft.
@@ -535,7 +540,15 @@ def main() -> None:
             "scripts.demo runs student code unsandboxed; not in production"
         )
     port = int(os.environ.get("GREADER_DEMO_PORT", "8000"))
-    uvicorn.run(build_demo_app(), host="127.0.0.1", port=port)
+    seed = DemoSeed()
+    if os.environ.get("ALLOW_UNSAFE_RUNNER", "").strip() == "1":
+        seed.code_runner = LocalUnsafeRunner()
+    else:
+        logger.warning(
+            "Run/Submit answer 'not configured'; set ALLOW_UNSAFE_RUNNER=1 to "
+            "execute student code with the local Python (unsandboxed, demo only)"
+        )
+    uvicorn.run(build_demo_app(seed), host="127.0.0.1", port=port)
 
 
 if __name__ == "__main__":

@@ -42,6 +42,7 @@ from greader.core.assignments.ports import (
 )
 from greader.core.auth.models import Actor, PermissionDeniedError, Role
 from greader.core.classrooms.models import ClassroomRole
+from greader.core.rounding import average
 
 FIRST_VERSION_REASON = "Published"
 MOST_FAILED_LIMIT = 5
@@ -193,7 +194,7 @@ class AssignmentService:
             solved=sum(1 for s in standings if s.state is not StudentState.NOT_STARTED),
             passed=sum(1 for s in standings if s.state is StudentState.PASSED),
             total=len(postings),
-            avg_score=sum(scores) / len(scores) if scores else None,
+            avg_score=average(scores),
         )
 
     def problem(

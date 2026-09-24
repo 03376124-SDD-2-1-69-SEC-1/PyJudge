@@ -201,6 +201,7 @@ uv run ruff check .
 uv run ruff format --check .   # `ruff format .` to fix
 
 uv run python -m scripts.demo  # demo mode, http://127.0.0.1:8000/login
+ALLOW_UNSAFE_RUNNER=1 uv run python -m scripts.demo  # also execute Run/Submit code, unsandboxed
 
 # app.css from input.css — Tailwind v4.3.3 standalone binary, see README "Styles"
 tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css

@@ -3,18 +3,40 @@
 import pytest
 
 from greader.core.submissions.models import ExecutionStatus
-from tests.fakes.submissions import LocalUnsafeRunner, UnsafeRunnerInProductionError
+from tests.fakes.submissions import LocalUnsafeRunner, UnsafeRunnerNotAllowedError
 
 
-def test_refuses_to_exist_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_refuses_without_the_explicit_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ENV unset (as on a misconfigured server) must fail closed."""
+    monkeypatch.delenv("ENV", raising=False)
+    monkeypatch.delenv("ALLOW_UNSAFE_RUNNER", raising=False)
+
+    with pytest.raises(UnsafeRunnerNotAllowedError, match="ALLOW_UNSAFE_RUNNER"):
+        LocalUnsafeRunner()
+
+
+@pytest.mark.parametrize("flag", ["0", "true", "yes", ""])
+def test_only_the_value_1_opts_in(monkeypatch: pytest.MonkeyPatch, flag: str) -> None:
+    monkeypatch.delenv("ENV", raising=False)
+    monkeypatch.setenv("ALLOW_UNSAFE_RUNNER", flag)
+
+    with pytest.raises(UnsafeRunnerNotAllowedError):
+        LocalUnsafeRunner()
+
+
+def test_production_refuses_even_with_the_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("ALLOW_UNSAFE_RUNNER", "1")
 
-    with pytest.raises(UnsafeRunnerInProductionError):
+    with pytest.raises(UnsafeRunnerNotAllowedError, match="production"):
         LocalUnsafeRunner()
 
 
 def test_runs_in_a_temp_dir_with_stdin(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ENV", raising=False)
+    monkeypatch.setenv("ALLOW_UNSAFE_RUNNER", "1")
     code = "import os\nprint(input()[::-1], os.path.basename(os.getcwd())[:12])"
 
     result = LocalUnsafeRunner().run(
@@ -27,6 +49,7 @@ def test_runs_in_a_temp_dir_with_stdin(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_times_out_and_reports_crashes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ENV", raising=False)
+    monkeypatch.setenv("ALLOW_UNSAFE_RUNNER", "1")
     runner = LocalUnsafeRunner()
 
     looping = runner.run(

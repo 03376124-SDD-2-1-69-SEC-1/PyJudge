@@ -149,6 +149,10 @@ All computed on read from each Student's counted Submission.
 - Per-test "Failing" (T-02) = share of counted Submissions failing that test.
 - Student "Solved" = submitted at least once; "Passed" = all tests passed.
 
+Averages (Average score on T-01/S-01/T-02) are rounded to one decimal
+half up (6.25 → 6.3), in Decimal, never with Python's round-half-to-even
+(`core/rounding.py`, added 2026-09-24).
+
 There is no admin dashboard.
 
 ## 8. Admin (A-01)
@@ -361,7 +365,15 @@ keys.
    local Python behind a timeout, CPU/memory rlimits and a temp dir, and
    refuses to start when `ENV=production`; it is not a sandbox. Candidates:
    self-hosted Judge0 CE (§5.5), or another isolate/nsjail-based service.
-   S-02a and asynchronous Submit wait for this decision.
+   S-02a and asynchronous Submit wait for this decision. The demo runner is
+   opt-in (`ALLOW_UNSAFE_RUNNER=1`) and refuses `ENV=production` either way.
+2. **Per-Submission score: floor vs round half up?** (raised 2026-09-24,
+   grading policy not decided) The code floors today: `max_score × passed
+   ÷ total`, rounded down. The two differ when the fraction is .5 or more:
+   2 of 3 tests at max 10 is 6.67 → 6 (floor) or 7 (half up); 1 of 2 at
+   max 5 is 2.5 → 2 or 3. Changing it changes every stored score, so
+   decide before OPS-15 persists Submissions. `score_for` in
+   `core/submissions/service.py` is the one place to change.
 
 ## Consequences
 

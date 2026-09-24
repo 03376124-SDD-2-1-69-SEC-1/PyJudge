@@ -9,6 +9,7 @@ from greader.core.assignments.models import (
     StudentStanding,
     StudentState,
 )
+from greader.core.rounding import average
 from greader.core.submissions.models import Submission
 from greader.core.submissions.ports import AssignmentLookup, SubmissionRepository
 from greader.core.submissions.service import counted_submissions
@@ -25,9 +26,9 @@ class SubmissionPostingStats:
         counted = self._counted(posting_id)
         if not counted:
             return PostingSummary()
-        scores = [submission.score for submission in counted.values()]
         return PostingSummary(
-            submitted=len(counted), avg_score=round(sum(scores) / len(scores), 1)
+            submitted=len(counted),
+            avg_score=average([submission.score for submission in counted.values()]),
         )
 
     def standing(self, posting_id: int, student_id: int) -> StudentStanding:

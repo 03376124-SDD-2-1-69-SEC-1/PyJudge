@@ -388,3 +388,22 @@ def test_fail_rate_is_students_failing_any_test_over_students_who_submitted() ->
     assert stats.standing(1, 4).state is StudentState.LATE
     assert stats.fail_rate(99) is None
     assert stats.posting_summary(99).avg_score is None
+
+
+@pytest.mark.parametrize(
+    ("scores", "expected"),
+    [
+        ([6, 6, 6, 7], 6.3),  # 6.25: round() and "%.1f" would say 6.2
+        ([8] * 11 + [9] * 9, 8.5),  # 8.45: "%.1f" would say 8.4
+    ],
+)
+def test_average_rounds_half_up_not_to_even(scores: list[int], expected: float) -> None:
+    # With 10 tests and max score 10, a score equals the tests passed.
+    stats = _stats(
+        *(
+            _graded(student, score, 10, at=student)
+            for student, score in enumerate(scores, start=1)
+        )
+    )
+
+    assert stats.posting_summary(1).avg_score == expected
