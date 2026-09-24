@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import button with context %}
+{% from "_components/ui.html" import page_header, badge, empty_state %}
+{% block title %}My classrooms · GReader{% endblock %}
+{% block content %}
+<section data-page="C-01" data-variant="student">
+  {% call page_header("My classrooms") %}
+    <div class="box w-full flex-row items-center justify-between gap-6 px-3.5 py-2.5 sm:w-auto">
+      <span>Solved <strong>{{ picker.progress.solved }}</strong> of <strong>{{ picker.progress.total }}</strong></span>
+      <span class="text-mid">Passed {{ picker.progress.passed }}</span>
+    </div>
+  {% endcall %}
+
+  {% if not picker.cards %}
+    {% call empty_state("You have not joined a classroom yet", "Ask your instructor for the 6-character join code.", state="C-01b") %}
+      {{ button("+ Join with code", variant="primary", type="button", popovertarget="join-classroom") }}
+    {% endcall %}
+  {% else %}
+  <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {% for card in picker.cards %}
+    <li>
+      <a class="card h-full no-underline hover:border-mid" href="/classes/{{ card.classroom.id }}">
+        <p class="eyebrow">{{ card.classroom.label }}</p>
+        <h2 class="h2">{{ card.classroom.course_name }}</h2>
+        <hr class="hr">
+        <p class="text-xs">{{ card.instructor_name }}</p>
+        <div class="flex items-center justify-between text-xs">
+          {% if card.stats.pending_count %}
+            {{ badge(card.stats.pending_count ~ " problem" ~ ("s" if card.stats.pending_count > 1 else "") ~ " pending", tone="accent") }}
+            <span class="text-soft">{% if card.stats.next_deadline %}deadline {{ card.stats.next_deadline.strftime("%d %b") }}{% endif %}</span>
+          {% else %}
+            {{ badge("All done") }}<span class="text-soft">—</span>
+          {% endif %}
+        </div>
+      </a>
+    </li>
+    {% endfor %}
+    <li>{{ button("+ Join with code", variant="tile", type="button", popovertarget="join-classroom") }}</li>
+  </ul>
+  {% endif %}
+  {% include "shared/c02_join.html" %}
+</section>
+{% endblock %}

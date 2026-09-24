@@ -1,0 +1,95 @@
+{#
+  Form controls. Pages import these instead of writing <input>/<button>
+  (tests/architecture enforces it). Import WITH CONTEXT so csrf_field() can
+  see the request:
+
+    {% from "_components/forms.html" import field, button with context %}
+    {{ field("email", "Email", type="email", value=email, error=error_text) }}
+    {{ button("Log in", variant="primary", block=true) }}
+
+  Extra keyword arguments become HTML attributes: required=true renders
+  `required`, maxlength=6 renders `maxlength="6"`, false/none are dropped.
+#}
+
+{% macro attrs(extra) -%}
+  {%- for key, value in extra.items() -%}
+    {%- if value is sameas true %} {{ key }}{% elif value is not sameas false and value is not none %} {{ key }}="{{ value }}"{% endif -%}
+  {%- endfor -%}
+{%- endmacro %}
+
+{% macro field(name, label, type="text", value="", error="", hint="", id="", class="", input_class="") -%}
+{%- set field_id = id or "f-" ~ name %}
+<div class="field {{ class }}">
+  <label class="label" for="{{ field_id }}">{{ label }}</label>
+  <input class="input{% if error %} input-error{% endif %} {{ input_class }}" id="{{ field_id }}" name="{{ name }}" type="{{ type }}"{% if type != "password" %} value="{{ value }}"{% endif %}{% if error %} aria-invalid="true" aria-describedby="{{ field_id }}-error"{% endif %}{{ attrs(kwargs) }}>
+  {% if hint %}<small class="hint">{{ hint }}</small>{% endif %}
+  {% if error %}<p class="error-text" id="{{ field_id }}-error">{{ error }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro textarea_field(name, label, value="", error="", hint="", id="") -%}
+{%- set field_id = id or "f-" ~ name %}
+<div class="field">
+  <label class="label" for="{{ field_id }}">{{ label }}</label>
+  <textarea class="input{% if error %} input-error{% endif %}" id="{{ field_id }}" name="{{ name }}"{{ attrs(kwargs) }}>{{ value }}</textarea>
+  {% if hint %}<small class="hint">{{ hint }}</small>{% endif %}
+  {% if error %}<p class="error-text">{{ error }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro select_field(name, label, options, selected="", blank="", error="", hint="", id="") -%}
+{%- set field_id = id or "f-" ~ name %}
+<div class="field">
+  <label class="label" for="{{ field_id }}">{{ label }}</label>
+  <select class="input{% if error %} input-error{% endif %}" id="{{ field_id }}" name="{{ name }}"{{ attrs(kwargs) }}>
+    {% if blank %}<option value="">{{ blank }}</option>{% endif %}
+    {% for option in options %}<option{% if option == selected %} selected{% endif %}>{{ option }}</option>{% endfor %}
+  </select>
+  {% if hint %}<small class="hint">{{ hint }}</small>{% endif %}
+  {% if error %}<p class="error-text">{{ error }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro checkbox(name, label, checked=false, note="") -%}
+<label class="check">
+  <input type="checkbox" name="{{ name }}"{% if checked %} checked{% endif %}{{ attrs(kwargs) }}>
+  <span>{{ label }}{% if note %} <span class="muted">{{ note }}</span>{% endif %}</span>
+</label>
+{%- endmacro %}
+
+{#- Every POST form carries this first; core/auth/csrf.py checks it. -#}
+{% macro csrf_field() -%}
+<input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+{%- endmacro %}
+
+{% macro hidden(name, value) -%}
+<input type="hidden" name="{{ name }}" value="{{ value }}">
+{%- endmacro %}
+
+{#- variant: primary | secondary | danger | ghost | tile | plain (no btn styling) -#}
+{% macro button_class(variant, size, block, class) -%}
+{%- if variant == "plain" -%}{{ class }}{%- else -%}
+btn{% if variant != "secondary" %} btn-{{ variant }}{% endif %}{% if size %} btn-{{ size }}{% endif %}{% if block %} btn-block{% endif %} {{ class }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro button(label, variant="secondary", type="submit", size="", block=false, class="") -%}
+<button type="{{ type }}" class="{{ button_class(variant, size, block, class) }}"{{ attrs(kwargs) }}>{{ label }}</button>
+{%- endmacro %}
+
+{% macro link_button(href, label, variant="secondary", size="", block=false, class="") -%}
+<a href="{{ href }}" class="{{ button_class(variant, size, block, class) }}"{{ attrs(kwargs) }}>{{ label }}</a>
+{%- endmacro %}
+
+{#- A POST form with one button, e.g. "Archive classroom". -#}
+{% macro action_form(action, label, variant="secondary", size="", class="") -%}
+<form method="post" action="{{ action }}" class="inline">
+  {{ csrf_field() }}
+  {{ button(label, variant=variant, size=size, class=class) }}
+</form>
+{%- endmacro %}
+
+{#- A button that opens a popover and holds markup (icons, counts). -#}
+{% macro toggle(target, aria_label="", class="") -%}
+<button type="button" popovertarget="{{ target }}" class="cursor-pointer {{ class }}"{% if aria_label %} aria-label="{{ aria_label }}"{% endif %}>{{ caller() }}</button>
+{%- endmacro %}

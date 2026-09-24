@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session
@@ -28,6 +28,21 @@ from greader.core.assignments.ports import AssignmentRepository
 from greader.core.assignments.routes import router as assignment_router
 from greader.core.assignments.service import AssignmentService
 from greader.core.assignments.testcase_routes import router as test_case_router
+from greader.core.auth.csrf import csrf_token
+from greader.core.auth.models import (
+    CsrfTokenError,
+    NotAuthenticatedError,
+    PermissionDeniedError,
+)
+from greader.core.auth.pages import DemoAccount
+from greader.core.auth.pages import router as auth_page_router
+from greader.core.auth.ports import AuthRepository, Clock, VerificationMailer
+from greader.core.auth.routes import router as auth_router
+from greader.core.auth.service import AuthService
+from greader.core.classrooms.pages import router as classroom_page_router
+from greader.core.classrooms.ports import ClassroomRepository, ClassroomStats
+from greader.core.classrooms.routes import router as classroom_router
+from greader.core.classrooms.service import ClassroomService
 from greader.core.generation.ports import GenerationClient, GenerationRepository
 from greader.core.generation.routes import router as generation_router
 from greader.core.generation.service import GenerationService
@@ -44,6 +59,7 @@ from greader.database.core.knowledge_document_repository import (
 )
 from greader.database.core.topic_repository import SQLTopicRepository
 from greader.database.health import check_db
+from greader.database.pending import PendingRepository, SliceNotPersistedError
 from greader.database.rag.vector_repository import PostgresVectorRepository
 from greader.database.session import (
     SessionFactory,
@@ -52,11 +68,25 @@ from greader.database.session import (
     get_session,
 )
 from greader.database.storage.r2 import R2ObjectStorage, build_r2_client, check_r2
+from greader.integrations.clock import SystemClock
+from greader.integrations.email import StubEmailSender
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _WEB_DIR = _PACKAGE_DIR / "web"
 _TEMPLATE_DIR = _WEB_DIR / "templates"
 _STATIC_DIR = _WEB_DIR / "static"
+
+
+def asset_url(path: str) -> str:
+    """Return `/static/<path>?v=<mtime>` so a rebuilt file gets a new URL.
+
+    StaticFiles sends no Cache-Control, so browsers cache app.css heuristically
+    from Last-Modified and can keep an old build for days, even across a
+    reload. The version changes whenever the file on disk changes, including
+    a `tailwindcss --watch` rebuild while the server keeps running.
+    """
+    version = int((_STATIC_DIR / path).stat().st_mtime)
+    return f"/static/{path}?v={version}"
 
 
 def create_app(
@@ -69,6 +99,13 @@ def create_app(
     generation_client: GenerationClient | None = None,
     generation_repository: GenerationRepository | None = None,
     vector_repository: VectorRepository | None = None,
+    auth_repository: AuthRepository | None = None,
+    verification_mailer: VerificationMailer | None = None,
+    clock: Clock | None = None,
+    classroom_repository: ClassroomRepository | None = None,
+    classroom_stats: ClassroomStats | None = None,
+    demo_accounts: tuple[DemoAccount, ...] | None = None,
+    secure_cookies: bool | None = None,
 ) -> FastAPI:
     """Build the application, wiring SQL adapters for anything not supplied."""
     # Resolved lazily and at most once each, so an app built entirely from
@@ -97,7 +134,40 @@ def create_app(
     application.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
+    templates.env.globals["asset_url"] = asset_url
+    templates.env.globals["csrf_token"] = csrf_token
     application.state.templates = templates
+    # The "log in as" list on G-01 exists only when scripts/demo.py passes it.
+    if demo_accounts is None:
+        demo_accounts = ()
+    application.state.demo_accounts = demo_accounts
+    # Cookies are Secure unless a caller on plain HTTP (scripts/demo.py, the
+    # tests) turns it off explicitly.
+    if secure_cookies is None:
+        secure_cookies = True
+    application.state.secure_cookies = secure_cookies
+
+    if clock is None:
+        clock = SystemClock()
+
+    # ADR-0007 §10.4: no tables until OPS-15, so production gets a pending
+    # adapter that answers every call with 503.
+    if auth_repository is None:
+        auth_repository = PendingRepository("auth")
+    if verification_mailer is None:
+        verification_mailer = StubEmailSender()
+    auth_service = AuthService(auth_repository, verification_mailer, clock)
+    application.state.auth_service = auth_service
+
+    if classroom_repository is None:
+        classroom_repository = PendingRepository("classrooms")
+    # Card numbers come from assignments and submissions, which have no
+    # tables yet either.
+    if classroom_stats is None:
+        classroom_stats = PendingRepository("classroom stats")
+    application.state.classroom_service = ClassroomService(
+        classroom_repository, auth_service, classroom_stats, clock
+    )
 
     if topic_repository is None:
         topic_repository = SQLTopicRepository(use_session_factory())
@@ -140,6 +210,50 @@ def create_app(
     application.include_router(generation_router)
     application.include_router(upload_router)
     application.include_router(vector_router)
+    application.include_router(auth_router)
+    application.include_router(auth_page_router)
+    application.include_router(classroom_router)
+    application.include_router(classroom_page_router)
+
+    @application.exception_handler(NotAuthenticatedError)
+    def not_authenticated(request: Request, error: NotAuthenticatedError) -> Response:
+        """API callers get 401; a browser on a page is sent to /login."""
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "detail": {"code": "not_authenticated", "message": "Log in first"}
+                },
+            )
+        return RedirectResponse("/login", status_code=303)
+
+    @application.exception_handler(PermissionDeniedError)
+    def permission_denied(request: Request, error: PermissionDeniedError) -> Response:
+        """A member in the wrong role (ADR-0007 §9.6)."""
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": {"code": "forbidden", "message": "Not allowed"}},
+            )
+        return HTMLResponse("<h1>403 · Not allowed</h1>", status_code=403)
+
+    @application.exception_handler(CsrfTokenError)
+    def csrf_rejected(request: Request, error: CsrfTokenError) -> Response:
+        """A form posted without its page's token (core/auth/csrf.py)."""
+        return HTMLResponse(
+            "<h1>403 · This form expired</h1><p>Go back, reload and try again.</p>",
+            status_code=403,
+        )
+
+    @application.exception_handler(SliceNotPersistedError)
+    def slice_not_persisted(
+        request: Request, error: SliceNotPersistedError
+    ) -> Response:
+        """A slice whose tables OPS-15 has not created yet."""
+        return JSONResponse(
+            status_code=503,
+            content={"detail": {"code": "not_persisted_yet", "message": str(error)}},
+        )
 
     @application.exception_handler(RequestValidationError)
     def request_validation_error(
@@ -155,11 +269,6 @@ def create_app(
                 }
             },
         )
-
-    @application.get("/")
-    def home(request: Request):
-        """Render the shared layout example."""
-        return templates.TemplateResponse(request, "home.html")
 
     @application.get("/health")
     def health() -> dict[str, str]:

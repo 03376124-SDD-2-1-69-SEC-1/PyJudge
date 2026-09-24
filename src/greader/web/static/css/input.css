@@ -1,8 +1,264 @@
 @import "tailwindcss";
 @source "../../templates";
 
+/*
+ * Design tokens from docs/wireframes/GReader wireframes - Prototype.html
+ * (the :root block every screen shares). Use them as Tailwind utilities:
+ * text-ink, bg-fill, border-line, text-acc, font-mono ...
+ */
+@theme {
+  --color-ink: #24231f;
+  --color-mid: #6f6c66;
+  --color-soft: #8d8a83;
+  --color-line: #c7c4be;
+  --color-hair: #e2dfda;
+  --color-fill: #eceae6;
+  --color-pap: #ffffff;
+  --color-acc: #b68235;
+  --color-acc-ink: #7d5a23;
+  --color-danger: #7a2d2d;
+  --color-code: #fbfaf9;
+  --color-code-ink: #4c4a44;
+
+  /* Latin text in Helvetica; Thai glyphs fall through to Noto Sans Thai. */
+  --font-sans: "Helvetica Neue", Helvetica, Arial, "Noto Sans Thai", sans-serif;
+  --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-ui: 3px;
+  --text-xxs: 11px;
+  --text-ui: 13px;
+}
+
+@layer base {
+  /* Root stays 16px so rem-based utilities (h-9 = 36px) match the prototype;
+     body text is the prototype's 13px. */
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-ui);
+    line-height: 1.45;
+    color: var(--color-ink);
+    background: var(--color-pap);
+  }
+  a {
+    color: inherit;
+  }
+}
+
 @layer components {
-  /* Custom scrollbar */
+  /* ---- Layout ------------------------------------------------------- */
+  .page {
+    @apply mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-8 sm:py-6;
+  }
+  .page-narrow {
+    @apply mx-auto flex min-h-screen w-full max-w-[440px] flex-col justify-center gap-5 px-4 py-10;
+  }
+  .page-header {
+    @apply mb-5 flex flex-wrap items-start justify-between gap-4;
+  }
+  .h1 {
+    @apply text-[22px] leading-tight font-semibold;
+  }
+  .h2 {
+    @apply text-base font-semibold;
+  }
+  .sub {
+    @apply mt-1 text-xxs text-soft;
+  }
+  .eyebrow {
+    @apply text-xxs tracking-[.06em] text-soft uppercase;
+  }
+  .muted {
+    @apply text-soft;
+  }
+  .link {
+    @apply text-mid underline underline-offset-3 hover:text-ink;
+  }
+  .logo {
+    @apply font-mono text-[15px] leading-none font-bold tracking-[.02em] no-underline;
+  }
+  .hr {
+    @apply m-0 h-px border-0 bg-hair;
+  }
+
+  /* ---- G-02 header ---------------------------------------------------- */
+  .site-header {
+    @apply flex h-14 items-center gap-4 border-b border-line bg-fill px-4 sm:px-6;
+  }
+  .crumb {
+    @apply hidden truncate text-mid sm:inline;
+  }
+  .icon-dot {
+    @apply relative inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border border-line bg-pap;
+  }
+  .count {
+    @apply absolute -top-2 -right-2 min-w-4 rounded-full bg-acc px-1 text-center font-mono text-[10px] leading-4 text-pap;
+  }
+
+  /* ---- Buttons -------------------------------------------------------- */
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-ui border border-line bg-pap px-3.5 py-2 text-ui whitespace-nowrap text-ink no-underline hover:bg-fill disabled:cursor-not-allowed disabled:opacity-45;
+  }
+  .btn-primary {
+    @apply border-acc bg-acc text-pap hover:bg-acc-ink hover:border-acc-ink;
+  }
+  .btn-danger {
+    @apply border-danger text-danger hover:bg-danger hover:text-pap;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent px-1 text-mid underline underline-offset-3 hover:bg-transparent hover:text-ink;
+  }
+  .btn-sm {
+    @apply px-2.5 py-1 text-xs;
+  }
+  .btn-block {
+    @apply w-full;
+  }
+  /* The dashed "+ Create classroom" / "+ Join with code" card. */
+  .btn-tile {
+    @apply min-h-[120px] w-full border-dashed text-mid hover:bg-fill;
+  }
+
+  /* ---- Forms ---------------------------------------------------------- */
+  .field {
+    @apply flex flex-col gap-1.5;
+  }
+  .label {
+    @apply text-xxs tracking-[.06em] text-soft uppercase;
+  }
+  .input {
+    @apply h-9 w-full rounded-ui border border-line bg-pap px-2.5 text-ui text-ink placeholder:text-soft focus:border-acc focus:outline-none;
+  }
+  textarea.input {
+    @apply h-auto min-h-24 py-2.5;
+  }
+  select.input {
+    @apply pr-8;
+  }
+  .input-error,
+  .input-error:focus {
+    @apply border-danger;
+  }
+  .input-code {
+    @apply font-mono tracking-[.4em] uppercase;
+  }
+  .hint {
+    @apply text-xxs text-mid;
+  }
+  .error-text {
+    @apply text-xs text-danger;
+  }
+  .check {
+    @apply flex items-center gap-2.5;
+  }
+  .check input {
+    @apply h-3.5 w-3.5 accent-acc;
+  }
+
+  /* ---- Surfaces ------------------------------------------------------- */
+  .card {
+    @apply flex flex-col gap-2 rounded-ui border border-line bg-pap p-4;
+  }
+  .box {
+    @apply flex flex-col gap-2.5 rounded-ui border border-line p-3.5;
+  }
+  .alert {
+    @apply flex items-center gap-2.5 border border-line border-l-[3px] border-l-acc bg-fill px-3.5 py-2.5 text-xs;
+  }
+  .alert-danger {
+    @apply border-l-danger;
+  }
+  .placeholder {
+    @apply flex items-center justify-center border border-hair p-2 text-center font-mono text-xxs text-[#8a8780];
+    background: repeating-linear-gradient(45deg, #f3f1ee 0 7px, #e8e5e1 7px 14px);
+  }
+  .empty {
+    @apply mx-auto flex max-w-md flex-col items-center gap-3 py-12 text-center;
+  }
+  .join-code {
+    @apply font-mono text-[34px] leading-none font-bold tracking-[.25em];
+  }
+
+  /* ---- Tables --------------------------------------------------------- */
+  .table {
+    @apply w-full border-collapse text-xs;
+  }
+  .table th {
+    @apply border-b border-line px-2.5 py-2 text-left text-xxs font-semibold tracking-[.06em] text-soft uppercase;
+  }
+  .table td {
+    @apply border-b border-hair px-2.5 py-2.5 text-ink;
+  }
+  .table-wrap {
+    @apply w-full overflow-x-auto;
+  }
+
+  /* ---- Tabs and segmented filters (links, not JS) ------------------------ */
+  .tabs {
+    @apply mb-5 flex gap-6 overflow-x-auto border-b border-line;
+  }
+  .tab {
+    @apply -mb-px border-b-2 border-transparent px-0.5 py-2.5 whitespace-nowrap text-soft no-underline hover:text-ink;
+  }
+  .tab[aria-current="page"] {
+    @apply border-b-acc text-ink;
+  }
+  .seg {
+    @apply inline-flex overflow-hidden rounded-ui border border-line;
+  }
+  .seg a {
+    @apply border-r border-line px-3 py-1.5 text-xs text-mid no-underline last:border-r-0 hover:text-ink;
+  }
+  .seg a[aria-current="page"] {
+    @apply bg-fill text-ink;
+  }
+
+  /* ---- Badges (status colours) -------------------------------------- */
+  .badge {
+    @apply inline-block rounded-[2px] border border-line bg-fill px-[7px] py-0.5 text-xxs text-mid;
+  }
+  .badge-accent {
+    @apply border-acc bg-pap text-acc-ink;
+  }
+  .badge-danger {
+    @apply border-danger bg-pap text-danger;
+  }
+  .badge-ok {
+    @apply border-mid bg-mid text-pap;
+  }
+
+  /* ---- Popovers: modal, dropdown, mobile menu ------------------------ */
+  .modal {
+    @apply m-auto w-[min(480px,92vw)] flex-col gap-3.5 border border-line bg-pap p-5 text-ink shadow-[0_8px_24px_rgba(0,0,0,.12)];
+  }
+  .modal:popover-open,
+  .modal-static .modal {
+    @apply flex;
+  }
+  .modal::backdrop {
+    background: repeating-linear-gradient(45deg, #f3f1ee 0 7px, #e8e5e1 7px 14px);
+    opacity: 0.9;
+  }
+  /* A modal rendered open by the server (C-02a, C-03a): no JS can open a popover. */
+  .modal-static {
+    @apply fixed inset-0 z-40 flex items-center justify-center;
+    background: repeating-linear-gradient(45deg, #f3f1eee6 0 7px, #e8e5e1e6 7px 14px);
+  }
+  .dropdown {
+    @apply fixed top-[60px] right-4 left-auto m-0 w-[min(360px,calc(100vw-2rem))] border border-line bg-pap p-0 text-ink shadow-[0_8px_24px_rgba(0,0,0,.12)];
+  }
+  .dropdown-item {
+    @apply block w-full border-b border-hair px-3.5 py-3 text-left text-ui no-underline last:border-b-0 hover:bg-fill;
+  }
+  .mobile-menu {
+    @apply fixed top-14 right-0 left-0 m-0 w-full border-0 border-b border-line bg-pap px-4 py-2 text-ink;
+  }
+  .mobile-menu .dropdown-item {
+    @apply px-0 py-3.5;
+  }
+}
+
+/* Legacy helpers kept for FE-01's existing markup. */
+@layer components {
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -18,22 +274,3 @@
     background: #94a3b8;
   }
 }
-
-/* Animations */
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.05); }
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 3s infinite ease-in-out;
-}
-
-@keyframes bounce-dots {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-.dot-1 { animation: bounce-dots 1s infinite 0s ease-in-out; }
-.dot-2 { animation: bounce-dots 1s infinite 0.2s ease-in-out; }
-.dot-3 { animation: bounce-dots 1s infinite 0.4s ease-in-out; }

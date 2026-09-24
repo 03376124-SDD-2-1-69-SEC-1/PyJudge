@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, field, button, hidden, link_button with context %}
+{% block title %}Verify email · GReader{% endblock %}
+{% block main %}
+<main class="page-narrow items-center text-center" data-page="G-04">
+  {% if state == "waiting" %}
+  <div class="flex flex-col items-center gap-3" data-state="G-04a">
+    <div class="placeholder h-14 w-14">mail</div>
+    <h1 class="h1">Check your inbox</h1>
+    <p class="muted">We sent a verification link{% if email %} to<br><strong>{{ email }}</strong>{% endif %}.<br>Links are valid for 24 hours.</p>
+  </div>
+  {% elif state == "verified" %}
+  <div class="flex flex-col items-center gap-3" data-state="G-04b">
+    <div class="placeholder h-14 w-14">ok</div>
+    <h1 class="h1">Email verified</h1>
+    <p class="muted">You can log in now.</p>
+    {{ link_button("/login", "Log in", variant="primary") }}
+  </div>
+  {% elif state == "expired" %}
+  <div class="flex flex-col items-center gap-3" data-state="G-04c">
+    <div class="placeholder h-14 w-14">expired</div>
+    <h1 class="h1">This link has expired.</h1>
+    <p class="muted">Links are valid for 24 hours.</p>
+  </div>
+  {% else %}
+  <div class="flex flex-col items-center gap-3" data-state="invalid">
+    <div class="placeholder h-14 w-14">?</div>
+    <h1 class="h1">This link is not valid</h1>
+    <p class="muted">It may have been used already.</p>
+  </div>
+  {% endif %}
+
+  {% if state != "verified" %}
+  <form method="post" action="/verify/resend" class="flex w-full flex-col gap-3 text-left">
+    {{ csrf_field() }}
+    {% if email %}
+      {{ hidden("email", email) }}
+      <div class="text-center">{{ button("Send a new link" if state != "waiting" else "Resend link", variant="primary" if state == "expired" else "secondary") }}</div>
+    {% else %}
+      {{ field("email", "Email", type="email", placeholder="name@kmitl.ac.th", required=true) }}
+      {{ button("Send a new link", block=true) }}
+    {% endif %}
+  </form>
+  <p class="text-xs text-mid">Wrong address? <a class="link" href="/signup">Back to sign up</a></p>
+  {% endif %}
+</main>
+{% endblock %}

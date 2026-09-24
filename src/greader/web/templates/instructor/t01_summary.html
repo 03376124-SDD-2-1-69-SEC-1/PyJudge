@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "_components/ui.html" import empty_state %}
+{% block title %}Summary · {{ view.classroom.course_name }} · GReader{% endblock %}
+{% block content %}
+<section data-page="T-01" data-tab="summary">
+  {% include "instructor/t01_header.html" %}
+  {% include "instructor/t01_tabs.html" %}
+  <div class="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+    <div class="box"><p class="eyebrow">Students</p><p class="h1">{{ view.student_count }}</p></div>
+    <div class="box"><p class="eyebrow">Avg pass rate</p><p class="h1">—</p></div>
+    <div class="box"><p class="eyebrow">Problems</p><p class="h1">0</p></div>
+    <div class="box"><p class="eyebrow">Never submitted</p><p class="h1">—</p></div>
+  </div>
+  {{ empty_state("Nothing to summarise yet", "Most-failed problems and the score table appear once problems are published.", art="chart") }}
+</section>
+{% endblock %}

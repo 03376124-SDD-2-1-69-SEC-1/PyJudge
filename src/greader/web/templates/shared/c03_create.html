@@ -1,0 +1,30 @@
+{# C-03 create modal (popover); C-03a is rendered open after the redirect. #}
+{% from "_components/forms.html" import csrf_field, field, button, link_button with context %}
+{% from "_components/ui.html" import modal %}
+{% if created %}
+  {% call modal("classroom-created", created.course_name ~ " · Sec " ~ created.section ~ " created", static=true, state="C-03a", centered=true) %}
+  <p class="-mt-2 text-center text-xs text-mid">Share this code with your students.</p>
+  <div class="box items-center py-5">
+    <p class="join-code select-all">{{ created.join_code }}</p>
+  </div>
+  <div class="flex justify-center gap-2.5">
+    {{ link_button("/classes", "Back to classrooms") }}
+    {{ link_button("/classes/" ~ created.id, "Go to classroom", variant="primary") }}
+  </div>
+  {% endcall %}
+{% endif %}
+{% call modal("create-classroom", "Create a classroom", page="C-03") %}
+<form method="post" action="/classes" class="flex flex-col gap-3.5">
+  {{ csrf_field() }}
+  {{ field("course_code", "Course code", placeholder="01076001", required=true) }}
+  {{ field("course_name", "Course name", placeholder="Programming I", required=true) }}
+  <div class="grid grid-cols-2 gap-3">
+    {{ field("section", "Section", placeholder="1", required=true) }}
+    {{ field("semester", "Semester", placeholder="1/2569", required=true) }}
+  </div>
+  <div class="flex justify-end gap-2.5">
+    {{ button("Cancel", type="button", popovertarget="create-classroom", popovertargetaction="hide") }}
+    {{ button("Create", variant="primary") }}
+  </div>
+</form>
+{% endcall %}

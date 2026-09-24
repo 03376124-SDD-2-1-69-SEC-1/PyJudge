@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, field, button, hidden with context %}
+{% from "_components/ui.html" import alert %}
+{% block title %}Log in · GReader{% endblock %}
+{% block main %}
+<main class="page-narrow max-w-[400px]" data-page="G-01">
+  <div class="text-center">
+    <p class="logo text-[20px]">GReader</p>
+    <p class="sub">KMITL · programming assignments</p>
+  </div>
+
+  {% if error == "not_verified" %}
+    {% call alert(state="G-01b") %}
+      <span class="flex-1">This email is not verified yet.</span>
+      <form method="post" action="/verify/resend">
+        {{ csrf_field() }}
+        {{ hidden("email", email) }}
+        {{ button("Resend link", size="sm") }}
+      </form>
+    {% endcall %}
+  {% elif error == "deactivated" %}
+    {% call alert(tone="danger") %}This account is deactivated. Contact an administrator.{% endcall %}
+  {% endif %}
+
+  <form method="post" action="/login" class="flex flex-col gap-4">
+    {{ csrf_field() }}
+    {{ field("email", "Email", type="email", value=email, placeholder="name@kmitl.ac.th", required=true, autocomplete="username") }}
+    {% if error == "wrong_password" %}
+    <div data-state="G-01a">
+      {{ field("password", "Password", type="password", error="Email or password is incorrect.", required=true, autocomplete="current-password") }}
+    </div>
+    {% else %}
+      {{ field("password", "Password", type="password", required=true, autocomplete="current-password") }}
+    {% endif %}
+    {{ button("Log in", variant="primary", block=true) }}
+  </form>
+  <p class="text-center text-xs text-mid">No account? <a class="link" href="/signup">Sign up</a></p>
+
+  {% if demo_accounts %}
+  <section class="box mt-4" data-demo="log-in-as">
+    <p class="eyebrow">Demo mode · log in as</p>
+    <ul class="flex flex-col gap-2">
+      {% for account in demo_accounts %}
+      <li>
+        <form method="post" action="/login">
+          {{ csrf_field() }}
+          {{ hidden("email", account.email) }}
+          {{ hidden("password", account.password) }}
+          {{ button(account.label, size="sm", block=true, class="justify-start") }}
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</main>
+{% endblock %}

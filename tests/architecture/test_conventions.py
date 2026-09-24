@@ -158,12 +158,35 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
 # says which one. Expected first entry for ALLOWED_TIMESTAMP_FIELDS:
 # `approved_at` on a draft, once GReader's approval flow needs it -- unlike
 # `created_at`/`updated_at`, that's a business fact, not row bookkeeping.
-ALLOWED_TIMESTAMP_FIELDS: set[str] = set()  # empty on purpose
+ALLOWED_TIMESTAMP_FIELDS: set[str] = {
+    # auth (ADR-0007 §1): verify_email refuses a link after 24 h and
+    # resolve_session refuses an expired session.
+    "expires_at",
+    # auth: resolve_session writes it at most hourly; A-01 "Last active".
+    "last_active_at",
+    # auth: A-01 pending Instructor requests, "Requested" column.
+    "requested_at",
+    # classrooms: T-01 Members "Joined" column and its ordering.
+    "joined_at",
+}
 # `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
 # `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
 # Citation carries them as a business fact about itself (which source chunk it
 # quotes), not as a column that exists only to satisfy a table (OPS-12).
-ALLOWED_ID_SUFFIX_FIELDS = {"artifact_id", "chunk_id", "source_id"}
+ALLOWED_ID_SUFFIX_FIELDS = {
+    "artifact_id",
+    "chunk_id",
+    "source_id",
+    # auth (ADR-0007 §9.5): whose account a Session, token or Instructor
+    # request is, and who an Actor is -- every authorization check reads it.
+    "user_id",
+    # classrooms (ADR-0007 §9.6): ClassroomService._owned compares
+    # instructor_id with the Actor, and _visible looks up a Membership by
+    # classroom_id + student_id -- the 404/403 rule reads all three.
+    "instructor_id",
+    "classroom_id",
+    "student_id",
+}
 
 
 def _dataclass_field_names(tree: ast.Module) -> list[tuple[str, str, int]]:
@@ -284,9 +307,8 @@ def test_http_client_tests_live_under_integration() -> None:
 # --- ADR-0007: classroom-centric flow ------------------------------------------
 
 TEMPLATE_ROOT = SRC_ROOT / "web" / "templates"
-# Templates that predate the page-group layout. home.html goes away when the
-# classroom pages land; do not add to this set.
-TOP_LEVEL_TEMPLATES = {"base.html", "home.html"}
+# The one template outside a page group: the layout every page extends.
+TOP_LEVEL_TEMPLATES = {"base.html"}
 # Page group directory -> the page-ID letters it may hold (G/C shared, S, T, A).
 TEMPLATE_GROUPS = {
     "shared": ("g", "c"),
@@ -295,9 +317,13 @@ TEMPLATE_GROUPS = {
     "admin": ("a",),
 }
 TEMPLATE_NAME = re.compile(r"^([a-z])\d{2}[a-z]?_[a-z0-9_]+\.html$")
-# main.py still renders the placeholder home page; it moves into a pages.py
-# with the classroom pages. Do not add to this set.
-LEGACY_TEMPLATE_RENDERERS = {MAIN_PY}
+# Jinja macros every page imports (field, button, tabs, badge, ...).
+COMPONENTS_DIR = "_components"
+COMPONENT_NAME = re.compile(r"^[a-z][a-z0-9_]*\.html$")
+RAW_CONTROL = re.compile(r"<(button|input|select|textarea)\b", re.IGNORECASE)
+# Files outside core/<slice>/pages.py allowed to render templates. Empty since
+# `/` became a redirect in core/auth/pages.py; keep it that way.
+LEGACY_TEMPLATE_RENDERERS: set[Path] = set()
 # Slices whose every public use case takes the Actor first. A slice listed here
 # is checked as soon as its service.py exists; assignments and generation join
 # when their use cases gain an actor.
@@ -382,6 +408,12 @@ def test_templates_live_in_a_page_group() -> None:
     violations = []
     for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
         relative = template.relative_to(TEMPLATE_ROOT)
+        if relative.parts[0] == COMPONENTS_DIR:
+            if not COMPONENT_NAME.match(relative.name) or len(relative.parts) != 2:
+                violations.append(
+                    f"{relative}: component files are _components/<name>.html"
+                )
+            continue
         if len(relative.parts) == 1:
             if relative.name not in TOP_LEVEL_TEMPLATES:
                 violations.append(f"{relative}: not in a page group directory")
@@ -402,16 +434,33 @@ def test_templates_live_in_a_page_group() -> None:
     )
 
 
-def test_routes_and_pages_never_read_a_role() -> None:
+def _decision_nodes(tree: ast.Module) -> list[ast.AST]:
+    """Expressions a handler branches on: comparisons and conditions."""
+    nodes: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Compare):
+            nodes.append(node)
+        elif isinstance(node, (ast.If, ast.IfExp, ast.While, ast.Assert)):
+            nodes.append(node.test)
+        elif isinstance(node, ast.Match):
+            nodes.append(node.subject)
+        elif isinstance(node, ast.comprehension):
+            nodes.extend(node.ifs)
+    return nodes
+
+
+def test_routes_and_pages_never_branch_on_a_role() -> None:
+    """Serializing a role is fine; deciding on one belongs to the service."""
     violations = []
     for source_file in _api_modules() + _page_modules():
-        for node in ast.walk(_parse(source_file)):
-            if isinstance(node, ast.Attribute) and node.attr in ROLE_ATTRIBUTES:
-                violations.append(f"{source_file}:{node.lineno}: .{node.attr}")
+        for decision in _decision_nodes(_parse(source_file)):
+            for node in ast.walk(decision):
+                if isinstance(node, ast.Attribute) and node.attr in ROLE_ATTRIBUTES:
+                    violations.append(f"{source_file}:{node.lineno}: .{node.attr}")
 
     assert not violations, (
-        "Authorization lives in the service; routes and pages never read a "
-        "role (AGENTS.md 'Definition of done'). Violations:\n" + "\n".join(violations)
+        "Authorization lives in the service; routes and pages never branch on "
+        "a role (AGENTS.md 'Definition of done'). Violations:\n" + "\n".join(violations)
     )
 
 
@@ -454,4 +503,100 @@ def test_classroom_use_cases_take_the_actor_first() -> None:
     assert not violations, (
         "Every public use case in a classroom slice takes `actor` right after "
         "self (AGENTS.md 'Definition of done'). Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_templates_build_controls_only_through_component_macros() -> None:
+    """Buttons and inputs come from _components/forms.html, so they look alike."""
+    violations = []
+    for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
+        relative = template.relative_to(TEMPLATE_ROOT)
+        if relative.parts[0] == COMPONENTS_DIR:
+            continue
+        for lineno, line in enumerate(template.read_text().splitlines(), start=1):
+            match = RAW_CONTROL.search(line)
+            if match:
+                violations.append(f"{relative}:{lineno}: <{match.group(1)}>")
+
+    assert not violations, (
+        "Use the macros in web/templates/_components/forms.html (field, button, "
+        "hidden, ...) instead of raw form controls (AGENTS.md 'Definition of "
+        "done'). Violations:\n" + "\n".join(violations)
+    )
+
+
+POST_FORM = re.compile(r"<form\b[^>]*method=\"post\"[^>]*>(.*?)</form>", re.S | re.I)
+FORMS_IMPORT = re.compile(
+    r'\{%\s*from\s+"_components/forms\.html"\s+import\s+([^%]*?)%\}'
+)
+
+
+def test_every_post_form_carries_the_csrf_field() -> None:
+    """core/auth/csrf.py rejects a form post without its page's token."""
+    violations = []
+    for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
+        for match in POST_FORM.finditer(template.read_text()):
+            if "csrf_field()" not in match.group(1):
+                line = template.read_text()[: match.start()].count("\n") + 1
+                violations.append(f"{template.relative_to(TEMPLATE_ROOT)}:{line}")
+
+    assert not violations, (
+        'Put {{ csrf_field() }} inside every <form method="post"> (or use '
+        "action_form). Violations:\n" + "\n".join(violations)
+    )
+
+
+def test_forms_macros_are_imported_with_context() -> None:
+    """csrf_field() reads `request`, which a context-free import cannot see."""
+    violations = []
+    for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
+        for match in FORMS_IMPORT.finditer(template.read_text()):
+            if not match.group(1).rstrip().endswith("with context"):
+                violations.append(str(template.relative_to(TEMPLATE_ROOT)))
+
+    assert not violations, (
+        "Import _components/forms.html macros `with context`. Violations:\n"
+        + "\n".join(violations)
+    )
+
+
+def _is_post_route(decorator: ast.expr) -> bool:
+    return (
+        isinstance(decorator, ast.Call)
+        and isinstance(decorator.func, ast.Attribute)
+        and decorator.func.attr == "post"
+    )
+
+
+def test_every_post_page_handler_checks_csrf_first() -> None:
+    violations = []
+    for page_module in _page_modules():
+        for node in ast.walk(_parse(page_module)):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            if not any(_is_post_route(d) for d in node.decorator_list):
+                continue
+            parameters = {argument.arg for argument in node.args.args}
+            body = [
+                statement
+                for statement in node.body
+                if not (
+                    isinstance(statement, ast.Expr)
+                    and isinstance(statement.value, ast.Constant)
+                )
+            ]
+            first = body[0] if body else None
+            calls_check = (
+                isinstance(first, ast.Expr)
+                and isinstance(first.value, ast.Call)
+                and isinstance(first.value.func, ast.Name)
+                and first.value.func.id == "require_csrf"
+            )
+            if "csrf_token" not in parameters or not calls_check:
+                violations.append(f"{page_module}:{node.lineno}: {node.name}")
+
+    assert not violations, (
+        "Every POST page handler takes `csrf_token` and calls "
+        "require_csrf(request, csrf_token) as its first statement. "
+        "Violations:\n" + "\n".join(violations)
     )

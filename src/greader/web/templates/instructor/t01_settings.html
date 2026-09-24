@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, field, button, action_form with context %}
+{% block title %}Settings · {{ view.classroom.course_name }} · GReader{% endblock %}
+{% block content %}
+<section data-page="T-01" data-tab="settings">
+  {% include "instructor/t01_tabs.html" %}
+  <div class="grid gap-4 lg:grid-cols-3">
+    <div class="flex flex-col gap-4">
+      <form id="classroom-settings" method="post" action="/classes/{{ view.classroom.id }}/settings" class="flex flex-col gap-4">
+        {{ csrf_field() }}
+        {{ field("course_code", "Course code", value=view.classroom.course_code, required=true) }}
+        {{ field("course_name", "Course name", value=view.classroom.course_name, required=true) }}
+        <div class="grid grid-cols-2 gap-4">
+          {{ field("section", "Section", value=view.classroom.section, required=true) }}
+          {{ field("semester", "Semester", value=view.classroom.semester, required=true) }}
+        </div>
+      </form>
+      <div class="flex flex-wrap gap-2.5">
+        {{ button("Save changes", variant="primary", form="classroom-settings") }}
+        {% if view.classroom.archived %}
+          {{ action_form("/classes/" ~ view.classroom.id ~ "/unarchive", "Unarchive classroom") }}
+        {% else %}
+          {{ action_form("/classes/" ~ view.classroom.id ~ "/archive", "Archive classroom") }}
+        {% endif %}
+      </div>
+    </div>
+    <div class="box self-start">
+      <p class="eyebrow">Join code</p>
+      <p class="join-code select-all">{{ view.classroom.join_code or "—" }}</p>
+      <div class="flex flex-wrap gap-2">
+        {{ action_form("/classes/" ~ view.classroom.id ~ "/join-code/regenerate", "Regenerate", size="sm") }}
+        {% if view.classroom.join_code %}
+          {{ action_form("/classes/" ~ view.classroom.id ~ "/join-code/disable", "Disable joining", variant="danger", size="sm") }}
+        {% endif %}
+      </div>
+      <p class="hint">{% if view.classroom.join_code %}Regenerating invalidates the old code. Students already in the class keep access.{% else %}Joining is disabled. Regenerate to allow new students.{% endif %}</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -197,7 +197,21 @@ uv run fastapi dev src/greader/main.py
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .   # `ruff format .` to fix
+
+uv run python -m scripts.demo  # demo mode, http://127.0.0.1:8000/login
+
+# app.css from input.css — Tailwind v4.3.3 standalone binary, see README "Styles"
+tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css
+tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css --watch
 ```
+
+**Demo mode** (`scripts/demo.py`) runs the app on the in-memory fakes from
+`tests/fakes/` with a seed mirroring `docs/wireframes/`, so pages are clickable
+before OPS-15 creates the tables. G-01 lists every seeded account under "log in
+as"; verification links are logged, not emailed; data is lost on restart. It
+lives outside `src/` because fakes may not ship in the package. When a slice
+lands, extend `DemoSeed` so its pages have data. `fastapi dev` still wires the
+real adapters, and every classroom slice answers 503 there until OPS-15.
 
 `tests/unit/` domain + service · `tests/integration/` HTTP via ASGI transport ·
 `tests/architecture/` import direction and the no-JavaScript rule ·
@@ -236,13 +250,21 @@ everywhere. See `tests/conftest.py`.
 - routes hold no business rules or SQL
 - authorization lives in the service: every use case touching classroom data
   takes `actor: Actor` first and raises `PermissionDeniedError`; routes and
-  pages never read a role. A handler gets the actor with
+  pages never branch on a role (serializing one is fine). A handler gets the actor with
   `current_actor(request)`, never `Depends()`. Non-member → 404, wrong role
   in own Classroom → 403
 - HTML pages live in `core/<slice>/pages.py` (no `/api` prefix); only
   `pages.py` renders templates. Templates live in
   `web/templates/<group>/<page-id>_<slug>.html`, group one of `shared`,
   `student`, `instructor`, `admin` (e.g. `student/s02_solve.html`)
+- templates build buttons and inputs only through the macros in
+  `web/templates/_components/forms.html`, and layout pieces (page header, tabs,
+  badge, empty state, modal) through `_components/ui.html`; style with the
+  tokens in `input.css`, then rebuild `app.css`
+- every `<form method="post">` renders `{{ csrf_field() }}` (import the forms
+  macros `with context`), and every POST page handler takes `csrf_token` and
+  calls `require_csrf(request, csrf_token)` first (`core/auth/csrf.py`); the
+  tests post forms through `tests/integration/forms.py`
 - integration tests cover each page route for every role: 200 with the right
   template for the allowed role, 403/404 for the others
 - unit test at the service/repository seam, integration test at the HTTP layer

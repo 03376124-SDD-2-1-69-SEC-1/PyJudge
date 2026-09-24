@@ -177,6 +177,31 @@ CI reads these same four names from repo secrets/variables
 as secrets; `R2_TEST_BUCKET_NAME` as a variable) — see
 `.github/workflows/ci.yml`.
 
+### Styles (Tailwind CSS v4, standalone CLI)
+
+`src/greader/web/static/css/app.css` is generated from `input.css` next to it
+and is committed, so the app runs without the CLI. Rebuild it whenever you
+change `input.css` or add Tailwind classes to a template (`@source` scans
+`web/templates/`). Never edit `app.css` by hand.
+
+The CLI is a single binary, not a Python or npm dependency. Download
+`tailwindcss-<platform>` for **v4.3.3** from
+https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.3.3, then:
+
+```bash
+chmod +x tailwindcss-macos-arm64 && mv tailwindcss-macos-arm64 ~/.local/bin/tailwindcss
+
+# build once
+tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css
+# rebuild on every change while you work
+tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css --watch
+```
+
+Design tokens (colours, fonts) and components (`.btn`, `.input`, `.card`,
+`.tabs`, `.badge`, `.modal`, …) live in `input.css` and come from
+`docs/wireframes/`. Pages build forms and buttons only through the Jinja macros
+in `src/greader/web/templates/_components/`.
+
 Create a migration after changing database models:
 
 ```bash

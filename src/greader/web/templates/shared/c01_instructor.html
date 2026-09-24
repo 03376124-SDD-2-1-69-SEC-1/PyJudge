@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import button with context %}
+{% from "_components/ui.html" import page_header, seg, empty_state %}
+{% block title %}My classrooms · GReader{% endblock %}
+{% block content %}
+<section data-page="C-01" data-variant="instructor">
+  {% call page_header("My classrooms") %}
+    {{ seg([("all", "All", "/classes?filter=all"), ("active", "Active", "/classes?filter=active"), ("archived", "Archived", "/classes?filter=archived")], filter) }}
+  {% endcall %}
+
+  {% if not picker.cards and filter == "all" %}
+    {% call empty_state("No classrooms yet", "Create one and share its join code with your students.", state="C-01a") %}
+      {{ button("+ Create classroom", variant="primary", type="button", popovertarget="create-classroom") }}
+    {% endcall %}
+  {% else %}
+  <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {% for card in picker.cards %}
+    <li>
+      <a class="card h-full no-underline hover:border-mid" href="/classes/{{ card.classroom.id }}">
+        <p class="eyebrow">{{ card.classroom.label }}{% if card.classroom.archived %} · archived{% endif %}</p>
+        <h2 class="h2">{{ card.classroom.course_name }}</h2>
+        <hr class="hr">
+        <div class="flex justify-between text-xs">
+          <span>{{ card.student_count }} students</span>
+          <span>Avg pass rate <strong>{% if card.stats.avg_pass_rate is not none %}{{ (card.stats.avg_pass_rate * 100) | round | int }}%{% else %}—{% endif %}</strong></span>
+        </div>
+        <p class="text-xs text-mid">{{ card.stats.problem_count }} problems{% if card.stats.draft_count %} · {{ card.stats.draft_count }} draft{% if card.stats.draft_count > 1 %}s{% endif %}{% endif %}</p>
+      </a>
+    </li>
+    {% endfor %}
+    <li>{{ button("+ Create classroom", variant="tile", type="button", popovertarget="create-classroom") }}</li>
+  </ul>
+  {% endif %}
+  {% include "shared/c03_create.html" %}
+</section>
+{% endblock %}

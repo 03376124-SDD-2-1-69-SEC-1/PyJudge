@@ -78,6 +78,16 @@ def test_every_slice_module_is_importable() -> None:
         ),
         "uploads": ("models", "schemas", "ports", "service", "routes"),
         "generation": ("models", "schemas", "ports", "service", "routes"),
+        "auth": (
+            "models",
+            "schemas",
+            "ports",
+            "service",
+            "routes",
+            "pages",
+            "current",
+        ),
+        "classrooms": ("models", "schemas", "ports", "service", "routes", "pages"),
     }
     for slice_name, modules in slices.items():
         for module in modules:

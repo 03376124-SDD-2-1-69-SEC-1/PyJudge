@@ -1,0 +1,69 @@
+{#
+  Layout pieces. Import what a page needs:
+
+    {% from "_components/ui.html" import page_header, tabs, badge, empty_state, modal %}
+#}
+
+{% macro page_header(title, subtitle="") -%}
+<header class="page-header">
+  <div>
+    <h1 class="h1">{{ title }}</h1>
+    {% if subtitle %}<p class="sub">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if caller is defined %}<div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">{{ caller() }}</div>{% endif %}
+</header>
+{%- endmacro %}
+
+{#- items: list of (key, label, href); current: the active key. -#}
+{% macro tabs(items, current, label="Tabs") -%}
+<nav class="tabs" aria-label="{{ label }}">
+  {% for key, text, href in items %}
+  <a class="tab" href="{{ href }}"{% if key == current %} aria-current="page"{% endif %}>{{ text }}</a>
+  {% endfor %}
+</nav>
+{%- endmacro %}
+
+{% macro seg(items, current, label="Filter") -%}
+<nav class="seg" aria-label="{{ label }}">
+  {% for key, text, href in items %}
+  <a href="{{ href }}"{% if key == current %} aria-current="page"{% endif %}>{{ text }}</a>
+  {% endfor %}
+</nav>
+{%- endmacro %}
+
+{#- tone: "" (neutral) | accent | danger | ok -#}
+{% macro badge(text, tone="") -%}
+<span class="badge{% if tone %} badge-{{ tone }}{% endif %}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro empty_state(title, body="", art="empty", state="") -%}
+<div class="empty"{% if state %} data-state="{{ state }}"{% endif %}>
+  <div class="placeholder h-12 w-16">{{ art }}</div>
+  <h2 class="h2">{{ title }}</h2>
+  {% if body %}<p class="muted">{{ body }}</p>{% endif %}
+  {% if caller is defined %}<div class="flex flex-wrap justify-center gap-2.5">{{ caller() }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{#-
+  A popover modal opened by <button popovertarget="{{ id }}">. With
+  static=true it renders already open (server-side states such as C-02a).
+-#}
+{% macro modal(id, title, static=false, page="", state="", centered=false) -%}
+{% if static %}<div class="modal-static"{% if state %} data-state="{{ state }}"{% endif %}>{% endif %}
+<div class="modal" id="{{ id }}"{% if not static %} popover{% endif %}{% if page %} data-page="{{ page }}"{% endif %} role="dialog" aria-labelledby="{{ id }}-title">
+  <h2 class="h2{% if centered %} text-center{% endif %}" id="{{ id }}-title">{{ title }}</h2>
+  {{ caller() }}
+</div>
+{% if static %}</div>{% endif %}
+{%- endmacro %}
+
+{% macro alert(tone="", state="") -%}
+<div class="alert{% if tone %} alert-{{ tone }}{% endif %}" role="alert"{% if state %} data-state="{{ state }}"{% endif %}>{{ caller() }}</div>
+{%- endmacro %}
+
+{#- "Somchai Prasert" -> "Somchai P." as the G-02 header shows it. -#}
+{% macro short_name(full_name) -%}
+{%- set parts = full_name.split() -%}
+{{ parts[0] }}{% if parts | length > 1 %} {{ parts[-1][0] }}.{% endif %}
+{%- endmacro %}

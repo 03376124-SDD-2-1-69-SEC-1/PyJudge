@@ -1,0 +1,8 @@
+{% from "_components/ui.html" import tabs %}
+{% set base = "/classes/" ~ view.classroom.id %}
+{{ tabs([
+  ("problems", "Problems", base ~ "?tab=problems"),
+  ("summary", "Summary", base ~ "?tab=summary"),
+  ("members", "Members", base ~ "?tab=members"),
+  ("settings", "Classroom settings", base ~ "?tab=settings"),
+], tab, label="Classroom tabs") }}

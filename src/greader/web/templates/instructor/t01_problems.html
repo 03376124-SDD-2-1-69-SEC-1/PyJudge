@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import link_button with context %}
+{% from "_components/ui.html" import empty_state %}
+{% block title %}{{ view.classroom.course_name }} · GReader{% endblock %}
+{% block content %}
+<section data-page="T-01" data-tab="problems">
+  {% include "instructor/t01_header.html" %}
+  {% include "instructor/t01_tabs.html" %}
+  {% if view.student_count == 0 %}
+  <div class="mx-auto mb-8 flex max-w-lg flex-col items-center gap-3 text-center" data-state="T-01a">
+    <h2 class="h2">Invite your students</h2>
+    <p class="muted text-xs">Share this join code — nobody has joined yet.</p>
+    <div class="box w-full items-center py-5">
+      <p class="join-code select-all">{{ view.classroom.join_code or "—" }}</p>
+      {% if not view.classroom.join_code %}<p class="hint">Joining is disabled. Regenerate a code in Classroom settings.</p>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% call empty_state("No problems in this classroom", "Generate one from your uploaded lecture notes, or upload a PDF first.", state="T-01b") %}
+    {{ link_button("/documents", "Upload documents") }}
+    {{ link_button("/classes/" ~ view.classroom.id ~ "/generate", "+ Create problem with AI", variant="primary") }}
+  {% endcall %}
+</section>
+{% endblock %}
