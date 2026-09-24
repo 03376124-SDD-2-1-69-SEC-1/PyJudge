@@ -195,8 +195,9 @@ There is no admin dashboard.
    `Content-Type: application/json` and on allowing no CORS origins.
 8. Cookies are `HttpOnly`, `SameSite=Lax` and `Secure`; only
    `scripts/demo.py` and the tests turn `Secure` off (plain HTTP).
-9. `/` redirects a logged-in account to its landing and everyone else to
-   `/login`.
+9. `/` redirects a logged-in account to its landing; a visitor gets the
+   public landing page G-00 (changed 2026-09-24; it used to redirect to
+   `/login`).
 
 ## 10. Code structure
 
@@ -238,6 +239,7 @@ One URL can render a different template per role.
 
 | Route | Pages (states) | Who |
 |---|---|---|
+| / | G-00 public landing (hero, how it works, for instructors/students, static draft preview); a logged-in account is redirected to its landing | visitor |
 | /login | G-01 (01a wrong password, 01b email not verified) | all |
 | /signup | G-03 (03a not a KMITL email, 03b already registered) | all |
 | /verify | G-04 (04a waiting, 04b verified, 04c link expired after 24h) | all |

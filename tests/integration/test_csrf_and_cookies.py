@@ -1,4 +1,4 @@
-"""CSRF on every HTML form post, Secure cookies, and the `/` redirect."""
+"""CSRF on every HTML form post, Secure cookies, and `/` (G-00 or a redirect)."""
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -136,17 +136,44 @@ async def test_cookies_are_secure_unless_turned_off() -> None:
 @pytest.mark.parametrize(
     ("email", "location"),
     [
-        (None, "/login"),
         (STUDENT, "/classes"),
         (TEACHER, "/classes"),
         (ADMIN, "/admin/settings"),
     ],
 )
-async def test_root_redirects_to_the_landing(email: str | None, location: str) -> None:
+async def test_root_redirects_to_the_landing(email: str, location: str) -> None:
     async with _client(build_app(auth_repository=_users())) as client:
-        if email is not None:
-            await log_in(client, email, DEFAULT_PASSWORD)
+        await log_in(client, email, DEFAULT_PASSWORD)
         response = await client.get("/")
 
     assert response.status_code == 303
     assert response.headers["location"] == location
+
+
+@pytest.mark.anyio
+async def test_root_shows_the_landing_page_to_a_visitor() -> None:
+    async with _client(build_app(auth_repository=_users())) as client:
+        response = await client.get("/")
+
+    assert response.status_code == 200
+    assert 'data-page="G-00"' in response.text
+    assert "set-cookie" not in response.headers
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("label", "href"),
+    [
+        ("Log in", "/login"),
+        ("Sign up with your @kmitl.ac.th email", "/signup"),
+    ],
+)
+async def test_landing_calls_to_action_lead_to_live_pages(
+    label: str, href: str
+) -> None:
+    async with _client(build_app(auth_repository=_users())) as client:
+        landing = await client.get("/")
+        target = await client.get(href)
+
+    assert f'href="{href}"' in landing.text and f">{label}</a>" in landing.text
+    assert target.status_code == 200

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import link_button with context %}
+{% from "_components/ui.html" import badge %}
+{% block title %}GReader · programming assignments for KMITL classrooms{% endblock %}
+{% block main %}
+<main class="page flex flex-col gap-6" data-page="G-00">
+  <header class="flex flex-wrap items-center justify-between gap-4">
+    <p class="logo text-[20px]">GReader</p>
+    <nav class="flex flex-wrap gap-2.5" aria-label="Account">
+      {{ link_button("/login", "Log in", size="sm") }}
+      {{ link_button("/signup", "Sign up", variant="primary", size="sm") }}
+    </nav>
+  </header>
+
+  <section class="flex max-w-2xl flex-col gap-4" aria-labelledby="hero-title">
+    <p class="eyebrow">KMITL · programming courses</p>
+    <h1 class="h1" id="hero-title">Programming assignments for KMITL classrooms</h1>
+    <p class="text-mid">Instructors turn their lecture PDFs into problems with tests. Students write code in the browser and get graded on sample and hidden tests.</p>
+    <div class="flex flex-wrap gap-2.5">
+      {{ link_button("/login", "Log in", variant="primary") }}
+      {{ link_button("/signup", "Sign up with your @kmitl.ac.th email") }}
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-4" aria-labelledby="how-title">
+    <h2 class="h2" id="how-title">How it works</h2>
+    <ol class="grid gap-4 lg:grid-cols-3">
+      <li class="box">
+        <p class="eyebrow">Step 1</p>
+        <p class="font-semibold">Create a classroom and share the code</p>
+        <p class="muted">Each section gets a six-character join code. Students enter it to join.</p>
+      </li>
+      <li class="box">
+        <p class="eyebrow">Step 2</p>
+        <p class="font-semibold">Generate a problem from your PDFs</p>
+        <p class="muted">The draft cites the pages it came from. Review it, edit it, then publish.</p>
+      </li>
+      <li class="box">
+        <p class="eyebrow">Step 3</p>
+        <p class="font-semibold">Students submit and are graded</p>
+        <p class="muted">Every submission runs against the sample and hidden tests. The score shows right away.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="grid gap-4 lg:grid-cols-2" aria-label="Who it is for">
+    <div class="card gap-3">
+      <h2 class="h2">For instructors</h2>
+      <ul class="flex flex-col gap-2 text-mid">
+        <li>Keep your lecture PDFs in one library.</li>
+        <li>Draft problems with tests, each citing its source pages.</li>
+        <li>Publish one problem to several classrooms, each with its own deadline.</li>
+        <li>See who passed, who is late and which test fails most.</li>
+      </ul>
+    </div>
+    <div class="card gap-3">
+      <h2 class="h2">For students</h2>
+      <ul class="flex flex-col gap-2 text-mid">
+        <li>Join a classroom with the code your instructor shares.</li>
+        <li>Run your code on the sample tests before you submit.</li>
+        <li>See your score and which tests passed as soon as you submit.</li>
+        <li>Get told when a problem changes and you need to resubmit.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-4" aria-labelledby="preview-title">
+    <h2 class="h2" id="preview-title">What a draft looks like</h2>
+    <div class="card max-w-3xl gap-4" data-preview="draft">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div><p class="eyebrow">Title</p><p class="h2">Binary search</p></div>
+        {{ badge("Draft", tone="accent") }}
+      </div>
+      <p class="whitespace-pre-line">Given a sorted list and a target, print the index of the target, or -1 if it is not in the list.</p>
+      <hr class="hr">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Input</th><th>Expected</th><th>Type</th></tr></thead>
+          <tbody>
+            <tr><td class="code-cell">1 3 5 7 9<br>7</td><td class="code-cell">3</td><td>sample</td></tr>
+            <tr><td class="code-cell">2 4 6<br>5</td><td class="code-cell">-1</td><td>hidden</td></tr>
+            <tr><td class="code-cell">(empty)<br>1</td><td class="code-cell">-1</td><td>edge</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs"><span class="eyebrow">Citations</span> Week 4 · Searching.pdf · p. 12 · p. 14</p>
+    </div>
+  </section>
+
+  <hr class="hr">
+  <footer class="-mt-2 flex flex-wrap items-center justify-between gap-4 text-xs text-soft">
+    <p>GReader · KMITL programming courses</p>
+    <nav class="flex gap-4" aria-label="Footer">
+      <a class="link" href="/login">Log in</a>
+      <a class="link" href="/signup">Sign up</a>
+    </nav>
+  </footer>
+</main>
+{% endblock %}
