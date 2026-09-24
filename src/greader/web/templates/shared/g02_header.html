@@ -5,7 +5,7 @@
   <a class="logo" href="/classes">GReader</a>
   {% if breadcrumb is defined %}<span class="crumb">/ {{ breadcrumb }}</span>{% endif %}
   <div class="ml-auto flex items-center gap-5">
-    {% if actor.owns_classrooms %}<a class="link hidden sm:inline" href="/documents">My documents</a>{% endif %}
+    {#- "My documents" (T-06) returns with the documents slice; /documents is 404 until then. -#}
     {% call toggle("notifications", aria_label="Notifications") %}
       <span class="icon-dot">{% if unread_count is defined and unread_count %}<span class="count">{{ unread_count }}</span>{% endif %}</span>
     {% endcall %}
@@ -43,7 +43,7 @@
   <nav aria-label="Mobile">
     <a class="dropdown-item" href="/classes">Classrooms</a>
     {% if breadcrumb is defined %}<span class="dropdown-item">{{ breadcrumb }}</span>{% endif %}
-    {% if actor.owns_classrooms %}<a class="dropdown-item" href="/documents">My documents</a>{% endif %}
+    {#- "My documents" returns with the documents slice. -#}
     <span class="dropdown-item">{{ short_name(actor.full_name) }}</span>
     {{ action_form("/logout", "Log out", variant="plain", class="dropdown-item cursor-pointer text-soft") }}
   </nav>
