@@ -130,6 +130,16 @@ def root(request: Request) -> HTMLResponse | RedirectResponse:
     )
 
 
+@router.get("/admin/settings", response_class=HTMLResponse)
+def admin_settings_placeholder(request: Request) -> HTMLResponse:
+    """Where an Admin lands until A-01 exists, so the landing is never a 404."""
+    actor = current_actor(request)
+    auth_service(request).admin_home(actor)
+    return _templates(request).TemplateResponse(
+        request, "admin/a01_placeholder.html", {"actor": actor}
+    )
+
+
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request) -> HTMLResponse:
     """G-01."""
