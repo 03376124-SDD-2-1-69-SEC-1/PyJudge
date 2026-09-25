@@ -53,7 +53,7 @@ offer the version that fits.
 | SQL or business rules in a route | routes map HTTP to a service call and nothing else |
 | an ORM import under `core/` | adapters live in `database/core/` only |
 | `core/` importing `ai/` | the dependency only runs one way |
-| a change to the `/v1/generations` contract | it is shared with the other repo; that is a conversation, not a commit |
+| a change to a contract another slice depends on (`GenerationClient`, `AssignmentPublisher`, `CodeRunner`, a schema in `core/*/schemas.py`) | both sides break; that is a conversation, not a commit |
 | files outside the row in `task-scope.md` | say which files and ask them to confirm before including them |
 | "I'll add tests later" | the done condition includes them |
 | a UUID primary key on a persisted table | keys are BIGSERIAL; the in-memory Topics demo is not the pattern |

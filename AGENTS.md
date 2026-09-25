@@ -1,28 +1,43 @@
 # AGENTS.md — GReader
 
-Modular monolith: FastAPI + Jinja2. A classroom system for programming
-courses: Instructors publish Assignments (drafted by the AI slice from their
-lecture notes) to Classrooms, and Students submit code that is judged.
+Modular monolith: one FastAPI + Jinja2 app in one repo, one Neon project.
+`core/` and `ai/` are modules of that app, not separate services; they call
+each other through Python interfaces (`typing.Protocol`), never over HTTP.
+A classroom system for programming courses: Instructors publish Assignments
+(drafted by the AI slice from their lecture notes) to Classrooms, and Students
+submit code that is judged.
 The flow and every decision behind it: `docs/adr/0007-classroom-centric-flow.md`.
-Domain words: `CONTEXT.md`. UI contract: `docs/wireframes/`.
+Domain words: `CONTEXT.md`.
+
+**UI source of truth:** the Figma file GradeFlow (fileKey
+`WecQlqyFS71jLCNmD6U1jE`) for the pages พาย has mocked. A page without a mock
+follows `docs/wireframes/GReader wireframes - Prototype.html` until it has one.
+Do not call the Figma MCP in a task unless the task says so (the Starter plan
+quota is used up). UI-01 in `docs/task-scope.md` tracks which template matches
+which Figma frame.
 
 This file holds the rules an agent needs to not break things. Human-facing
 setup and background live in `README.md` and `docs/adr/`.
 
 ## Status
 
-| Area                      | State                                                          | Owner            |
-| ------------------------- | -------------------------------------------------------------- | ---------------- |
-| `core/topics`             | Working. **The reference slice — copy its shape.**             | shared           |
-| `core/assignments`        | ADR-0007 shape (Versions, Postings) on fakes; 503 until OPS-15 | Assignment owner |
-| `core/generation`         | Drafts, T-03/T-04, daily Quota on fakes; 503 until OPS-15      | TBD              |
-| `core/uploads`            | Working; to be renamed `core/documents` (0007)                 | TBD              |
-| `core/auth`, `classrooms` | Working on fakes (demo mode); 503 in production until OPS-15     | TBD              |
-| `core/submissions`        | S-02/T-02, Run vs Submit, PostingStats on fakes; 503 until OPS-15 | TBD              |
-| `core/notifications`, `admin` | Planned (0007)                                             | TBD              |
-| `database/`               | 9 tables live on Neon; classroom tables pending an OPS task    | DB owner         |
-| `ai/`                     | In progress                                                    | AI owner         |
-| `web/templates/base.html` | Shared layout                                                  | Design           |
+| Area                          | State                                                                                              | Owner (task)        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------- | ------------------- |
+| `core/topics`                 | Working. **The reference slice — copy its shape.**                                                 | shared              |
+| `core/auth`, `classrooms`     | Working on fakes (demo mode); **503 in production until OPS-15**                                   | done (CORE-12, 13)  |
+| `core/assignments`            | Versions and Postings on fakes; **503 in production until OPS-15**                                 | done (CORE-14)      |
+| `core/generation`             | Drafts, T-03/T-04, daily Quota on fakes; **503 until OPS-15**; production client is a stub         | done (CORE-15)      |
+| `core/submissions`            | Run vs Submit, PostingStats on fakes; **503 until OPS-15**; production `CodeRunner` is a stub      | พาย (CORE-17)       |
+| `core/uploads`                | Working; to be renamed `core/documents`                                                            | open (CORE-16)      |
+| `core/notifications`, `admin` | Not started                                                                                        | open (CORE-18, 19)  |
+| `database/`                   | 9 tables live on Neon; classroom, posting, version, submission, notification and auth tables wait for OPS-15 | พาย (OPS-15)        |
+| `ai/`                         | Vector storage works (AI-01). Ingestion, retrieval and a real `GenerationClient` are not started; the standalone app in `ai/app/main.py` is unused | ฟิล์ม (AI-02 to 07), พาย (OPS-16) |
+| `web/templates/`              | Every page of ADR-0007 except T-05, T-06 and A-01 exists; matching them to Figma is UI-01          | พาย (UI-01)         |
+
+"Working on fakes" means the slice runs in demo mode (`scripts/demo.py`) and in
+tests. In production it is wired to `database/pending.py`, which refuses every
+call, so its routes answer 503 until OPS-15 lands the tables and SQL adapters.
+Every SQL adapter is OPS-15's work; a slice's task never lists one.
 
 Do not implement another area's placeholder unless the task says to.
 
@@ -82,7 +97,9 @@ one executable reference; prose in this file does not override it.
 - Primary keys are `BIGSERIAL` (int), not UUID. (In-memory Topics still uses
   UUID; that is the demo, not the pattern to copy for persisted tables.)
 - One Neon project, two schemas: `core` and `rag`.
-- **No foreign keys across schemas.** The two sides sync over HTTP only.
+- **No foreign keys across schemas.** `core` and `rag` share one database and
+  one app; the modules reach each other through Python interfaces, and cleanup
+  across the two schemas is done by the application, not by a cascade.
 - `assignments.artifact_id` is nullable and UNIQUE.
 - `test_cases` has no `title` column. Do not add one. The per-test label is
   `note`, and `kind` (sample, hidden, edge) replaces `is_hidden` — both
@@ -151,6 +168,12 @@ touch" column. This applies to every agent, not just Claude Code — `/grill-me`
 (Claude Code only) reads the same file automatically; agents without
 slash-command support must open `docs/task-scope.md` themselves at the start
 of a session.
+
+The row's Status is `open`, `in-progress` or `done`, and it is the only thing
+that says whether a task is available. `/start-task` offers `open` rows owned by
+you or by `TBD`, and your `in-progress` rows; it hides a row whose paths no
+longer exist. A path the task must create is written `creates:` in its row.
+`uv run python -m scripts.task_scope <owner>` prints the same list.
 
 ## Terminology
 

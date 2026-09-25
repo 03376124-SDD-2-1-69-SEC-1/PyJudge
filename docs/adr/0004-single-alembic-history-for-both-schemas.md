@@ -1,3 +1,8 @@
+> **Superseded by ADR-0007** (single-app decision of 2026-09-08). The Core and
+> AI/RAG sides are no longer two services talking over HTTP; they are modules
+> of one app. The single Alembic history below still stands. Kept as written
+> for the record.
+
 # Single Alembic history for both schemas
 
 One Alembic history, in this repo, covers both the `core` and `rag` Postgres

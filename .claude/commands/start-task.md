@@ -1,6 +1,6 @@
 ---
 description: Pick one of my assigned tasks, branch for it, then interview me before any code is written.
-argument-hint: [owner name, e.g. พาย]
+argument-hint: [owner name, e.g. พาย] [--maintainer]
 ---
 
 Owner for this session: $1
@@ -17,30 +17,40 @@ Run `git status --porcelain` and `git branch --show-current`.
 
 ## Step 2 — Offer only their tasks
 
-Read `docs/task-scope.md`. Take every row whose Owner column contains `$1`,
-including shared rows like `นัด + โปรแกรม`.
+Run `uv run python -m scripts.task_scope $1`. Add `--maintainer` when พาย asks
+for it. The script reads the Status column of `docs/task-scope.md`; that column
+is the only thing that decides what is offered. Do not look at branches to
+decide a task's state.
 
-Run `git branch -a`, then sort the remaining tasks into three groups:
+It prints, in order:
 
-- **A. Not started:** no matching branch exists locally or on the remote. Keep.
-- **B. In progress, assigned to `$1`:** a matching branch exists and the task
-  owner is `$1` or is shared with `$1`. Mark `[awaiting your action]` and keep.
-- **C. In progress, assigned to someone else:** a matching branch exists but
-  the task is assigned to someone else. Drop.
+- `open` rows owned by `$1`, and `open` rows owned by `TBD` (tagged
+  "ยังไม่มีเจ้าของ รับได้");
+- `in-progress` rows owned by `$1` only. Rows owned by someone else are not
+  shown;
+- `done` rows and the `OPS-*` / `BUG-*` pattern rows are never shown;
+- a row whose "May touch" path is missing from the repo, or whose text uses
+  wording from the retired two-service design, is hidden. Only พาย (or
+  `--maintainer`) sees it, under "งานที่ต้องอัปเดต". A path the task must
+  create is written `creates:` in the row and does not count as missing.
 
-Show groups A + B as a numbered list: TASK-ID, the done condition, and the
-paths it may touch. If nothing is left, say so and stop.
+If the script exits with an error (an unknown Status, a row with no Status, a
+malformed table), stop and show the message. Do not guess a Status.
+
+Show the printed list as it is. If it is empty, say so and stop.
 
 Ask which one. Wait. Accept only a number or a TASK-ID from that list — if they
-name a task belonging to someone else, say who owns it and stop.
+name a task that is not in it, say it is not offered to them and stop. If it
+appears under "งานที่ต้องอัปเดต", tell them it needs พาย to update the row first.
 
-When they pick a task from group B, switch to its existing local branch. If it
-exists only on the remote, create a local tracking branch and switch to it.
-The branch is now checked out; skip Step 3 and continue at Step 4.
+When they pick an `in-progress` task, look for a branch named
+`<type>/<TASK-ID>-<slug>` with `git branch -a`. If one exists, switch to it (make
+a local tracking branch if it is only on the remote), skip Step 3 and continue
+at Step 4. If none exists, continue at Step 3.
 
 ## Step 3 — Branch
 
-Skip this step when Step 2 already checked out a group B branch.
+Skip this step when Step 2 already checked out the task's branch.
 
 Confirm the type prefix with them (`feat`, `fix`, `chore`, `docs`, `refactor`),
 propose a slug from the task title, and show the full branch name for approval.

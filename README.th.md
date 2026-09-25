@@ -2,6 +2,12 @@
 
 **ภาษา:** [English](README.md) | ภาษาไทย
 
+> **ถูกแทนที่โดย ADR-0007 (ส่วนสถาปัตยกรรม)** ข้อความเก่าใน README นี้บางตอน
+> เล่าว่า Core กับ AI เป็นสอง service คุยกันผ่าน HTTP แบบนั้นเลิกใช้แล้ว
+> GReader คือแอป FastAPI ตัวเดียวใน repo เดียว ใช้ Neon project เดียวแยก schema
+> `core` กับ `rag` โดย `core/` และ `ai/` เป็นโมดูลของแอปนี้ เรียกกันผ่าน Python
+> interface อ่านกฎปัจจุบันที่ `AGENTS.md` และ `docs/adr/0007-classroom-centric-flow.md`
+
 GReader คือแอปพลิเคชัน FastAPI ที่ช่วยผู้สอนเตรียมโจทย์เขียนโปรแกรม ชุดทดสอบ
 และสื่อการเรียนที่เกี่ยวข้อง โปรเจกต์ใช้สถาปัตยกรรมแบบ modular monolith
 เพื่อให้แต่ละทีมพัฒนาส่วนที่รับผิดชอบได้โดยไม่ผูกกับส่วนอื่นมากเกินไป
@@ -291,7 +297,7 @@ src/greader/
 │       ├── __init__.py
 │       └── tables.py            ✅ SQLModel — schema `rag`
 │
-├── ai/                          ← AI/RAG Service (ยังไม่เริ่ม)
+├── ai/                          ← โมดูล AI ในแอปเดียวกัน (vector storage ใช้ได้แล้ว ส่วน ingestion ยังไม่เริ่ม)
 └── web/                         ← Jinja2 templates
 
 alembic/                         ← root ตาม convention
@@ -347,7 +353,7 @@ erDiagram
 
     knowledge_documents {
         BIGSERIAL id PK
-        TEXT r2_object_key UK "natural key ใช้ cross-check ตอน mirror"
+        TEXT r2_object_key UK "natural key ใช้ cross-check ตอนคัดลอก"
         TEXT filename
         TEXT content_hash "sha256 กันไฟล์ซ้ำ"
         TEXT status "CHECK: uploaded | ingesting | ready | failed"
@@ -412,7 +418,7 @@ erDiagram
         TEXT status "CHECK: pending | processing | ready | failed"
         TEXT embedding_model "nullable"
         INT embedding_dim "nullable"
-        JSONB metadata "GIN index — mirror มาเพื่อ filter"
+        JSONB metadata "GIN index — คัดลอกมาเพื่อ filter"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
@@ -440,7 +446,7 @@ erDiagram
     generation_artifacts ||--o| assignments : "applied to"
     assignments ||--o{ test_cases : "has"
     knowledge_sources ||--o{ knowledge_chunks : "split into"
-    knowledge_documents ||..o| knowledge_sources : "mirror ข้ามschema (ไม่มี FK จริง)"
+    knowledge_documents ||..o| knowledge_sources : "คัดลอกข้าม schema (ไม่มี FK จริง)"
 ```
 
 ### 4. สิ่งที่ ORM สร้างให้ไม่ได้ — ต้องเขียนมือใน migration
@@ -466,8 +472,8 @@ USING hnsw (embedding vector_cosine_ops);
 
 **4.3 Cross-schema cleanup ไม่มี cascade.** ลบ `core.knowledge_documents`
 แล้ว `rag.knowledge_sources` + `knowledge_chunks` **ไม่หายตาม**
-เพราะไม่มี FK จริง ต้องเขียน cleanup ระดับ application (Core ยิง
-`DELETE /v1/knowledge/{id}` ไป AI service) ไม่งั้นจะมี orphan chunk
+เพราะไม่มี FK จริง ต้องเขียน cleanup ระดับ application (Core เรียก
+use case ลบของโมดูล AI ผ่าน Python interface) ไม่งั้นจะมี orphan chunk
 ที่ยัง retrieve เจอ ทั้งที่ไฟล์ต้นฉบับถูกลบแล้ว
 
 ### 5. Decision ที่ปิดแล้ว

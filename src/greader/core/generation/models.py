@@ -44,7 +44,7 @@ class Citation:
     """Source excerpt supporting generated Assignment content.
 
     `chunk_id`/`source_id` point at rows in the `rag` schema. There is no FK
-    between `core` and `rag` -- the two sync over HTTP only -- so these are
+    between `core` and `rag` -- they never reference each other by key -- so these are
     business facts a citation carries about itself, not columns that exist
     only to satisfy a table. Allowlisted in
     `test_domain_models_hold_no_table_only_fields`.

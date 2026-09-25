@@ -2,6 +2,13 @@
 
 **Language:** English | [ภาษาไทย](README.th.md)
 
+> **Superseded by ADR-0007 (architecture).** Older passages in this README
+> describe Core and AI as two services that talk over HTTP. That design is
+> replaced: GReader is one FastAPI app in one repo, with one Neon project and
+> the schemas `core` and `rag`. `core/` and `ai/` are modules of it and call
+> each other through Python interfaces. Read `AGENTS.md` and
+> `docs/adr/0007-classroom-centric-flow.md` for the current rules.
+
 GReader is a FastAPI application that helps instructors prepare programming
 assignments, test cases, and related learning materials. It is organized as a
 modular monolith so each team can develop its area without tightly coupling it
@@ -301,7 +308,7 @@ src/greader/
 │       ├── __init__.py
 │       └── tables.py            ✅ SQLModel — schema `rag`
 │
-├── ai/                          ← AI/RAG Service (not started)
+├── ai/                          ← AI module of the same app (vector storage works; ingestion not started)
 └── web/                         ← Jinja2 templates
 
 alembic/                         ← at repo root, by convention
@@ -358,7 +365,7 @@ erDiagram
 
     knowledge_documents {
         BIGSERIAL id PK
-        TEXT r2_object_key UK "natural key, cross-checked when mirroring"
+        TEXT r2_object_key UK "natural key, cross-checked when copying"
         TEXT filename
         TEXT content_hash "sha256, prevents duplicate files"
         TEXT status "CHECK: uploaded | ingesting | ready | failed"
@@ -423,7 +430,7 @@ erDiagram
         TEXT status "CHECK: pending | processing | ready | failed"
         TEXT embedding_model "nullable"
         INT embedding_dim "nullable"
-        JSONB metadata "GIN index — mirrored for filtering"
+        JSONB metadata "GIN index — copied for filtering"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
@@ -451,7 +458,7 @@ erDiagram
     generation_artifacts ||--o| assignments : "applied to"
     assignments ||--o{ test_cases : "has"
     knowledge_sources ||--o{ knowledge_chunks : "split into"
-    knowledge_documents ||..o| knowledge_sources : "cross-schema mirror (no real FK)"
+    knowledge_documents ||..o| knowledge_sources : "cross-schema copy (no real FK)"
 ```
 
 ### 4. What the ORM can't create — hand-write these in migrations
@@ -478,9 +485,9 @@ but slow immediately once chunks reach the tens of thousands.
 **4.3 Cross-schema cleanup has no cascade.** Deleting
 `core.knowledge_documents` does **not** cascade to `rag.knowledge_sources` +
 `knowledge_chunks`, because there is no real FK between them. Cleanup must be
-handled at the application level (Core calls `DELETE /v1/knowledge/{id}` on
-the AI service) — otherwise orphaned chunks stay retrievable even after the
-source file has been deleted.
+handled at the application level (Core calls the AI module's delete use case
+through its Python interface) — otherwise orphaned chunks stay retrievable
+even after the source file has been deleted.
 
 ### 5. Decisions already closed
 

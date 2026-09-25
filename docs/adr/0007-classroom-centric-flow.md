@@ -383,6 +383,7 @@ keys.
 - Old FE-02/03/04 and CORE-07 rows are closed as superseded;
   `docs/task-scope.md` gains one row per new slice and one FE row per page
   group.
-- The "sync over HTTP only" wording under Schema rules still assumes a
-  separate AI service; the single-app decision of 2026-09-08 is a separate
-  OPS edit and is not settled here.
+- The old "sync over HTTP only" wording assumed a separate AI service. The
+  single-app decision of 2026-09-08 replaces it: `core/` and `ai/` are modules
+  of one app and call each other through Python interfaces (`typing.Protocol`),
+  not over HTTP. AGENTS.md "Schema rules" now says so.

@@ -1,8 +1,8 @@
 """Adapters satisfying core.generation's GenerationClient Protocol.
 
-StubGenerationClient is a placeholder. OPS-04 replaces it with an adapter
-that calls the ai repo over HTTP; routes.py and the Protocol do not change
-when that happens.
+StubGenerationClient is a placeholder. AI-06 replaces it with an adapter that
+calls the AI module in this same app through a Python interface; routes.py and
+the Protocol do not change when that happens.
 """
 
 from greader.core.generation.schemas import (

@@ -1,3 +1,7 @@
+> **Historical.** Written for OPS-12 (2026-09) and not kept up to date. For the
+> current state read `AGENTS.md`, `docs/task-scope.md` and
+> `docs/handoff/2026-09-24-OPS-14.md`. Kept as written for the record.
+
 # Handoff: OPS-12 — real persistence
 
 Branch `refactor/OPS-12-real-persistence`, off `dev`. Read this before
