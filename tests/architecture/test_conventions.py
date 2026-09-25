@@ -180,7 +180,7 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "submitted_at",
 }
 # `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
-# `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
+# `rag` schema. There is no FK -- core and rag never reference each other by key -- so a
 # Citation carries them as a business fact about itself (which source chunk it
 # quotes), not as a column that exists only to satisfy a table (OPS-12).
 ALLOWED_ID_SUFFIX_FIELDS = {
