@@ -27,7 +27,7 @@ async def client():
         ("/api/v1/knowledge-sources", {}),
         ("/api/v1/knowledge-chunks/search", {}),
         ("/api/v1/topics", {"name": " "}),
-        ("/api/v1/generations", {"prompt": "test", "unknown": "private input"}),
+        ("/api/v1/classrooms/1/drafts", {"prompt": "", "difficulty": "private input"}),
         ("/api/v1/uploads", {}),
     ],
 )
@@ -70,7 +70,7 @@ async def test_openapi_documents_shared_validation_envelope(client):
         "/api/v1/knowledge-sources",
         "/api/v1/knowledge-chunks/search",
         "/api/v1/topics",
-        "/api/v1/generations",
+        "/api/v1/classrooms/{classroom_id}/drafts",
         "/api/v1/uploads",
     ):
         schema = document["paths"][path]["post"]["responses"]["422"]["content"][

@@ -9,7 +9,6 @@ from greader.main import create_app
 from tests.fakes.app import build_app, fake_settings
 from tests.fakes.assignments import FakeAssignmentRepository
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
-from tests.fakes.generation import FakeGenerationRepository
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
@@ -160,7 +159,6 @@ async def test_production_wiring_answers_503_until_the_schema_lands() -> None:
         assignment_repository=FakeAssignmentRepository(),
         knowledge_document_repository=FakeKnowledgeDocumentRepository(),
         object_storage=FakeObjectStorage(),
-        generation_repository=FakeGenerationRepository(),
         vector_repository=FakeVectorRepository(),
     )
     async with _client(app) as client:

@@ -174,6 +174,9 @@
   .empty {
     @apply mx-auto flex max-w-md flex-col items-center gap-3 py-12 text-center;
   }
+  .stat {
+    @apply font-mono text-[28px] leading-tight;
+  }
   .join-code {
     @apply font-mono text-[34px] leading-none font-bold tracking-[.25em];
   }
@@ -210,6 +213,32 @@
   }
   .seg a[aria-current="page"] {
     @apply bg-fill text-ink;
+  }
+
+  /* ---- T-04 stepper and radio segments ------------------------------- */
+  .steps {
+    @apply mb-6 grid grid-cols-4 gap-0;
+  }
+  .steps li {
+    @apply border-t-[3px] border-hair pt-2 text-xs text-soft;
+  }
+  .steps li[data-done] {
+    @apply border-acc text-mid;
+  }
+  .steps li[aria-current="step"] {
+    @apply border-acc text-ink;
+  }
+  .radio-seg {
+    @apply inline-flex overflow-hidden rounded-ui border border-line;
+  }
+  .radio-seg label {
+    @apply cursor-pointer border-r border-line px-3 py-1.5 text-xs text-mid last:border-r-0 has-[:checked]:bg-fill has-[:checked]:text-ink;
+  }
+  .radio-seg input {
+    @apply sr-only;
+  }
+  .code-cell {
+    @apply font-mono text-xs whitespace-pre-wrap;
   }
 
   /* ---- Badges (status colours) -------------------------------------- */

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, checkbox with context %}
+{% from "_components/ui.html" import badge %}
+{% block title %}Confirm classrooms · Review draft · GReader{% endblock %}
+{% block content %}
+<section data-page="T-04" data-step="4">
+  {% include "instructor/t04_steps.html" %}
+  <form method="post" action="/classes/{{ classroom_id }}/drafts/{{ draft.id }}/step4">
+    {{ csrf_field() }}
+    <div class="grid gap-6 lg:grid-cols-2">
+      <div class="flex flex-col gap-2.5">
+        <p class="eyebrow">Publish this problem to</p>
+        {% for classroom, students in targets %}
+        <div class="box flex-row items-center justify-between">
+          {{ checkbox("classroom_ids", classroom.label ~ " " ~ classroom.course_name, checked=classroom.id in draft.classroom_ids, value=classroom.id) }}
+          <span class="flex items-center gap-2 text-xxs text-soft">{% if classroom.id == draft.classroom_id %}{{ badge("current", tone="accent") }}{% endif %}{{ students }} students</span>
+        </div>
+        {% endfor %}
+        {% if "classrooms" in missing %}<p class="error-text">Choose at least one classroom.</p>{% endif %}
+      </div>
+      <div class="box self-start">
+        <p class="eyebrow">Summary</p>
+        {% set kinds = draft.content.test_cases | map(attribute="kind.value") | list %}
+        <p class="text-xs"><strong>{{ draft.content.title or "Untitled" }}</strong> · {{ draft.content.difficulty.value | capitalize }} · {{ kinds | length }} tests ({{ kinds | select("equalto", "sample") | list | length }} sample, {{ kinds | select("equalto", "hidden") | list | length }} hidden, {{ kinds | select("equalto", "edge") | list | length }} edge) · deadline {% if draft.settings.deadline %}{{ draft.settings.deadline | local }}{% else %}—{% endif %} · {{ draft.settings.max_score }} points</p>
+        {% if draft.citations %}<p class="text-xxs text-mid">Cited: {% for c in draft.citations %}{{ sources.get(c.source_id, "source " ~ c.source_id) }}{% if c.page %} p. {{ c.page }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+      </div>
+    </div>
+    {% include "instructor/t04_nav.html" %}
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_components/ui.html" import badge, empty_state %}
+{% from "student/s02_parts.html" import s02_header, results_table with context %}
+{% set problem = view.problem %}
+{% set url = "/classes/" ~ problem.posting.classroom_id ~ "/assignments/" ~ problem.assignment.id %}
+{% block title %}Submission history · GReader{% endblock %}
+{% block content %}
+<section data-page="S-02" data-tab="history" data-state="S-02g">
+  {{ s02_header(view, "history", url) }}
+  {% if view.submissions %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Attempt</th><th>Submitted</th><th>Tests passed</th><th>Score</th><th>Note</th><th></th></tr></thead>
+      <tbody>
+        {% for sub in view.submissions | reverse %}
+        <tr>
+          <td>{{ sub.attempt }}</td>
+          <td>{{ sub.submitted_at | local }}{% if sub.is_late %} {{ badge("Late") }}{% endif %}</td>
+          <td>{{ sub.passed_count }}/{{ sub.results | length }}</td>
+          <td>{{ sub.score }}/{{ sub.max_score }}</td>
+          <td>{% if sub.version_number < problem.assignment.current_version %}on an older version{% elif loop.first %}counted{% else %}—{% endif %}</td>
+          <td class="text-right"><a class="link" href="{{ url }}?tab=history&attempt={{ sub.attempt }}">View code</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty_state("No submissions yet", "Your submissions and their scores show here.") }}
+  {% endif %}
+  {% if shown %}
+  <section class="card mt-4 gap-3" data-attempt="{{ shown.attempt }}" aria-labelledby="shown-title">
+    <h2 class="h2" id="shown-title">Attempt {{ shown.attempt }} · score {{ shown.score }}/{{ shown.max_score }}</h2>
+    <pre class="code-cell box">{{ shown.code }}</pre>
+    {{ results_table(shown.results, problem.assignment.settings.show_hidden_names) }}
+  </section>
+  {% endif %}
+</section>
+{% endblock %}

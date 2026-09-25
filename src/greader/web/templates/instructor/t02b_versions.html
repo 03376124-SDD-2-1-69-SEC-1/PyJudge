@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "instructor/t02_parts.html" import t02_header with context %}
+{% set problem = view.problem %}
+{% set url = "/classes/" ~ problem.posting.classroom_id ~ "/assignments/" ~ problem.assignment.id %}
+{% block title %}{{ problem.assignment.title }} · Versions · GReader{% endblock %}
+{% block content %}
+<section data-page="T-02" data-tab="versions" data-state="T-02b">
+  {{ t02_header(view, "versions", url) }}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Version</th><th>Changed</th><th>Reason</th></tr></thead>
+      <tbody>
+        {% for version in view.versions %}
+        <tr><td>v{{ version.number }}{% if loop.first %} · current{% endif %}</td><td>{{ version.changed_at | local }}</td><td>{{ version.reason }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-4 text-xxs text-soft">Students who submitted before a change are marked “Resubmit needed”.</p>
+</section>
+{% endblock %}

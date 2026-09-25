@@ -1,9 +1,35 @@
 {% extends "base.html" %}
-{% from "_components/ui.html" import empty_state %}
+{% from "_components/ui.html" import empty_state, seg, state_badge %}
 {% block title %}{{ view.classroom.course_name }} · GReader{% endblock %}
 {% block content %}
 <section data-page="S-01" data-tab="problems">
   {% include "student/s01_tabs.html" %}
-  {{ empty_state("No problems yet", "Your instructor has not published a problem in this classroom.", state="S-01a") }}
+  {% if problems.total %}
+  {% set base = "/classes/" ~ view.classroom.id ~ "?tab=problems&filter=" %}
+  <div class="mb-4 flex items-center justify-between gap-4">
+    {{ seg([("all", "All", base ~ "all"), ("not_started", "Not started", base ~ "not_started"), ("submitted", "Submitted", base ~ "submitted")], filter) }}
+    <span class="text-xxs text-soft">{{ problems.total }} problems</span>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Problem</th><th>Difficulty</th><th>Deadline</th><th>Status</th><th class="text-right">Score</th></tr></thead>
+      <tbody>
+        {% for row in problems.problems %}
+        <tr>
+          <td><a class="no-underline hover:underline" href="/classes/{{ view.classroom.id }}/assignments/{{ row.assignment.id }}">{{ row.number }} · {{ row.assignment.title }}</a></td>
+          <td>{{ row.assignment.difficulty.value | capitalize }}</td>
+          <td>{{ row.posting.schedule.deadline | local }}</td>
+          <td>{{ state_badge(row.standing.state.value) }}</td>
+          <td class="text-right">{% if row.standing.score is not none %}{{ row.standing.score | round | int }}/{{ row.posting.schedule.max_score }}{% else %}—{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="muted">No problems match this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty_state("No problems yet", "Your instructor has not published a problem in this classroom.", state="S-01a") }}
+  {% endif %}
 </section>
 {% endblock %}

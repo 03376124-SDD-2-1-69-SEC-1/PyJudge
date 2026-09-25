@@ -119,7 +119,9 @@ Terms used below are defined in `CONTEXT.md`.
    synchronously with a timeout.
 6. **Late**: a Submission after the deadline on a Posting that allows late
    work. It is accepted and flagged, with no automatic penalty.
-7. **Closed**: a Posting closes when the Instructor clicks Close
+7. **Archived** Classrooms refuse Run and Submit (page: S-02f with an
+   "archived" notice, 409; API: 409 `classroom_archived`), added 2026-09-24.
+8. **Closed**: a Posting closes when the Instructor clicks Close
    submissions, or at the deadline when allow late is off. Allow
    resubmission off means one Submit only. A closed Posting shows S-02f,
    read-only.
@@ -146,6 +148,10 @@ All computed on read from each Student's counted Submission.
   who submitted.
 - Per-test "Failing" (T-02) = share of counted Submissions failing that test.
 - Student "Solved" = submitted at least once; "Passed" = all tests passed.
+
+Averages (Average score on T-01/S-01/T-02) are rounded to one decimal
+half up (6.25 → 6.3), in Decimal, never with Python's round-half-to-even
+(`core/rounding.py`, added 2026-09-24).
 
 There is no admin dashboard.
 
@@ -195,8 +201,9 @@ There is no admin dashboard.
    `Content-Type: application/json` and on allowing no CORS origins.
 8. Cookies are `HttpOnly`, `SameSite=Lax` and `Secure`; only
    `scripts/demo.py` and the tests turn `Secure` off (plain HTTP).
-9. `/` redirects a logged-in account to its landing and everyone else to
-   `/login`.
+9. `/` redirects a logged-in account to its landing; a visitor gets the
+   public landing page G-00 (changed 2026-09-24; it used to redirect to
+   `/login`).
 
 ## 10. Code structure
 
@@ -238,6 +245,7 @@ One URL can render a different template per role.
 
 | Route | Pages (states) | Who |
 |---|---|---|
+| / | G-00 public landing (hero, how it works, for instructors/students, static draft preview); a logged-in account is redirected to its landing | visitor |
 | /login | G-01 (01a wrong password, 01b email not verified) | all |
 | /signup | G-03 (03a not a KMITL email, 03b already registered) | all |
 | /verify | G-04 (04a waiting, 04b verified, 04c link expired after 24h) | all |
@@ -347,6 +355,25 @@ keys.
   require_citations).
 - `knowledge_documents`: `uploaded_by` becomes NOT NULL; add `page_count`,
   `progress`, `error_code`.
+
+## Open questions
+
+1. **What executes student code in production?** (raised 2026-09-24) The
+   `CodeRunner` port is fixed; the adapter is not. Production wires
+   `integrations/judge0.StubCodeRunner`, which runs nothing. The demo's
+   `LocalUnsafeRunner` (in `tests/fakes/`, never shipped) runs code with the
+   local Python behind a timeout, CPU/memory rlimits and a temp dir, and
+   refuses to start when `ENV=production`; it is not a sandbox. Candidates:
+   self-hosted Judge0 CE (§5.5), or another isolate/nsjail-based service.
+   S-02a and asynchronous Submit wait for this decision. The demo runner is
+   opt-in (`ALLOW_UNSAFE_RUNNER=1`) and refuses `ENV=production` either way.
+2. **Per-Submission score: floor vs round half up?** (raised 2026-09-24,
+   grading policy not decided) The code floors today: `max_score × passed
+   ÷ total`, rounded down. The two differ when the fraction is .5 or more:
+   2 of 3 tests at max 10 is 6.67 → 6 (floor) or 7 (half up); 1 of 2 at
+   max 5 is 2.5 → 2 or 3. Changing it changes every stored score, so
+   decide before OPS-15 persists Submissions. `score_for` in
+   `core/submissions/service.py` is the one place to change.
 
 ## Consequences
 

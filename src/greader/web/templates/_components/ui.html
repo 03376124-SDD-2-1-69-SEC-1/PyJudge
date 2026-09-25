@@ -67,3 +67,21 @@
 {%- set parts = full_name.split() -%}
 {{ parts[0] }}{% if parts | length > 1 %} {{ parts[-1][0] }}.{% endif %}
 {%- endmacro %}
+
+{#- S-01b status badges; "Resubmit needed" is the only accented one. -#}
+{% macro state_badge(state) -%}
+{%- set labels = {
+  "not_started": "Not started",
+  "partial": "Submitted · partial",
+  "passed": "Passed",
+  "resubmit_needed": "Resubmit needed",
+  "late": "Late",
+  "closed": "Closed",
+} -%}
+{{ badge(labels[state], tone="accent" if state == "resubmit_needed" else "") }}
+{%- endmacro %}
+
+{#- A labelled number, as on T-01/S-01 Summary. -#}
+{% macro stat_box(label, value) -%}
+<div class="box"><p class="eyebrow">{{ label }}</p><p class="stat">{{ value }}</p></div>
+{%- endmacro %}

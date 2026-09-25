@@ -11,6 +11,8 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from greader.core.assignments.models import ProblemFilter
+from greader.core.assignments.service import AssignmentService
 from greader.core.auth.csrf import require_csrf
 from greader.core.auth.current import current_actor
 from greader.core.auth.models import Actor, PermissionDeniedError
@@ -42,6 +44,11 @@ STUDENT_TABS = {
 
 def _service(request: Request) -> ClassroomService:
     return request.app.state.classroom_service
+
+
+def _assignments(request: Request) -> AssignmentService:
+    """T-01/S-01 Problems and Summary tabs are drawn from the assignments slice."""
+    return request.app.state.assignment_service
 
 
 def _templates(request: Request) -> Jinja2Templates:
@@ -139,7 +146,10 @@ def join_submit(
 
 @router.get("/classes/{classroom_id}", response_class=HTMLResponse)
 def classroom_page(
-    request: Request, classroom_id: int, tab: str = "problems"
+    request: Request,
+    classroom_id: int,
+    tab: str = "problems",
+    filter: ProblemFilter = ProblemFilter.ALL,
 ) -> HTMLResponse:
     """T-01 for the owner, S-01 for a Member; 404 for anyone else."""
     actor = current_actor(request)
@@ -165,6 +175,20 @@ def classroom_page(
     }
     if tab == "members":
         context["members"] = service.members(actor, classroom_id)
+    if tab == "problems":
+        context["problems"] = _assignments(request).problems(
+            actor, classroom_id, filter
+        )
+        context["filter"] = filter.value
+        if isinstance(view, InstructorClassroomView):
+            generation = request.app.state.generation_service
+            context["drafts"] = generation.drafts(actor, classroom_id)
+            context["draft_sources"] = {
+                document.id: document.filename
+                for document in generation.documents(actor)
+            }
+    if tab == "summary":
+        context["summary"] = _assignments(request).summary(actor, classroom_id)
     return _templates(request).TemplateResponse(request, tabs[tab], context)
 
 

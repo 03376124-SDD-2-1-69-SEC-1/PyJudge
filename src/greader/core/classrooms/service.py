@@ -12,6 +12,7 @@ from greader.core.auth.models import Actor, PermissionDeniedError, Role
 from greader.core.classrooms.models import (
     Classroom,
     ClassroomFilter,
+    ClassroomRole,
     InstructorClassroomCard,
     InstructorClassroomView,
     InstructorPicker,
@@ -228,6 +229,47 @@ class ClassroomService:
                 )
             )
         return views
+
+    def role_of(self, actor: Actor, classroom_id: int) -> ClassroomRole:
+        """Owner, Member or outsider; a missing Classroom counts as outsider."""
+        try:
+            classroom = self._visible(actor, classroom_id)
+        except ClassroomNotFoundError:
+            return ClassroomRole.OUTSIDER
+        if classroom.instructor_id == actor.user_id:
+            return ClassroomRole.OWNER
+        return ClassroomRole.MEMBER
+
+    def is_archived(self, actor: Actor, classroom_id: int) -> bool:
+        """Archived Classrooms take no Submissions (ADR-0007 §2); owner or Member."""
+        return self._visible(actor, classroom_id).archived
+
+    def member_ids(self, actor: Actor, classroom_id: int) -> list[int]:
+        """Every Member's user id; the owning Instructor only."""
+        classroom = self._owned(actor, classroom_id)
+        return [m.student_id for m in self._repository.list_memberships(classroom.id)]
+
+    def member_names(self, actor: Actor, classroom_id: int) -> list[tuple[int, str]]:
+        """(user id, full name) of every Member, in join order; owner only."""
+        classroom = self._owned(actor, classroom_id)
+        memberships = sorted(
+            self._repository.list_memberships(classroom.id),
+            key=lambda membership: membership.joined_at,
+        )
+        return [
+            (membership.student_id, self._name_of(membership.student_id))
+            for membership in memberships
+        ]
+
+    def owned_classrooms(self, actor: Actor) -> list[Classroom]:
+        """The Instructor's active Classrooms (T-04 step 4 lists them)."""
+        if actor.role is not Role.INSTRUCTOR:
+            raise PermissionDeniedError
+        return [
+            classroom
+            for classroom in self._repository.list_owned_by(actor.user_id)
+            if not classroom.archived
+        ]
 
     def remove_member(self, actor: Actor, classroom_id: int, student_id: int) -> None:
         classroom = self._owned(actor, classroom_id)

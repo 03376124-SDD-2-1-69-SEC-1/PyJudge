@@ -168,6 +168,16 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "requested_at",
     # classrooms: T-01 Members "Joined" column and its ordering.
     "joined_at",
+    # assignments: Posting.is_closed reads closed_at; published_at orders the
+    # problem numbers on T-01/S-01; changed_at is T-02b's "Changed" column.
+    "closed_at",
+    "published_at",
+    "changed_at",
+    # generation: T-01 Drafts "Created" column and T-03a "Generated ...".
+    "generated_at",
+    # submissions (ADR-0007 §5.6): is_late compares submitted_at with the
+    # deadline; S-02g and T-02 show it in "Submitted".
+    "submitted_at",
 }
 # `chunk_id`/`source_id` on generation/models.py::Citation point at rows in the
 # `rag` schema. There is no FK -- core and rag sync over HTTP only -- so a
@@ -186,6 +196,15 @@ ALLOWED_ID_SUFFIX_FIELDS = {
     "instructor_id",
     "classroom_id",
     "student_id",
+    # assignments: AssignmentService._owned_assignment compares owner_id with
+    # the Actor; Versions and Postings are listed by assignment_id; topic_id
+    # is the one Topic T-03/T-04 pick (ADR-0007 §3.5).
+    "owner_id",
+    "assignment_id",
+    # submissions: Submissions are listed by posting_id (S-02g history, T-02
+    # results, PostingStats) -- the Counted Submission is found through it.
+    "posting_id",
+    "topic_id",
 }
 
 
@@ -327,7 +346,15 @@ LEGACY_TEMPLATE_RENDERERS: set[Path] = set()
 # Slices whose every public use case takes the Actor first. A slice listed here
 # is checked as soon as its service.py exists; assignments and generation join
 # when their use cases gain an actor.
-ACTOR_SLICES = ("classrooms", "submissions", "notifications", "admin", "documents")
+ACTOR_SLICES = (
+    "classrooms",
+    "assignments",
+    "generation",
+    "submissions",
+    "notifications",
+    "admin",
+    "documents",
+)
 ROLE_ATTRIBUTES = {"role", "instructor_id"}
 
 

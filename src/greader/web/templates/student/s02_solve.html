@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, textarea_field, button, link_button with context %}
+{% from "_components/ui.html" import alert, badge %}
+{% from "student/s02_parts.html" import s02_header, results_table with context %}
+{% set problem = view.problem %}
+{% set url = "/classes/" ~ problem.posting.classroom_id ~ "/assignments/" ~ problem.assignment.id %}
+{% block title %}{{ problem.assignment.title }} · GReader{% endblock %}
+{% block content %}
+<section data-page="S-02" data-tab="problem"{% if view.closed %} data-state="S-02f"{% elif view.update %} data-state="S-02e"{% endif %}>
+  {{ s02_header(view, "problem", url) }}
+
+  {% if error %}{% call alert(tone="danger") %}{{ error }}{% endcall %}{% endif %}
+  {% if view.update %}
+    {% call alert(state="S-02e") %}
+      <span class="flex-1">This problem was updated on {{ view.update.changed_at | local }}. Please resubmit. Reason from instructor: “{{ view.update.reason }}”</span>
+      {{ badge("Resubmit needed", tone="accent") }}
+    {% endcall %}
+  {% endif %}
+  {% if view.closed %}
+    {% call alert(state="S-02f") %}
+      <span class="flex-1">{% if view.archived %}This classroom is archived. Submissions are no longer accepted.{% else %}Closed{% if problem.posting.closed_at %} on {{ problem.posting.closed_at | local }}{% else %} on {{ problem.posting.schedule.deadline | local }}{% endif %}. Submissions are no longer accepted.{% endif %}</span>
+      {% if view.counted %}<span>Final score {{ view.counted.score }}/{{ view.counted.max_score }} · attempt {{ view.counted.attempt }}</span>{% endif %}
+    {% endcall %}
+  {% endif %}
+
+  <div class="grid gap-4 lg:grid-cols-2">
+    <article class="card gap-3">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <h2 class="h2">{{ problem.number }} · {{ problem.assignment.title }}</h2>
+        {{ badge(problem.assignment.difficulty.value | capitalize) }}
+      </div>
+      <p class="text-xxs text-soft">Deadline {{ problem.posting.schedule.deadline | local }} · max score {{ problem.posting.schedule.max_score }} · time limit {{ problem.assignment.settings.time_limit_ms / 1000 }}s / test{% if problem.posting.schedule.allow_late %} · late work accepted{% endif %}</p>
+      <p class="whitespace-pre-line">{{ problem.assignment.problem_statement }}</p>
+      <p class="eyebrow">Sample tests</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Input</th><th>Expected output</th></tr></thead>
+          <tbody>
+            {% for tc in view.samples %}
+            <tr><td class="code-cell">{{ tc.input_data }}</td><td class="code-cell">{{ tc.expected_output }}</td></tr>
+            {% else %}
+            <tr><td colspan="2" class="muted">No sample tests.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if view.hidden_count %}<p class="text-xxs text-soft">{{ view.hidden_count }} hidden test{{ "s" if view.hidden_count != 1 }} · you see pass/fail only</p>{% endif %}
+    </article>
+
+    <form method="post" action="{{ url }}" class="card gap-3">
+      {{ csrf_field() }}
+      <div class="flex items-center justify-between gap-2">
+        <p class="eyebrow">Code editor</p>
+        <span class="text-xxs text-soft">Python 3</span>
+      </div>
+      {{ textarea_field("code", "Your code", value=code, input_class="font-mono text-xs", rows=18, spellcheck="false", readonly=view.closed) }}
+      <div class="flex flex-wrap justify-end gap-2.5">
+        {% if not view.closed %}{{ link_button(url, "Reset") }}{% endif %}
+        {{ button("Run", name="action", value="run", disabled=view.closed) }}
+        {{ button("Submit", variant="primary", name="action", value="submit", disabled=not view.can_submit) }}
+      </div>
+      {% if not view.closed and not view.can_submit %}<p class="hint">This problem allows one submission only.</p>{% endif %}
+    </form>
+  </div>
+
+  <section class="card mt-4 gap-3" aria-labelledby="results-title">
+    {% if run %}
+      <h2 class="h2" id="results-title">Results · Run (sample tests only) finished in {{ "%.2f" | format(run.time_seconds) }}s</h2>
+      {{ results_table(run.results, problem.assignment.settings.show_hidden_names) }}
+      <p class="text-xxs text-soft">Hidden tests run on Submit. A Run is not graded or kept.</p>
+    {% elif view.counted %}
+      {% set sub = view.counted %}
+      <div class="flex flex-wrap items-center justify-between gap-2"{% if sub.all_passed %} data-state="S-02b"{% else %} data-state="S-02c"{% endif %}>
+        <h2 class="h2" id="results-title">{% if sub.all_passed %}All {{ sub.results | length }} tests passed{% else %}{{ sub.passed_count }} of {{ sub.results | length }} tests passed{% endif %} · score {{ sub.score }}/{{ sub.max_score }}</h2>
+        {% if sub.is_late %}{{ badge("Late") }}{% endif %}
+      </div>
+      {{ results_table(sub.results, problem.assignment.settings.show_hidden_names) }}
+      <p class="text-xxs text-soft">Submitted {{ sub.submitted_at | local }} · attempt {{ sub.attempt }}. Hidden tests show pass/fail only.</p>
+    {% else %}
+      <h2 class="h2" id="results-title">Results</h2>
+      <p class="muted">Run checks your code on the sample tests. Submit grades it on every test; your latest submission counts.</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

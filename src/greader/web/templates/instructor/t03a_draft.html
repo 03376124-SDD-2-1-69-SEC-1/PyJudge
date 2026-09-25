@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, hidden, button, link_button with context %}
+{% from "_components/ui.html" import page_header %}
+{% block title %}Draft · GReader{% endblock %}
+{% macro regenerate(part) -%}
+<form method="post" action="/classes/{{ classroom_id }}/drafts/{{ draft.id }}/regenerate">
+  {{ csrf_field() }}
+  {{ hidden("part", part) }}
+  {{ button("Regenerate this part", size="sm") }}
+</form>
+{%- endmacro %}
+{% macro cases_table(rows, with_kind) -%}
+<table class="table">
+  <thead><tr><th>Input</th><th>Expected</th>{% if with_kind %}<th>Type</th>{% else %}<th>Note</th>{% endif %}</tr></thead>
+  <tbody>
+    {% for tc in rows %}
+    <tr><td class="code-cell">{{ tc.input_data }}</td><td class="code-cell">{{ tc.expected_output }}</td><td>{% if with_kind %}{{ tc.kind.value }}{% else %}{{ tc.note or "—" }}{% endif %}</td></tr>
+    {% else %}
+    <tr><td colspan="3" class="muted">None.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{%- endmacro %}
+{% block content %}
+<section data-page="T-03" data-state="T-03a">
+  {% call page_header("Draft") %}
+    <span class="text-xxs text-soft">Generated {{ draft.generated_at | local }} from {{ draft.document_ids | length }} document{{ "s" if draft.document_ids | length != 1 }}</span>
+  {% endcall %}
+  <div class="card gap-4">
+    <div class="flex items-start justify-between gap-4">
+      <div><p class="eyebrow">Title</p><h2 class="h2">{{ draft.content.title }}</h2></div>
+      {{ regenerate("title") }}
+    </div>
+    <hr class="hr">
+    <div class="flex items-start justify-between gap-4">
+      <div><p class="eyebrow">Description</p><p class="whitespace-pre-line">{{ draft.content.problem_statement }}</p></div>
+      {{ regenerate("description") }}
+    </div>
+    <hr class="hr">
+    <div class="grid gap-6 lg:grid-cols-2">
+      <div><p class="eyebrow mb-2">Test cases</p>{{ cases_table(draft.content.test_cases | rejectattr("kind.value", "equalto", "edge") | list, true) }}</div>
+      <div><p class="eyebrow mb-2">Edge cases</p>{{ cases_table(draft.content.test_cases | selectattr("kind.value", "equalto", "edge") | list, false) }}</div>
+    </div>
+    <hr class="hr">
+    <div>
+      <p class="eyebrow">Citations</p>
+      <p class="text-xs">
+        {% for citation in draft.citations %}{{ sources.get(citation.source_id, "source " ~ citation.source_id) }}{% if citation.page %} · p. {{ citation.page }}{% endif %}{% if not loop.last %} · {% endif %}{% else %}<span class="muted">No citations.</span>{% endfor %}
+      </p>
+    </div>
+    <div class="flex flex-wrap justify-between gap-2.5">
+      <div class="flex gap-2.5">
+        {{ link_button("/classes/" ~ classroom_id ~ "/generate", "Back to prompt") }}
+        {{ link_button("/classes/" ~ classroom_id ~ "/drafts/" ~ draft.id ~ "?step=1", "Edit") }}
+      </div>
+      {{ link_button("/classes/" ~ classroom_id ~ "/drafts/" ~ draft.id ~ "?step=1", "Looks good, continue", variant="primary") }}
+    </div>
+  </div>
+</section>
+{% endblock %}

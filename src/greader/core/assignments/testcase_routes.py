@@ -1,163 +1,94 @@
-"""FastAPI adapter for the TestCase sub-resource of an Assignment.
+"""FastAPI adapter for /api/v1/assignments/{id}/test-cases.
 
-A separate router from `routes.py` so neither file mixes two resources; the
-domain stays one aggregate (CORE-11) and both routers share one service.
-
-Named `testcase_routes.py`, not `test_case_routes.py`: the architecture test that
-keeps pytest files out of `src/` matches any filename starting with `test_`.
+Every write publishes a new Version (ADR-0007 §3.7), so each one carries the
+reason Students will see.
 """
 
-from typing import NoReturn
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 
 from greader.core.assignments.models import TestCase
-from greader.core.assignments.routes import get_service, raise_assignment_not_found
-from greader.core.assignments.schemas import (
-    TestCaseCreate,
-    TestCasePatch,
-    TestCaseReplace,
-    TestCaseResponse,
+from greader.core.assignments.routes import (
+    assignment_service,
+    domain_errors,
+    test_case_response,
 )
-from greader.core.assignments.service import (
-    AssignmentNotFoundError,
-    TestCaseNotFoundError,
-)
+from greader.core.assignments.schemas import TestCaseResponse, TestCaseWrite
+from greader.core.auth.current import current_actor
 
 router = APIRouter(
-    prefix="/api/v1/assignments/{assignment_id}/test-cases",
-    tags=["Assignments"],
+    prefix="/api/v1/assignments/{assignment_id}/test-cases", tags=["assignments"]
 )
 
 
-def _response(test_case: TestCase) -> TestCaseResponse:
-    """Convert a domain TestCase into its HTTP response schema."""
-    return TestCaseResponse(
-        id=test_case.id,
-        input_data=test_case.input_data,
-        expected_output=test_case.expected_output,
-        is_hidden=test_case.is_hidden,
-        order_index=test_case.order_index,
+def _domain(payload: TestCaseWrite) -> TestCase:
+    return TestCase(
+        input_data=payload.input_data,
+        expected_output=payload.expected_output,
+        kind=payload.kind,
+        note=payload.note,
     )
-
-
-def _raise_test_case_not_found() -> NoReturn:
-    """Raise the stable HTTP representation of a missing TestCase."""
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail={
-            "code": "test_case_not_found",
-            "message": "Test case not found",
-        },
-    )
-
-
-@router.post("", response_model=TestCaseResponse, status_code=status.HTTP_201_CREATED)
-def create_test_case(
-    assignment_id: int, payload: TestCaseCreate, request: Request
-) -> TestCaseResponse:
-    """Create a TestCase on an Assignment."""
-    service = get_service(request)
-    try:
-        return _response(
-            service.add_test_case(
-                assignment_id=assignment_id,
-                input_data=payload.input_data,
-                expected_output=payload.expected_output,
-                is_hidden=payload.is_hidden,
-                order_index=payload.order_index,
-            )
-        )
-    except AssignmentNotFoundError:
-        raise_assignment_not_found()
 
 
 @router.get("", response_model=list[TestCaseResponse])
-def list_test_cases(assignment_id: int, request: Request) -> list[TestCaseResponse]:
-    """List every TestCase belonging to an Assignment."""
-    service = get_service(request)
-    try:
-        return [_response(tc) for tc in service.list_test_cases(assignment_id)]
-    except AssignmentNotFoundError:
-        raise_assignment_not_found()
+def list_test_cases(request: Request, assignment_id: int) -> list[TestCaseResponse]:
+    with domain_errors():
+        test_cases = assignment_service(request).test_cases(
+            current_actor(request), assignment_id
+        )
+    return [test_case_response(tc) for tc in test_cases]
 
 
 @router.get("/{test_case_id}", response_model=TestCaseResponse)
 def get_test_case(
-    assignment_id: int, test_case_id: int, request: Request
+    request: Request, assignment_id: int, test_case_id: int
 ) -> TestCaseResponse:
-    """Get one TestCase belonging to an Assignment."""
-    service = get_service(request)
-    try:
-        return _response(service.get_test_case(assignment_id, test_case_id))
-    except AssignmentNotFoundError:
-        raise_assignment_not_found()
-    except TestCaseNotFoundError:
-        _raise_test_case_not_found()
+    with domain_errors():
+        test_case = assignment_service(request).test_case(
+            current_actor(request), assignment_id, test_case_id
+        )
+    return test_case_response(test_case)
+
+
+@router.post("", response_model=TestCaseResponse, status_code=status.HTTP_201_CREATED)
+def add_test_case(
+    request: Request, assignment_id: int, payload: TestCaseWrite
+) -> TestCaseResponse:
+    with domain_errors():
+        test_case = assignment_service(request).add_test_case(
+            current_actor(request),
+            assignment_id,
+            _domain(payload),
+            reason=payload.reason,
+        )
+    return test_case_response(test_case)
 
 
 @router.put("/{test_case_id}", response_model=TestCaseResponse)
 def replace_test_case(
-    assignment_id: int,
-    test_case_id: int,
-    payload: TestCaseReplace,
-    request: Request,
+    request: Request, assignment_id: int, test_case_id: int, payload: TestCaseWrite
 ) -> TestCaseResponse:
-    """Replace every client-writable field of a TestCase."""
-    service = get_service(request)
-    try:
-        return _response(
-            service.update_test_case(
-                assignment_id=assignment_id,
-                test_case_id=test_case_id,
-                input_data=payload.input_data,
-                expected_output=payload.expected_output,
-                is_hidden=payload.is_hidden,
-                order_index=payload.order_index,
-            )
+    with domain_errors():
+        test_case = assignment_service(request).replace_test_case(
+            current_actor(request),
+            assignment_id,
+            test_case_id,
+            _domain(payload),
+            reason=payload.reason,
         )
-    except AssignmentNotFoundError:
-        raise_assignment_not_found()
-    except TestCaseNotFoundError:
-        _raise_test_case_not_found()
-
-
-@router.patch("/{test_case_id}", response_model=TestCaseResponse)
-def patch_test_case(
-    assignment_id: int,
-    test_case_id: int,
-    payload: TestCasePatch,
-    request: Request,
-) -> TestCaseResponse:
-    """Update only the TestCase fields present in the request body."""
-    service = get_service(request)
-    try:
-        return _response(
-            service.update_test_case(
-                assignment_id=assignment_id,
-                test_case_id=test_case_id,
-                input_data=payload.input_data,
-                expected_output=payload.expected_output,
-                is_hidden=payload.is_hidden,
-                order_index=payload.order_index,
-            )
-        )
-    except AssignmentNotFoundError:
-        raise_assignment_not_found()
-    except TestCaseNotFoundError:
-        _raise_test_case_not_found()
+    return test_case_response(test_case)
 
 
 @router.delete("/{test_case_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_test_case(
-    assignment_id: int, test_case_id: int, request: Request
+    request: Request,
+    assignment_id: int,
+    test_case_id: int,
+    reason: Annotated[str, Query(min_length=1, max_length=500)],
 ) -> Response:
-    """Delete a TestCase belonging to an Assignment."""
-    service = get_service(request)
-    try:
-        service.delete_test_case(assignment_id, test_case_id)
-    except AssignmentNotFoundError:
-        raise_assignment_not_found()
-    except TestCaseNotFoundError:
-        _raise_test_case_not_found()
+    with domain_errors():
+        assignment_service(request).delete_test_case(
+            current_actor(request), assignment_id, test_case_id, reason=reason
+        )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

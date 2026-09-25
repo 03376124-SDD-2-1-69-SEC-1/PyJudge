@@ -115,13 +115,15 @@ def _verify_page(
     )
 
 
-@router.get("/")
-def root(request: Request) -> RedirectResponse:
-    """A logged-in account goes to its landing, everyone else to G-01."""
+@router.get("/", response_model=None)
+def root(request: Request) -> HTMLResponse | RedirectResponse:
+    """G-00 for a visitor; a logged-in account goes to its landing."""
     try:
         actor = current_actor(request)
     except NotAuthenticatedError:
-        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+        return _templates(request).TemplateResponse(
+            request, "shared/g00_landing.html", {}
+        )
     landing = auth_service(request).landing_for(actor)
     return RedirectResponse(
         LANDING_URLS[landing], status_code=status.HTTP_303_SEE_OTHER

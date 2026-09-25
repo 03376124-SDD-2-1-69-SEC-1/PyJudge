@@ -9,7 +9,9 @@ environment variable is missing. There is no in-memory mode — a test that want
 one passes a fake from `tests/fakes/` explicitly.
 """
 
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -24,7 +26,15 @@ from greader.ai.app.schemas import ApplicationErrorResponse
 from greader.ai.app.service import VectorService
 from greader.ai.client import StubGenerationClient
 from greader.config import Settings, get_settings
-from greader.core.assignments.ports import AssignmentRepository
+from greader.core.assignments.ports import (
+    AssignmentRepository,
+    PostingRepository,
+    PostingStats,
+    VersionRepository,
+)
+from greader.core.assignments.routes import (
+    classroom_router as assignment_classroom_router,
+)
 from greader.core.assignments.routes import router as assignment_router
 from greader.core.assignments.service import AssignmentService
 from greader.core.assignments.testcase_routes import router as test_case_router
@@ -43,17 +53,29 @@ from greader.core.classrooms.pages import router as classroom_page_router
 from greader.core.classrooms.ports import ClassroomRepository, ClassroomStats
 from greader.core.classrooms.routes import router as classroom_router
 from greader.core.classrooms.service import ClassroomService
-from greader.core.generation.ports import GenerationClient, GenerationRepository
-from greader.core.generation.routes import router as generation_router
+from greader.core.generation.pages import router as generation_page_router
+from greader.core.generation.ports import (
+    DocumentCatalog,
+    DraftRepository,
+    GenerationClient,
+)
+from greader.core.generation.routes import classroom_router as draft_classroom_router
+from greader.core.generation.routes import router as draft_router
 from greader.core.generation.service import GenerationService
+from greader.core.submissions.pages import router as submission_page_router
+from greader.core.submissions.ports import CodeRunner, SubmissionRepository
+from greader.core.submissions.routes import (
+    classroom_router as submission_classroom_router,
+)
+from greader.core.submissions.routes import router as submission_router
+from greader.core.submissions.service import SubmissionService
+from greader.core.submissions.stats import SubmissionPostingStats
 from greader.core.topics.ports import TopicRepository
 from greader.core.topics.routes import router as topic_router
 from greader.core.topics.service import TopicService
 from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from greader.core.uploads.routes import router as upload_router
 from greader.core.uploads.service import UploadService
-from greader.database.core.assignment_repository import SQLAssignmentRepository
-from greader.database.core.generation_repository import SQLGenerationRepository
 from greader.database.core.knowledge_document_repository import (
     SQLKnowledgeDocumentRepository,
 )
@@ -70,11 +92,20 @@ from greader.database.session import (
 from greader.database.storage.r2 import R2ObjectStorage, build_r2_client, check_r2
 from greader.integrations.clock import SystemClock
 from greader.integrations.email import StubEmailSender
+from greader.integrations.judge0 import StubCodeRunner
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _WEB_DIR = _PACKAGE_DIR / "web"
 _TEMPLATE_DIR = _WEB_DIR / "templates"
 _STATIC_DIR = _WEB_DIR / "static"
+
+
+DISPLAY_ZONE = ZoneInfo("Asia/Bangkok")
+
+
+def local_time(value: datetime, pattern: str = "%-d %b, %H:%M") -> str:
+    """Render a stored UTC time in Bangkok time for templates (`|local`)."""
+    return value.astimezone(DISPLAY_ZONE).strftime(pattern)
 
 
 def asset_url(path: str) -> str:
@@ -94,16 +125,22 @@ def create_app(
     settings: Settings | None = None,
     topic_repository: TopicRepository | None = None,
     assignment_repository: AssignmentRepository | None = None,
+    version_repository: VersionRepository | None = None,
+    posting_repository: PostingRepository | None = None,
+    posting_stats: PostingStats | None = None,
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
-    generation_repository: GenerationRepository | None = None,
+    draft_repository: DraftRepository | None = None,
+    document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
     verification_mailer: VerificationMailer | None = None,
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
+    submission_repository: SubmissionRepository | None = None,
+    code_runner: CodeRunner | None = None,
     demo_accounts: tuple[DemoAccount, ...] | None = None,
     secure_cookies: bool | None = None,
 ) -> FastAPI:
@@ -136,6 +173,7 @@ def create_app(
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
     templates.env.globals["asset_url"] = asset_url
     templates.env.globals["csrf_token"] = csrf_token
+    templates.env.filters["local"] = local_time
     application.state.templates = templates
     # The "log in as" list on G-01 exists only when scripts/demo.py passes it.
     if demo_accounts is None:
@@ -165,17 +203,65 @@ def create_app(
     # tables yet either.
     if classroom_stats is None:
         classroom_stats = PendingRepository("classroom stats")
-    application.state.classroom_service = ClassroomService(
+    classroom_service = ClassroomService(
         classroom_repository, auth_service, classroom_stats, clock
+    )
+    application.state.classroom_service = classroom_service
+
+    # The ADR-0007 shape (owner, topic, kind/note, Versions, Postings) has no
+    # columns until OPS-15; database/core/assignment_repository.py still has
+    # the old shape and is not wired meanwhile.
+    if assignment_repository is None:
+        assignment_repository = PendingRepository("assignments")
+    if version_repository is None:
+        version_repository = PendingRepository("assignment versions")
+    if posting_repository is None:
+        posting_repository = PendingRepository("postings")
+    # Submissions have no table until OPS-15. T-01/S-01 numbers are computed
+    # from them unless a test injects its own PostingStats.
+    if submission_repository is None:
+        submission_repository = PendingRepository("submissions")
+    if posting_stats is None:
+        posting_stats = SubmissionPostingStats(
+            submission_repository, assignment_repository
+        )
+    assignment_service = AssignmentService(
+        assignment_repository,
+        version_repository,
+        posting_repository,
+        classroom_service,
+        posting_stats,
+        clock,
+    )
+    application.state.assignment_service = assignment_service
+
+    if code_runner is None:
+        code_runner = StubCodeRunner()
+    application.state.submission_service = SubmissionService(
+        submission_repository, code_runner, assignment_service, classroom_service, clock
+    )
+
+    # Drafts have no table until OPS-15 and the Document library arrives with
+    # the documents slice; database/core/generation_repository.py holds the
+    # pre-ADR request/artifact shape and is not wired.
+    if generation_client is None:
+        generation_client = StubGenerationClient()
+    if draft_repository is None:
+        draft_repository = PendingRepository("drafts")
+    if document_catalog is None:
+        document_catalog = PendingRepository("documents")
+    application.state.generation_service = GenerationService(
+        draft_repository,
+        generation_client,
+        document_catalog,
+        classroom_service,
+        assignment_service,
+        clock,
     )
 
     if topic_repository is None:
         topic_repository = SQLTopicRepository(use_session_factory())
     application.state.topic_service = TopicService(topic_repository)
-
-    if assignment_repository is None:
-        assignment_repository = SQLAssignmentRepository(use_session_factory())
-    application.state.assignment_service = AssignmentService(assignment_repository)
 
     if object_storage is None:
         storage_settings = use_settings()
@@ -192,28 +278,26 @@ def create_app(
         max_upload_size_bytes=use_settings().max_upload_size_bytes,
     )
 
-    if generation_client is None:
-        generation_client = StubGenerationClient()
-    if generation_repository is None:
-        generation_repository = SQLGenerationRepository(use_session_factory())
-    application.state.generation_service = GenerationService(
-        generation_repository, generation_client
-    )
-
     if vector_repository is None:
         vector_repository = PostgresVectorRepository(use_session_factory())
     application.state.vector_service = VectorService(vector_repository)
 
     application.include_router(topic_router)
     application.include_router(assignment_router)
+    application.include_router(assignment_classroom_router)
     application.include_router(test_case_router)
-    application.include_router(generation_router)
+    application.include_router(draft_router)
+    application.include_router(draft_classroom_router)
+    application.include_router(generation_page_router)
     application.include_router(upload_router)
     application.include_router(vector_router)
     application.include_router(auth_router)
     application.include_router(auth_page_router)
     application.include_router(classroom_router)
     application.include_router(classroom_page_router)
+    application.include_router(submission_router)
+    application.include_router(submission_classroom_router)
+    application.include_router(submission_page_router)
 
     @application.exception_handler(NotAuthenticatedError)
     def not_authenticated(request: Request, error: NotAuthenticatedError) -> Response:

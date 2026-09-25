@@ -11,19 +11,34 @@ from fastapi import FastAPI
 
 from greader.ai.app.repository import VectorRepository
 from greader.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
-from greader.core.assignments.ports import AssignmentRepository
+from greader.core.assignments.ports import (
+    AssignmentRepository,
+    PostingRepository,
+    PostingStats,
+    VersionRepository,
+)
 from greader.core.auth.pages import DemoAccount
 from greader.core.auth.ports import AuthRepository, Clock
 from greader.core.classrooms.ports import ClassroomRepository, ClassroomStats
-from greader.core.generation.ports import GenerationClient, GenerationRepository
+from greader.core.generation.ports import (
+    DocumentCatalog,
+    DraftRepository,
+    GenerationClient,
+)
+from greader.core.submissions.ports import CodeRunner, SubmissionRepository
 from greader.core.topics.ports import TopicRepository
 from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from greader.integrations.email import StubEmailSender
 from greader.main import create_app
-from tests.fakes.assignments import FakeAssignmentRepository
+from tests.fakes.assignments import (
+    FakeAssignmentRepository,
+    FakePostingRepository,
+    FakeVersionRepository,
+)
 from tests.fakes.auth import FakeAuthRepository, FakeClock
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
-from tests.fakes.generation import FakeGenerationRepository
+from tests.fakes.generation import FakeDocumentCatalog, FakeDraftRepository
+from tests.fakes.submissions import FakeSubmissionRepository, ScriptedCodeRunner
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
@@ -51,16 +66,22 @@ def build_app(
     *,
     topic_repository: TopicRepository | None = None,
     assignment_repository: AssignmentRepository | None = None,
+    version_repository: VersionRepository | None = None,
+    posting_repository: PostingRepository | None = None,
+    posting_stats: PostingStats | None = None,
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
-    generation_repository: GenerationRepository | None = None,
+    draft_repository: DraftRepository | None = None,
+    document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
     verification_mailer: StubEmailSender | None = None,
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
+    submission_repository: SubmissionRepository | None = None,
+    code_runner: CodeRunner | None = None,
     demo_accounts: tuple[DemoAccount, ...] | None = None,
     max_upload_size_bytes: int = DEFAULT_MAX_UPLOAD_SIZE_BYTES,
 ) -> FastAPI:
@@ -69,12 +90,22 @@ def build_app(
         topic_repository = FakeTopicRepository()
     if assignment_repository is None:
         assignment_repository = FakeAssignmentRepository()
+    if version_repository is None:
+        version_repository = FakeVersionRepository()
+    if posting_repository is None:
+        posting_repository = FakePostingRepository()
+    if submission_repository is None:
+        submission_repository = FakeSubmissionRepository()
+    if code_runner is None:
+        code_runner = ScriptedCodeRunner()
     if knowledge_document_repository is None:
         knowledge_document_repository = FakeKnowledgeDocumentRepository()
     if object_storage is None:
         object_storage = FakeObjectStorage()
-    if generation_repository is None:
-        generation_repository = FakeGenerationRepository()
+    if draft_repository is None:
+        draft_repository = FakeDraftRepository()
+    if document_catalog is None:
+        document_catalog = FakeDocumentCatalog()
     if vector_repository is None:
         vector_repository = FakeVectorRepository()
     if auth_repository is None:
@@ -92,16 +123,22 @@ def build_app(
         settings=fake_settings(max_upload_size_bytes=max_upload_size_bytes),
         topic_repository=topic_repository,
         assignment_repository=assignment_repository,
+        version_repository=version_repository,
+        posting_repository=posting_repository,
+        posting_stats=posting_stats,
         knowledge_document_repository=knowledge_document_repository,
         object_storage=object_storage,
         generation_client=generation_client,
-        generation_repository=generation_repository,
+        draft_repository=draft_repository,
+        document_catalog=document_catalog,
         vector_repository=vector_repository,
         auth_repository=auth_repository,
         verification_mailer=verification_mailer,
         clock=clock,
         classroom_repository=classroom_repository,
         classroom_stats=classroom_stats,
+        submission_repository=submission_repository,
+        code_runner=code_runner,
         demo_accounts=demo_accounts,
         # httpx talks plain HTTP to the ASGI app and drops Secure cookies.
         secure_cookies=False,

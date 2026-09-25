@@ -1,16 +1,51 @@
 {% extends "base.html" %}
-{% from "_components/ui.html" import empty_state %}
+{% from "_components/ui.html" import stat_box, empty_state %}
 {% block title %}Summary · {{ view.classroom.course_name }} · GReader{% endblock %}
 {% block content %}
 <section data-page="T-01" data-tab="summary">
-  {% include "instructor/t01_header.html" %}
   {% include "instructor/t01_tabs.html" %}
-  <div class="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-    <div class="box"><p class="eyebrow">Students</p><p class="h1">{{ view.student_count }}</p></div>
-    <div class="box"><p class="eyebrow">Avg pass rate</p><p class="h1">—</p></div>
-    <div class="box"><p class="eyebrow">Problems</p><p class="h1">0</p></div>
-    <div class="box"><p class="eyebrow">Never submitted</p><p class="h1">—</p></div>
+  <div class="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+    {{ stat_box("Students", summary.student_count) }}
+    {{ stat_box("Avg pass rate", ((summary.avg_pass_rate * 100) | round | int ~ "%") if summary.avg_pass_rate is not none else "—") }}
+    {{ stat_box("Problems", summary.problem_count) }}
+    {{ stat_box("Never submitted", summary.never_submitted) }}
   </div>
-  {{ empty_state("Nothing to summarise yet", "Most-failed problems and the score table appear once problems are published.", art="chart") }}
+  {% if summary.problem_count %}
+  <div class="grid gap-4 lg:grid-cols-[1fr_2fr]">
+    <section class="box self-start">
+      <h2 class="h2">Top 5 most-failed problems</h2>
+      <table class="table">
+        <thead><tr><th>Problem</th><th class="text-right">Fail rate</th></tr></thead>
+        <tbody>
+          {% for item in summary.most_failed %}
+          <tr><td>{{ item.title }}</td><td class="text-right">{{ (item.rate * 100) | round | int }}%</td></tr>
+          {% else %}
+          <tr><td colspan="2" class="muted">No submissions yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="hint">Fail rate = students who failed at least one test ÷ students who submitted that problem, not everyone enrolled.</p>
+    </section>
+    <section class="box self-start">
+      <h2 class="h2">Score table</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Student</th>{% for title in summary.problem_titles %}<th title="{{ title }}">P{{ loop.index }}</th>{% endfor %}<th class="text-right">Total</th></tr></thead>
+          <tbody>
+            {% for row in summary.score_table %}
+            <tr>
+              <td>{{ row.student_name }}</td>
+              {% for score in row.scores %}<td>{% if score is not none %}{{ score | round | int }}{% else %}—{% endif %}</td>{% endfor %}
+              <td class="text-right">{{ row.total | round | int }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  {% else %}
+    {{ empty_state("Nothing to summarise yet", "Most-failed problems and the score table appear once problems are published.", art="chart") }}
+  {% endif %}
 </section>
 {% endblock %}

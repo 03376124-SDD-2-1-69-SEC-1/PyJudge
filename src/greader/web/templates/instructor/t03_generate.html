@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, textarea_field, value_select, radio_seg, checkbox, button, link_button with context %}
+{% from "_components/ui.html" import page_header, alert, empty_state %}
+{% block title %}Create a problem with AI · GReader{% endblock %}
+{% block content %}
+<section data-page="T-03">
+  {{ page_header("Create a problem with AI") }}
+  {% if error == "failed" %}
+    {% call alert(tone="danger", state="T-03d") %}
+      <span><strong>Generation failed — the model did not respond.</strong> Nothing was saved and no quota was used. Try again, or narrow the prompt to fewer documents.</span>
+    {% endcall %}
+  {% elif error == "quota" %}
+    {% call alert(tone="danger") %}You have used all {{ quota.limit }} generations for today. The quota resets at midnight.{% endcall %}
+  {% elif error == "invalid" %}
+    {% call alert(tone="danger") %}Describe the problem and choose documents from your library.{% endcall %}
+  {% endif %}
+  <form method="post" action="/classes/{{ classroom_id }}/generate" class="mt-4 grid gap-6 lg:grid-cols-[2fr_1fr]">
+    {{ csrf_field() }}
+    <div class="flex flex-col gap-3">
+      {{ textarea_field("prompt", "What should the problem be about?", value=form.prompt, required=true, rows=5, placeholder="Write a problem about binary search on a sorted list of integers…") }}
+      <div class="flex items-center gap-3">
+        {{ button("Try again" if error == "failed" else "Generate", variant="primary", disabled=quota.remaining == 0) }}
+        <span class="text-xxs text-mid">Uses 1 of your {{ quota.limit }} daily generations · {{ quota.remaining }} left today.</span>
+      </div>
+    </div>
+    <div class="flex flex-col gap-4">
+      {{ value_select("topic_id", "Topic", topic_options, selected=form.topic_id, blank="—") }}
+      {{ radio_seg("difficulty", "Difficulty", [("easy", "Easy"), ("medium", "Medium"), ("hard", "Hard")], form.difficulty) }}
+      <div class="field">
+        <span class="label">Source documents</span>
+        {% if documents %}
+        <div class="box gap-2">
+          {% for document in documents %}
+            {{ checkbox("document_ids", document.filename, checked=document.id in form.document_ids, note="· " ~ document.pages ~ " p.", value=document.id) }}
+          {% endfor %}
+          <a class="link text-xxs" href="/documents">Manage in My documents</a>
+        </div>
+        {% else %}
+          {% call empty_state("No documents yet", "Upload your lecture notes so the AI can cite them.", art="PDF", state="T-03b") %}
+            {{ link_button("/documents", "Go to My documents") }}
+          {% endcall %}
+        {% endif %}
+      </div>
+    </div>
+  </form>
+</section>
+{% endblock %}
