@@ -195,6 +195,12 @@ class AuthService:
         """Where `/` sends a logged-in account."""
         return _landing(actor.role)
 
+    def admin_home(self, actor: Actor) -> User:
+        """The Admin landing; A-01 replaces its page when the admin slice lands."""
+        if actor.role is not Role.ADMIN:
+            raise PermissionDeniedError
+        return self._require_user(actor.user_id)
+
     def me(self, actor: Actor) -> User:
         return self._require_user(actor.user_id)
 

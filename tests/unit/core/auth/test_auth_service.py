@@ -347,3 +347,25 @@ def test_landing_for_follows_the_role(
     actor = Actor(user_id=1, role=role, full_name="A", email="a@kmitl.ac.th")
 
     assert service.landing_for(actor) is landing
+
+
+@pytest.mark.parametrize("role", [Role.STUDENT, Role.INSTRUCTOR])
+def test_admin_home_is_admin_only(
+    service: AuthService, repository: FakeAuthRepository, role: Role
+) -> None:
+    user = seed_user(repository, email="x@kmitl.ac.th", full_name="X", role=role)
+    actor = Actor(user_id=user.id, role=role, full_name="X", email=user.email)
+
+    with pytest.raises(PermissionDeniedError):
+        service.admin_home(actor)
+
+
+def test_admin_home_returns_the_admin(
+    service: AuthService, repository: FakeAuthRepository
+) -> None:
+    user = seed_user(
+        repository, email="admin@kmitl.ac.th", full_name="Admin", role=Role.ADMIN
+    )
+    actor = Actor(user_id=user.id, role=Role.ADMIN, full_name="Admin", email=user.email)
+
+    assert service.admin_home(actor).id == user.id
