@@ -1,0 +1,101 @@
+﻿task_id,title,category,topic,difficulty,pages,source_url,pdf_url,r2_key,source
+codecube_001,AxB Problem,codecube,io-arithmetic,easy,1,https://programming.in.th/tasks/codecube_001,https://programming.in.th/api/tasks/codecube_001/statement,sources/programming-in-th/codecube_001.pdf,CodeCube
+codecube_002,Greatest Common Divisor,codecube,math,easy,1,https://programming.in.th/tasks/codecube_002,https://programming.in.th/api/tasks/codecube_002/statement,sources/programming-in-th/codecube_002.pdf,CodeCube
+codecube_003,Least Common Multiple,codecube,math,easy,1,https://programming.in.th/tasks/codecube_003,https://programming.in.th/api/tasks/codecube_003/statement,sources/programming-in-th/codecube_003.pdf,CodeCube
+codecube_004,กําแพงเมืองไทย (Greed Wall of Siam),codecube,arrays,easy,1,https://programming.in.th/tasks/codecube_004,https://programming.in.th/api/tasks/codecube_004/statement,sources/programming-in-th/codecube_004.pdf,CodeCube
+codecube_005,ป้ายรถเมล์ (Bus stop!),codecube,math,easy,1,https://programming.in.th/tasks/codecube_005,https://programming.in.th/api/tasks/codecube_005/statement,sources/programming-in-th/codecube_005.pdf,CodeCube
+codecube_009,Z-Encryption,codecube,strings,easy,2,https://programming.in.th/tasks/codecube_009,https://programming.in.th/api/tasks/codecube_009/statement,sources/programming-in-th/codecube_009.pdf,CodeCube
+codecube_055,Plates,codecube,math,easy,1,https://programming.in.th/tasks/codecube_055,https://programming.in.th/api/tasks/codecube_055/statement,sources/programming-in-th/codecube_055.pdf,CodeCube
+codecube_077,The Box Drawing,codecube,pattern-printing,easy,2,https://programming.in.th/tasks/codecube_077,https://programming.in.th/api/tasks/codecube_077/statement,sources/programming-in-th/codecube_077.pdf,CodeCube
+codecube_087,Finding Jedi,codecube,strings,easy,1,https://programming.in.th/tasks/codecube_087,https://programming.in.th/api/tasks/codecube_087/statement,sources/programming-in-th/codecube_087.pdf,CodeCube
+codecube_089,Jedi Temple,codecube,math,easy,2,https://programming.in.th/tasks/codecube_089,https://programming.in.th/api/tasks/codecube_089/statement,sources/programming-in-th/codecube_089.pdf,CodeCube
+0001,Grading,prog/00,conditionals,easy,2,https://programming.in.th/tasks/0001,https://programming.in.th/api/tasks/0001/statement,sources/programming-in-th/0001.pdf,PROGRAMMING.IN.TH basic
+0002,Min Max,prog/00,loops,easy,1,https://programming.in.th/tasks/0002,https://programming.in.th/api/tasks/0002/statement,sources/programming-in-th/0002.pdf,PROGRAMMING.IN.TH basic
+0003,Matrix Addition,prog/00,2d-arrays,easy,1,https://programming.in.th/tasks/0003,https://programming.in.th/api/tasks/0003/statement,sources/programming-in-th/0003.pdf,PROGRAMMING.IN.TH basic
+0004,Character Checker,prog/00,strings,easy,1,https://programming.in.th/tasks/0004,https://programming.in.th/api/tasks/0004/statement,sources/programming-in-th/0004.pdf,PROGRAMMING.IN.TH basic
+0005,Pythagorus,prog/00,math,easy,1,https://programming.in.th/tasks/0005,https://programming.in.th/api/tasks/0005/statement,sources/programming-in-th/0005.pdf,PROGRAMMING.IN.TH basic
+0007,Herman,prog/00,math,easy,2,https://programming.in.th/tasks/0007,https://programming.in.th/api/tasks/0007/statement,sources/programming-in-th/0007.pdf,PROGRAMMING.IN.TH basic
+0008,X2,prog/00,io-arithmetic,easy,1,https://programming.in.th/tasks/0008,https://programming.in.th/api/tasks/0008/statement,sources/programming-in-th/0008.pdf,PROGRAMMING.IN.TH basic
+0009,ABC,prog/00,sorting,easy,1,https://programming.in.th/tasks/0009,https://programming.in.th/api/tasks/0009/statement,sources/programming-in-th/0009.pdf,PROGRAMMING.IN.TH basic
+0010,Trik,prog/00,simulation,easy,2,https://programming.in.th/tasks/0010,https://programming.in.th/api/tasks/0010/statement,sources/programming-in-th/0010.pdf,PROGRAMMING.IN.TH basic
+0011,Modulo,prog/00,arrays,easy,2,https://programming.in.th/tasks/0011,https://programming.in.th/api/tasks/0011/statement,sources/programming-in-th/0011.pdf,PROGRAMMING.IN.TH basic
+0012,Okviri,prog/00,strings,easy,2,https://programming.in.th/tasks/0012,https://programming.in.th/api/tasks/0012/statement,sources/programming-in-th/0012.pdf,PROGRAMMING.IN.TH basic
+0013,Seven Dwarves,prog/00,loops,easy,2,https://programming.in.th/tasks/0013,https://programming.in.th/api/tasks/0013/statement,sources/programming-in-th/0013.pdf,PROGRAMMING.IN.TH basic
+0014,Great Common Divisor,prog/00,math,easy,1,https://programming.in.th/tasks/0014,https://programming.in.th/api/tasks/0014/statement,sources/programming-in-th/0014.pdf,PROGRAMMING.IN.TH basic
+0015,Skocimis,prog/00,conditionals,easy,1,https://programming.in.th/tasks/0015,https://programming.in.th/api/tasks/0015/statement,sources/programming-in-th/0015.pdf,PROGRAMMING.IN.TH basic
+0017,Kornislav,prog/00,sorting,easy,2,https://programming.in.th/tasks/0017,https://programming.in.th/api/tasks/0017/statement,sources/programming-in-th/0017.pdf,PROGRAMMING.IN.TH basic
+0018,Reseto,prog/00,math,easy,2,https://programming.in.th/tasks/0018,https://programming.in.th/api/tasks/0018/statement,sources/programming-in-th/0018.pdf,PROGRAMMING.IN.TH basic
+0019,Perket,prog/00,recursion,easy,2,https://programming.in.th/tasks/0019,https://programming.in.th/api/tasks/0019/statement,sources/programming-in-th/0019.pdf,PROGRAMMING.IN.TH basic
+0020,Pet,prog/00,arrays,easy,2,https://programming.in.th/tasks/0020,https://programming.in.th/api/tasks/0020/statement,sources/programming-in-th/0020.pdf,PROGRAMMING.IN.TH basic
+0021,Kemija,prog/00,strings,easy,1,https://programming.in.th/tasks/0021,https://programming.in.th/api/tasks/0021/statement,sources/programming-in-th/0021.pdf,PROGRAMMING.IN.TH basic
+0022,ดาว (star),prog/00,pattern-printing,easy,2,https://programming.in.th/tasks/0022,https://programming.in.th/api/tasks/0022/statement,sources/programming-in-th/0022.pdf,PROGRAMMING.IN.TH basic
+0023,DATUM,prog/00,conditionals,easy,1,https://programming.in.th/tasks/0023,https://programming.in.th/api/tasks/0023/statement,sources/programming-in-th/0023.pdf,PROGRAMMING.IN.TH basic
+0025,BUKA,prog/00,io-arithmetic,easy,2,https://programming.in.th/tasks/0025,https://programming.in.th/api/tasks/0025/statement,sources/programming-in-th/0025.pdf,PROGRAMMING.IN.TH basic
+0028,ฟุตบอลโลก (worldcup),prog/00,arrays,easy,2,https://programming.in.th/tasks/0028,https://programming.in.th/api/tasks/0028/statement,sources/programming-in-th/0028.pdf,PROGRAMMING.IN.TH basic
+0029,กบ (frog),prog/00,loops,easy,1,https://programming.in.th/tasks/0029,https://programming.in.th/api/tasks/0029/statement,sources/programming-in-th/0029.pdf,PROGRAMMING.IN.TH basic
+0030,3-11 (three-eleven),prog/00,math,easy,2,https://programming.in.th/tasks/0030,https://programming.in.th/api/tasks/0030/statement,sources/programming-in-th/0030.pdf,PROGRAMMING.IN.TH basic
+0031,วุ้น (jelly),prog/00,loops,easy,2,https://programming.in.th/tasks/0031,https://programming.in.th/api/tasks/0031/statement,sources/programming-in-th/0031.pdf,PROGRAMMING.IN.TH basic
+0033,ลูบไล้ (looblike),prog/00,arrays,easy,2,https://programming.in.th/tasks/0033,https://programming.in.th/api/tasks/0033/statement,sources/programming-in-th/0033.pdf,PROGRAMMING.IN.TH basic
+0034,สมการกำลังสอง (quadeq),prog/00,math,easy,2,https://programming.in.th/tasks/0034,https://programming.in.th/api/tasks/0034/statement,sources/programming-in-th/0034.pdf,PROGRAMMING.IN.TH basic
+0035,สามเหลี่ยมใหญ่ (bigtriangle),prog/00,math,easy,2,https://programming.in.th/tasks/0035,https://programming.in.th/api/tasks/0035/statement,sources/programming-in-th/0035.pdf,PROGRAMMING.IN.TH basic
+0037,บินดูไฟ (skylight),prog/00,2d-arrays,easy,2,https://programming.in.th/tasks/0037,https://programming.in.th/api/tasks/0037/statement,sources/programming-in-th/0037.pdf,PROGRAMMING.IN.TH basic
+0038,Toppykung,prog/00,strings,easy,2,https://programming.in.th/tasks/0038,https://programming.in.th/api/tasks/0038/statement,sources/programming-in-th/0038.pdf,PROGRAMMING.IN.TH basic
+0039,อาหารโอชา (Food),prog/00,recursion,easy,2,https://programming.in.th/tasks/0039,https://programming.in.th/api/tasks/0039/statement,sources/programming-in-th/0039.pdf,PROGRAMMING.IN.TH basic
+0040,เฉพาะหรือคี่ (prime-odd),prog/00,math,easy,1,https://programming.in.th/tasks/0040,https://programming.in.th/api/tasks/0040/statement,sources/programming-in-th/0040.pdf,PROGRAMMING.IN.TH basic
+0041,บรรจุวงกลม (circle-packing),prog/00,math,easy,1,https://programming.in.th/tasks/0041,https://programming.in.th/api/tasks/0041/statement,sources/programming-in-th/0041.pdf,PROGRAMMING.IN.TH basic
+0042,Floating-Point Trick,prog/00,io-arithmetic,easy,1,https://programming.in.th/tasks/0042,https://programming.in.th/api/tasks/0042/statement,sources/programming-in-th/0042.pdf,PROGRAMMING.IN.TH basic
+0043,แชมป์นักจำ (Memory Champion),prog/00,loops,easy,2,https://programming.in.th/tasks/0043,https://programming.in.th/api/tasks/0043/statement,sources/programming-in-th/0043.pdf,PROGRAMMING.IN.TH basic
+1000,Word Chain,prog/10,strings,easy,2,https://programming.in.th/tasks/1000,https://programming.in.th/api/tasks/1000/statement,sources/programming-in-th/1000.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1001,Brick,prog/10,simulation,easy,2,https://programming.in.th/tasks/1001,https://programming.in.th/api/tasks/1001/statement,sources/programming-in-th/1001.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1002,Roman,prog/10,strings,easy,2,https://programming.in.th/tasks/1002,https://programming.in.th/api/tasks/1002/statement,sources/programming-in-th/1002.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1003,Nugget Number,prog/10,loops,easy,2,https://programming.in.th/tasks/1003,https://programming.in.th/api/tasks/1003/statement,sources/programming-in-th/1003.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1004,Plate,prog/10,queue,easy,2,https://programming.in.th/tasks/1004,https://programming.in.th/api/tasks/1004/statement,sources/programming-in-th/1004.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1005,Max Sequence,prog/10,arrays,easy,3,https://programming.in.th/tasks/1005,https://programming.in.th/api/tasks/1005/statement,sources/programming-in-th/1005.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1006,Dice,prog/10,simulation,easy,2,https://programming.in.th/tasks/1006,https://programming.in.th/api/tasks/1006/statement,sources/programming-in-th/1006.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1007,Bee,prog/10,loops,easy,2,https://programming.in.th/tasks/1007,https://programming.in.th/api/tasks/1007/statement,sources/programming-in-th/1007.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1008,Skyline,prog/10,arrays,easy,2,https://programming.in.th/tasks/1008,https://programming.in.th/api/tasks/1008/statement,sources/programming-in-th/1008.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1009,Seven Segment,prog/10,strings,easy,2,https://programming.in.th/tasks/1009,https://programming.in.th/api/tasks/1009/statement,sources/programming-in-th/1009.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1010,Word,prog/10,2d-arrays,easy,2,https://programming.in.th/tasks/1010,https://programming.in.th/api/tasks/1010/statement,sources/programming-in-th/1010.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1012,Silly Bakery,prog/10,math,easy,2,https://programming.in.th/tasks/1012,https://programming.in.th/api/tasks/1012/statement,sources/programming-in-th/1012.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1014,Filter,prog/10,2d-arrays,easy,2,https://programming.in.th/tasks/1014,https://programming.in.th/api/tasks/1014/statement,sources/programming-in-th/1014.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1016,Treasure,prog/10,math,easy,2,https://programming.in.th/tasks/1016,https://programming.in.th/api/tasks/1016/statement,sources/programming-in-th/1016.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1017,Magic Square,prog/10,2d-arrays,easy,2,https://programming.in.th/tasks/1017,https://programming.in.th/api/tasks/1017/statement,sources/programming-in-th/1017.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1018,Roboturtle,prog/10,simulation,easy,2,https://programming.in.th/tasks/1018,https://programming.in.th/api/tasks/1018/statement,sources/programming-in-th/1018.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1019,DNA,prog/10,strings,easy,2,https://programming.in.th/tasks/1019,https://programming.in.th/api/tasks/1019/statement,sources/programming-in-th/1019.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1022,Word II,prog/10,2d-arrays,easy,2,https://programming.in.th/tasks/1022,https://programming.in.th/api/tasks/1022/statement,sources/programming-in-th/1022.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1025,Least Common Multiplier,prog/10,math,easy,2,https://programming.in.th/tasks/1025,https://programming.in.th/api/tasks/1025/statement,sources/programming-in-th/1025.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1027,Short Message Service,prog/10,sorting,easy,2,https://programming.in.th/tasks/1027,https://programming.in.th/api/tasks/1027/statement,sources/programming-in-th/1027.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1035,Prime Palindrome,prog/10,math,easy,1,https://programming.in.th/tasks/1035,https://programming.in.th/api/tasks/1035/statement,sources/programming-in-th/1035.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1043,Power,prog/10,math,easy,2,https://programming.in.th/tasks/1043,https://programming.in.th/api/tasks/1043/statement,sources/programming-in-th/1043.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1048,Find the Distance,prog/10,bit-manipulation,easy,2,https://programming.in.th/tasks/1048,https://programming.in.th/api/tasks/1048/statement,sources/programming-in-th/1048.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1055,Wheel,prog/10,simulation,easy,3,https://programming.in.th/tasks/1055,https://programming.in.th/api/tasks/1055/statement,sources/programming-in-th/1055.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1059,SMS Thumb,prog/10,strings,easy,3,https://programming.in.th/tasks/1059,https://programming.in.th/api/tasks/1059/statement,sources/programming-in-th/1059.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1060,Cromartie Mountain,prog/10,pattern-printing,easy,3,https://programming.in.th/tasks/1060,https://programming.in.th/api/tasks/1060/statement,sources/programming-in-th/1060.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1062,Cromartie Key,prog/10,simulation,easy,3,https://programming.in.th/tasks/1062,https://programming.in.th/api/tasks/1062/statement,sources/programming-in-th/1062.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1065,กรอบสี (frame),prog/10,2d-arrays,easy,2,https://programming.in.th/tasks/1065,https://programming.in.th/api/tasks/1065/statement,sources/programming-in-th/1065.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1069,มาซู่ (mazu),prog/10,stack,easy,2,https://programming.in.th/tasks/1069,https://programming.in.th/api/tasks/1069/statement,sources/programming-in-th/1069.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1070,บูชาด้วยสามเหลี่ยม (triangle),prog/10,sorting,easy,2,https://programming.in.th/tasks/1070,https://programming.in.th/api/tasks/1070/statement,sources/programming-in-th/1070.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1073,มด (mravi),prog/10,simulation,easy,2,https://programming.in.th/tasks/1073,https://programming.in.th/api/tasks/1073/statement,sources/programming-in-th/1073.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1094,MJEHURIC,prog/10,sorting,easy,2,https://programming.in.th/tasks/1094,https://programming.in.th/api/tasks/1094/statement,sources/programming-in-th/1094.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1095,ROT,prog/10,2d-arrays,easy,2,https://programming.in.th/tasks/1095,https://programming.in.th/api/tasks/1095/statement,sources/programming-in-th/1095.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1097,TREZOR,prog/10,math,easy,2,https://programming.in.th/tasks/1097,https://programming.in.th/api/tasks/1097/statement,sources/programming-in-th/1097.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1011,Block Game,prog/10,simulation,medium,3,https://programming.in.th/tasks/1011,https://programming.in.th/api/tasks/1011/statement,sources/programming-in-th/1011.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1015,Tiling,prog/10,recursion,medium,3,https://programming.in.th/tasks/1015,https://programming.in.th/api/tasks/1015/statement,sources/programming-in-th/1015.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1023,CTX,prog/10,2d-arrays,medium,2,https://programming.in.th/tasks/1023,https://programming.in.th/api/tasks/1023/statement,sources/programming-in-th/1023.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1024,Factory,prog/10,recursion,medium,2,https://programming.in.th/tasks/1024,https://programming.in.th/api/tasks/1024/statement,sources/programming-in-th/1024.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1028,TOI,prog/10,strings,medium,3,https://programming.in.th/tasks/1028,https://programming.in.th/api/tasks/1028/statement,sources/programming-in-th/1028.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1030,Rice,prog/10,greedy,medium,2,https://programming.in.th/tasks/1030,https://programming.in.th/api/tasks/1030/statement,sources/programming-in-th/1030.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1056,Hands,prog/10,binary-search,medium,2,https://programming.in.th/tasks/1056,https://programming.in.th/api/tasks/1056/statement,sources/programming-in-th/1056.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1058,Longest,prog/10,strings,medium,2,https://programming.in.th/tasks/1058,https://programming.in.th/api/tasks/1058/statement,sources/programming-in-th/1058.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1061,Temperature is Rising,prog/10,recursion,medium,3,https://programming.in.th/tasks/1061,https://programming.in.th/api/tasks/1061/statement,sources/programming-in-th/1061.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1064,Cromartie School,prog/10,2d-arrays,medium,2,https://programming.in.th/tasks/1064,https://programming.in.th/api/tasks/1064/statement,sources/programming-in-th/1064.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1066,รวมอนุภาค (atom),prog/10,greedy,medium,2,https://programming.in.th/tasks/1066,https://programming.in.th/api/tasks/1066/statement,sources/programming-in-th/1066.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1067,สนามพลัง (field),prog/10,simulation,medium,3,https://programming.in.th/tasks/1067,https://programming.in.th/api/tasks/1067/statement,sources/programming-in-th/1067.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1074,Mravojed,prog/10,2d-arrays,medium,2,https://programming.in.th/tasks/1074,https://programming.in.th/api/tasks/1074/statement,sources/programming-in-th/1074.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1076,โกหก (lieman),prog/10,sorting,medium,2,https://programming.in.th/tasks/1076,https://programming.in.th/api/tasks/1076/statement,sources/programming-in-th/1076.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1080,สามเหลี่ยมอีกครั้ง (triagain),prog/10,sorting,medium,2,https://programming.in.th/tasks/1080,https://programming.in.th/api/tasks/1080/statement,sources/programming-in-th/1080.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1083,ลงทุนซื้อหุ้น (stock),prog/10,arrays,medium,2,https://programming.in.th/tasks/1083,https://programming.in.th/api/tasks/1083/statement,sources/programming-in-th/1083.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1086,ไดอารี่ (diary),prog/10,simulation,medium,2,https://programming.in.th/tasks/1086,https://programming.in.th/api/tasks/1086/statement,sources/programming-in-th/1086.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1087,ซื้อบ้าน (house),prog/10,2d-arrays,medium,2,https://programming.in.th/tasks/1087,https://programming.in.th/api/tasks/1087/statement,sources/programming-in-th/1087.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1088,กิ้งก่า (iguana),prog/10,math,medium,2,https://programming.in.th/tasks/1088,https://programming.in.th/api/tasks/1088/statement,sources/programming-in-th/1088.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
+1090,หางไก่ (cocktail),prog/10,two-pointers,medium,2,https://programming.in.th/tasks/1090,https://programming.in.th/api/tasks/1090/statement,sources/programming-in-th/1090.pdf,PROGRAMMING.IN.TH (TOI/COCI classics)
