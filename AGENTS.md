@@ -31,7 +31,7 @@ setup and background live in `README.md` and `docs/adr/`.
 | `core/uploads`                | Working; to be renamed `core/documents`                                                            | open (CORE-16)      |
 | `core/notifications`, `admin` | Not started                                                                                        | open (CORE-18, 19)  |
 | `database/`                   | 9 tables live on Neon; classroom, posting, version, submission, notification and auth tables wait for OPS-15 | พาย (OPS-15)        |
-| `ai/`                         | Vector storage works (AI-01). Ingestion, retrieval and a real `GenerationClient` are not started; the standalone app in `ai/app/main.py` is unused | ฟิล์ม (AI-02 to 07), พาย (OPS-16) |
+| `ai/`                         | Vector storage works (AI-01). Ingestion, retrieval and a real `GenerationClient` are not started; the standalone app in `ai/app/main.py` is unused. Seed corpus: 100 PDFs on R2 under `sources/programming-in-th/` (OPS-17), not yet in `core.knowledge_documents` (OPS-18) or `rag` (AI-08). | ฟิล์ม (AI-02 to 07), พาย (OPS-16) |
 | `web/templates/`              | Every page of ADR-0007 except T-05, T-06 and A-01 exists; matching them to Figma is UI-01          | พาย (UI-01)         |
 
 "Working on fakes" means the slice runs in demo mode (`scripts/demo.py`) and in
@@ -268,6 +268,21 @@ throwaway infrastructure:
 With those variables unset the marked tests skip themselves, so
 `uv run pytest` stays green with no database or bucket — one command
 everywhere. See `tests/conftest.py`.
+
+## Seed corpus on R2
+
+100 Thai problem-statement PDFs from programming.in.th live in the dev R2
+bucket under `sources/programming-in-th/{task_id}.pdf` (OPS-17). Their topic
+and difficulty are in `scripts/seed/pith-100-manifest.csv`; background, selection
+rules and known limits are in `docs/handoff/2026-09-28-OPS-17-pith-seed.md`.
+
+- Re-seed with `uv run --env-file .env python scripts/seed_pith_to_r2.py`
+  (`--dry-run` first). It skips objects that exist and never deletes.
+- Do not delete or overwrite objects under that prefix; ingestion work reads them.
+- Tests never read this prefix — the "never hit the real R2 bucket" rule above
+  still applies. Use `tests/fixtures/pdfs/` or moto.
+- Adding a PDF: check its extracted Thai text first. 53 of 190 candidates were
+  rejected for floating vowels, broken ำ or Private-Use-Area glyphs.
 
 ## Definition of done
 
