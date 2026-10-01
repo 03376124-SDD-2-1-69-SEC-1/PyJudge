@@ -1,7 +1,7 @@
 """The in-memory GenerationRepository against the shared contract.
 
-`tests/db/test_generation_repository.py` binds the same contract to the SQL
-adapter, so a behaviour the two do not share fails there.
+The pre-ADR port has no SQL adapter since OPS-15 (ADR-0008): Drafts replaced
+it. Only the fake is held to the contract until the port itself is retired.
 """
 
 import pytest

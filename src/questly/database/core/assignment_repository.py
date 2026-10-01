@@ -1,4 +1,5 @@
-"""SQL adapter for the AssignmentRepository port (CORE-10).
+"""SQL adapter for the AssignmentRepository port (CORE-10, ADR-0007 shape in
+OPS-15).
 
 Translates between the `core.assignments` + `core.test_cases` rows and the plain
 dataclasses in `core/assignments/models.py`. Test cases are reached only through
@@ -10,7 +11,14 @@ from __future__ import annotations
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
-from questly.core.assignments.models import Assignment, TestCase, TestCaseKind
+from questly.core.assignments.models import (
+    Assignment,
+    Difficulty,
+    JudgingSettings,
+    Language,
+    TestCase,
+    TestCaseKind,
+)
 from questly.database.core.tables import Assignment as AssignmentRow
 from questly.database.core.tables import TestCase as TestCaseRow
 from questly.database.session import SessionFactory
@@ -28,22 +36,53 @@ def _to_domain(row: AssignmentRow) -> Assignment:
         id=row.id,
         title=row.title,
         problem_statement=row.problem_statement,
-        difficulty=row.difficulty,
+        difficulty=Difficulty(row.difficulty),
         metadata=dict(row.metadata_),
         artifact_id=row.artifact_id,
-        test_cases=[
-            TestCase(
-                id=child.id,
-                input_data=child.input_data,
-                expected_output=child.expected_output,
-                # The table has only is_hidden until OPS-15 adds kind and note;
-                # this adapter is not wired meanwhile (ADR-0007 §10.4).
-                kind=TestCaseKind.HIDDEN if child.is_hidden else TestCaseKind.SAMPLE,
-                order_index=child.order_index,
-            )
-            for child in children
-        ],
+        test_cases=[_test_case(child) for child in children],
+        owner_id=row.owner_id,
+        topic_id=row.topic_id,
+        settings=JudgingSettings(
+            time_limit_ms=row.time_limit_ms,
+            language=Language(row.language),
+            show_hidden_names=row.show_hidden_names,
+        ),
+        current_version=row.current_version,
     )
+
+
+def _test_case(child: TestCaseRow) -> TestCase:
+    # An empty note is stored as NULL: ADR-0007 makes the column nullable.
+    note = "" if child.note is None else child.note
+    return TestCase(
+        id=child.id,
+        input_data=child.input_data,
+        expected_output=child.expected_output,
+        kind=TestCaseKind(child.kind),
+        note=note,
+        order_index=child.order_index,
+    )
+
+
+def _stored_note(test_case: TestCase) -> str | None:
+    if test_case.note == "":
+        return None
+    return test_case.note
+
+
+def _write_fields(row: AssignmentRow, assignment: Assignment) -> None:
+    """Copy every non-child field of the aggregate onto its row."""
+    row.title = assignment.title
+    row.problem_statement = assignment.problem_statement
+    row.difficulty = assignment.difficulty.value
+    row.metadata_ = dict(assignment.metadata)
+    row.artifact_id = assignment.artifact_id
+    row.owner_id = assignment.owner_id
+    row.topic_id = assignment.topic_id
+    row.current_version = assignment.current_version
+    row.time_limit_ms = assignment.settings.time_limit_ms
+    row.language = assignment.settings.language.value
+    row.show_hidden_names = assignment.settings.show_hidden_names
 
 
 def _new_child_row(assignment_id: int, test_case: TestCase) -> TestCaseRow:
@@ -51,7 +90,8 @@ def _new_child_row(assignment_id: int, test_case: TestCase) -> TestCaseRow:
         assignment_id=assignment_id,
         input_data=test_case.input_data,
         expected_output=test_case.expected_output,
-        is_hidden=not test_case.visible_to_students,
+        kind=test_case.kind.value,
+        note=_stored_note(test_case),
         order_index=test_case.order_index,
     )
 
@@ -96,10 +136,9 @@ class SQLAssignmentRepository:
             row = AssignmentRow(
                 title=assignment.title,
                 problem_statement=assignment.problem_statement,
-                difficulty=assignment.difficulty,
-                metadata_=dict(assignment.metadata),
-                artifact_id=assignment.artifact_id,
+                difficulty=assignment.difficulty.value,
             )
+            _write_fields(row, assignment)
             session.add(row)
             session.flush()
             for test_case in assignment.test_cases:
@@ -120,11 +159,7 @@ class SQLAssignmentRepository:
             if row is None:
                 raise KeyError(assignment.id)
 
-            row.title = assignment.title
-            row.problem_statement = assignment.problem_statement
-            row.difficulty = assignment.difficulty
-            row.metadata_ = dict(assignment.metadata)
-            row.artifact_id = assignment.artifact_id
+            _write_fields(row, assignment)
 
             stored_children = {child.id: child for child in row.test_cases}
             submitted_ids = {
@@ -143,7 +178,8 @@ class SQLAssignmentRepository:
                 child = stored_children[test_case.id]
                 child.input_data = test_case.input_data
                 child.expected_output = test_case.expected_output
-                child.is_hidden = not test_case.visible_to_students
+                child.kind = test_case.kind.value
+                child.note = _stored_note(test_case)
                 child.order_index = test_case.order_index
 
             session.commit()

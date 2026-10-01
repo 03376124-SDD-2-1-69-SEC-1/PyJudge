@@ -1,7 +1,8 @@
-"""SQLAssignmentRepository against the shared contract, on real Postgres.
+"""SQL Assignment, Version and Posting repositories against the shared
+contracts, on real Postgres.
 
 The same checks the in-memory adapter passes in
-`tests/unit/core/assignments/test_repository_contract.py` (CORE-10), plus the
+`tests/unit/core/assignments/test_repository_contract.py`, plus the
 database facts a fake cannot prove.
 """
 
@@ -15,20 +16,46 @@ from questly.core.assignments.models import (
     TestCaseKind,
 )
 from questly.database.core.assignment_repository import SQLAssignmentRepository
+from questly.database.core.posting_repository import SQLPostingRepository
+from questly.database.core.version_repository import SQLVersionRepository
 from questly.database.session import SessionFactory
-from tests.contracts.assignment_repository import AssignmentRepositoryContract
+from tests.contracts.assignment_repository import (
+    AssignmentRepositoryContract,
+    AssignmentShapeContract,
+)
+from tests.contracts.posting_repository import PostingRepositoryContract
+from tests.contracts.version_repository import VersionRepositoryContract
+from tests.db.rows import RealRows
 
 pytestmark = pytest.mark.postgres
 
 
-class TestSQLAssignmentRepository(AssignmentRepositoryContract):
-    """Run the contract against the SQL adapter."""
+class TestSQLAssignmentRepository(
+    RealRows, AssignmentRepositoryContract, AssignmentShapeContract
+):
+    """Run the contracts against the SQL adapter."""
 
     @pytest.fixture()
     def repository(
         self, session_factory: SessionFactory, empty_core_tables: None
     ) -> SQLAssignmentRepository:
         return SQLAssignmentRepository(session_factory)
+
+
+class TestSQLVersionRepository(RealRows, VersionRepositoryContract):
+    @pytest.fixture()
+    def repository(
+        self, session_factory: SessionFactory, empty_core_tables: None
+    ) -> SQLVersionRepository:
+        return SQLVersionRepository(session_factory)
+
+
+class TestSQLPostingRepository(RealRows, PostingRepositoryContract):
+    @pytest.fixture()
+    def repository(
+        self, session_factory: SessionFactory, empty_core_tables: None
+    ) -> SQLPostingRepository:
+        return SQLPostingRepository(session_factory)
 
 
 @pytest.mark.usefixtures("empty_core_tables")
