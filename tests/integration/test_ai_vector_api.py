@@ -6,19 +6,19 @@ from collections.abc import AsyncIterator
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.ai.app import main as ai_main
-from greader.ai.app.models import (
+from questly.ai.app import main as ai_main
+from questly.ai.app.models import (
     ChunkSearchResult,
     Embedding,
     NewKnowledgeChunk,
     NewKnowledgeSource,
     SourceCreationResult,
 )
-from greader.ai.app.repository import (
+from questly.ai.app.repository import (
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
-from greader.database.rag import vector_repository as postgres_adapter
+from questly.database.rag import vector_repository as postgres_adapter
 from tests.fakes.vector import FakeVectorRepository
 
 MODEL_A = "model-a"
@@ -342,7 +342,7 @@ def test_import_and_test_app_construction_need_no_credentials(monkeypatch) -> No
 
 @pytest.mark.parametrize(
     "database_url",
-    ["postgresql://user:password@localhost/greader", "sqlite:///greader.db"],
+    ["postgresql://user:password@localhost/questly", "sqlite:///questly.db"],
 )
 def test_production_factory_requires_psycopg_driver(
     monkeypatch, database_url: str
@@ -375,7 +375,7 @@ def test_production_factory_selects_postgres_without_connecting(monkeypatch) -> 
 
     monkeypatch.setenv(
         "DATABASE_URL",
-        "postgresql+psycopg://user:password@localhost/greader",
+        "postgresql+psycopg://user:password@localhost/questly",
     )
     monkeypatch.setattr(postgres_adapter, "create_engine", fake_create_engine)
     monkeypatch.setattr(

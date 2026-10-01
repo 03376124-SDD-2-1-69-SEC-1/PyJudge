@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from greader.core.assignments.models import Assignment, Difficulty, TestCase
-from greader.core.assignments.ports import AssignmentRepository
+from questly.core.assignments.models import Assignment, Difficulty, TestCase
+from questly.core.assignments.ports import AssignmentRepository
 
 
 def assignment(

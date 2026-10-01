@@ -8,9 +8,9 @@ import ast
 import re
 from pathlib import Path
 
-CORE_ROOT = Path("src/greader/core")
-SRC_ROOT = Path("src/greader")
-MAIN_PY = Path("src/greader/main.py")
+CORE_ROOT = Path("src/questly/core")
+SRC_ROOT = Path("src/questly")
+MAIN_PY = Path("src/questly/main.py")
 TESTS_ROOT = Path("tests")
 LEGACY_ASSIGNMENTS_TEST_DIR = TESTS_ROOT / "unit" / "core" / "topics" / "assignments"
 
@@ -81,7 +81,7 @@ def test_no_pytest_files_under_src() -> None:
     matches = sorted(p for p in SRC_ROOT.rglob("*.py") if _is_pytest_filename(p))
 
     assert not matches, (
-        "Test files belong under tests/, not src/greader/. Move these:\n"
+        "Test files belong under tests/, not src/questly/. Move these:\n"
         + "\n".join(str(p) for p in matches)
     )
 
@@ -90,9 +90,9 @@ def test_pytest_filename_check_ignores_the_test_cases_slice_name() -> None:
     """`core/test_cases/` is a domain slice (Assignment test cases), not a
     tests directory. The src-test-file check above matches filenames, not
     directory names, so it must not flag `test_cases/models.py`."""
-    assert not _is_pytest_filename(Path("src/greader/core/test_cases/models.py"))
-    assert _is_pytest_filename(Path("src/greader/core/test_cases/test_foo.py"))
-    assert _is_pytest_filename(Path("src/greader/core/test_cases/foo_test.py"))
+    assert not _is_pytest_filename(Path("src/questly/core/test_cases/models.py"))
+    assert _is_pytest_filename(Path("src/questly/core/test_cases/test_foo.py"))
+    assert _is_pytest_filename(Path("src/questly/core/test_cases/foo_test.py"))
 
 
 def _is_include_router_call(node: ast.AST) -> bool:
@@ -156,7 +156,7 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
 
 # A field goes in either allowlist only when a use case reads it and the PR
 # says which one. Expected first entry for ALLOWED_TIMESTAMP_FIELDS:
-# `approved_at` on a draft, once GReader's approval flow needs it -- unlike
+# `approved_at` on a draft, once Questly's approval flow needs it -- unlike
 # `created_at`/`updated_at`, that's a business fact, not row bookkeeping.
 ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     # auth (ADR-0007 §1): verify_email refuses a link after 24 h and
@@ -269,7 +269,7 @@ def test_no_in_memory_adapter_ships_inside_src() -> None:
                 violations.append(f"{source_file}:{node.lineno}: {node.name}")
 
     assert not violations, (
-        "In-memory adapters belong in tests/fakes/, not in src/greader/. "
+        "In-memory adapters belong in tests/fakes/, not in src/questly/. "
         "Violations:\n" + "\n".join(violations)
     )
 

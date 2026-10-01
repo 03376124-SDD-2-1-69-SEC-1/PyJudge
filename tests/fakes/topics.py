@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from greader.core.topics.models import Topic
-from greader.core.topics.service import TopicNameConflictError
+from questly.core.topics.models import Topic
+from questly.core.topics.service import TopicNameConflictError
 
 
 class FakeTopicRepository:

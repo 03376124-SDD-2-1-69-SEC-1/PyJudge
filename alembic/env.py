@@ -12,7 +12,7 @@ load_dotenv()
 
 # Import every module that defines SQLModel tables so they register on
 # SQLModel.metadata before autogenerate diffs against it.
-from greader.database import core_tables, rag_tables  # noqa: F401
+from questly.database import core_tables, rag_tables  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -21,7 +21,7 @@ config = context.config
 # Override alembic.ini's placeholder sqlalchemy.url with the real one from
 # the environment. Alembic runs migrations directly (DDL, long transactions)
 # so it uses the unpooled connection; the app uses DATABASE_URL (pooled) via
-# greader/database/session.py.
+# questly/database/session.py.
 db_url = os.environ.get("DATABASE_URL_UNPOOLED")
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)

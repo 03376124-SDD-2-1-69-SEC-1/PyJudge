@@ -82,7 +82,7 @@ async def test_empty_classroom_shows_s01a_and_t01b() -> None:
     app = build_demo_app(seed)
     teacher = await _client(app, seed.somchai.email)
     classroom = app.state.classroom_service.create(
-        app.state.auth_service.resolve_session(teacher.cookies["greader_session"]),
+        app.state.auth_service.resolve_session(teacher.cookies["questly_session"]),
         course_code="01076099",
         course_name="Empty",
         section="1",

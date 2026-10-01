@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from greader.core.uploads.models import KnowledgeDocument, StoredObject
+from questly.core.uploads.models import KnowledgeDocument, StoredObject
 
 FAKE_BUCKET = "fake-bucket"
 

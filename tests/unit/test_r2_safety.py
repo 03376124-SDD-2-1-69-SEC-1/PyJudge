@@ -2,7 +2,7 @@
 
 import pytest
 
-from greader.database.storage.safety import assert_valid_r2_endpoint
+from questly.database.storage.safety import assert_valid_r2_endpoint
 
 
 def test_accepts_a_well_formed_endpoint() -> None:

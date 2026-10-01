@@ -2,7 +2,7 @@
 
 import pytest
 
-from greader.core.topics.service import (
+from questly.core.topics.service import (
     TopicNameConflictError,
     TopicNotFoundError,
     TopicService,

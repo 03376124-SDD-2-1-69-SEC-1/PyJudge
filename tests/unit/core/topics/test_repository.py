@@ -5,7 +5,7 @@
 
 import pytest
 
-from greader.core.topics.ports import TopicRepository
+from questly.core.topics.ports import TopicRepository
 from tests.contracts.topic_repository import TopicRepositoryContract
 from tests.fakes.topics import FakeTopicRepository
 

@@ -9,27 +9,27 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from greader.ai.app.repository import VectorRepository
-from greader.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
-from greader.core.assignments.ports import (
+from questly.ai.app.repository import VectorRepository
+from questly.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
+from questly.core.assignments.ports import (
     AssignmentRepository,
     PostingRepository,
     PostingStats,
     VersionRepository,
 )
-from greader.core.auth.pages import DemoAccount
-from greader.core.auth.ports import AuthRepository, Clock
-from greader.core.classrooms.ports import ClassroomRepository, ClassroomStats
-from greader.core.generation.ports import (
+from questly.core.auth.pages import DemoAccount
+from questly.core.auth.ports import AuthRepository, Clock
+from questly.core.classrooms.ports import ClassroomRepository, ClassroomStats
+from questly.core.generation.ports import (
     DocumentCatalog,
     DraftRepository,
     GenerationClient,
 )
-from greader.core.submissions.ports import CodeRunner, SubmissionRepository
-from greader.core.topics.ports import TopicRepository
-from greader.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
-from greader.integrations.email import StubEmailSender
-from greader.main import create_app
+from questly.core.submissions.ports import CodeRunner, SubmissionRepository
+from questly.core.topics.ports import TopicRepository
+from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
+from questly.integrations.email import StubEmailSender
+from questly.main import create_app
 from tests.fakes.assignments import (
     FakeAssignmentRepository,
     FakePostingRepository,

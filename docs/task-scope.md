@@ -7,8 +7,8 @@ GitHub Issues.
 
 This is a single app (ADR-0007): one FastAPI process, one repo, one Neon
 project with schemas `core` and `rag`. Modules call each other through Python
-interfaces. The AI side lives in `src/greader/ai/`. Paths below are relative
-to `src/greader/` unless they start with `tests/`, `docs/`, `scripts/`,
+interfaces. The AI side lives in `src/questly/ai/`. Paths below are relative
+to `src/questly/` unless they start with `tests/`, `docs/`, `scripts/`,
 `alembic/`, `.github/` or name a file at the repo root.
 
 ## Columns
@@ -61,7 +61,7 @@ Rows that were closed and no longer apply are in `docs/task-archive.md`.
 | OPS-13 | พาย | done | `core/generation/__init__.py`, `core/generation/service.py`, `database/core/generation_repository.py`, `tests/fakes/generation.py`, `tests/contracts/generation_repository.py`, `tests/db/test_generation_repository.py`, `tests/db/conftest.py`, `tests/unit/core/generation/test_generation_repository_contract.py`, `tests/unit/core/generation/test_generation_service.py` | `__init__.py` no longer re-exports schema types under domain names; the JSON codec is public and shared by both adapters; a contract test proves the fake and SQL adapter round-trip identically; `generate()` marks a request failed if `create_artifact` raises, not only if the client call does |
 | OPS-14 | พาย | done | `docs/adr/0007-classroom-centric-flow.md`, `CONTEXT.md`, `AGENTS.md`, `docs/task-scope.md`, `docs/wireframes/`, `docs/handoff/`, `tests/architecture/`; phase 2: `core/`, `integrations/`, `database/pending.py`, `web/templates/`, `main.py`, `scripts/demo.py`, `tests/` | ADR-0007 accepted; every new AGENTS.md rule has a test in `tests/architecture/`; every route in the ADR's page and API contract exists on in-memory fakes and is covered by an integration test per role. Done — PR #29 and #31 merged |
 | OPS-15 | พาย | open | `database/core/tables.py`, `database/rag/tables.py`, `alembic/versions/`, `database/core/*_repository.py`, `tests/db/` | the ADR-0007 "Schema changes" list is one hand-written migration that CI upgrades on its own Neon branch; each new slice has a SQL adapter passing its contract test, and this includes every adapter for the slices below; no new-slice handler returns 503 |
-| OPS-16 | พาย | open | `ai/app/main.py`, `tests/unit/ai/`, `tests/integration/`, `tests/architecture/` | ลบ standalone AI app (`create_app` และ `create_production_app` ใน `ai/app/main.py`) ที่ไม่มีใครเรียกแล้ว เพราะ `vector_router` ถูก mount ใน `greader.main`; เทสต์ที่เคยสร้างแอปนี้ย้ายไปใช้แอปหลัก |
+| OPS-16 | พาย | open | `ai/app/main.py`, `tests/unit/ai/`, `tests/integration/`, `tests/architecture/` | ลบ standalone AI app (`create_app` และ `create_production_app` ใน `ai/app/main.py`) ที่ไม่มีใครเรียกแล้ว เพราะ `vector_router` ถูก mount ใน `questly.main`; เทสต์ที่เคยสร้างแอปนี้ย้ายไปใช้แอปหลัก |
 | CORE-12 | TBD | done | `core/auth/`, `tests/` | ลงทะเบียน (KMITL email), verify, login, logout, `current_actor(request)`, scrypt และ session ทำครบบน fakes พร้อมเทสต์ (OPS-14). การย้าย `VerificationMailer` ไปเรียก `NotificationService` เป็นงานของ CORE-18 |
 | CORE-13 | TBD | open | `core/classrooms/`, `core/assignments/`, `core/submissions/`, `tests/` | ทุก use case ของ Classroom (สร้าง, เข้าด้วยรหัส, สร้างรหัสใหม่/ปิดรหัส, ลบ Member, archive/unarchive, summary) ทำบน fakes แล้ว เหลือ `summary.csv` และ `submissions.csv` พร้อม unit และ integration test; non-member ได้ 404, Student ทำ use case ของ Instructor ได้ 403 |
 | CORE-14 | TBD | done | `core/assignments/`, `tests/` | Postings, Versions ที่ต้องมีเหตุผล, การขยาย deadline เฉพาะ Posting ที่เลือก, Test Case มี `kind` และ `note` ทำครบบน fakes พร้อมเทสต์ (OPS-14) |
@@ -84,7 +84,7 @@ Rows that were closed and no longer apply are in `docs/task-archive.md`.
 
 ## The composition root
 
-`src/greader/main.py` wires the application together, so a slice cannot reach
+`src/questly/main.py` wires the application together, so a slice cannot reach
 its own API without it. Any row whose done-condition names an endpoint may
 therefore edit `main.py` without that path being listed in its "May touch"
 column, and only to:

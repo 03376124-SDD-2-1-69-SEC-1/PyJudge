@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
-from greader.core.auth.models import (
+from questly.core.auth.models import (
     InstructorRequest,
     InstructorRequestStatus,
     Role,
@@ -13,7 +13,7 @@ from greader.core.auth.models import (
     User,
     VerificationToken,
 )
-from greader.core.auth.service import hash_password
+from questly.core.auth.service import hash_password
 
 DEFAULT_NOW = datetime(2026, 9, 28, 9, 0, tzinfo=UTC)
 

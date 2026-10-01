@@ -4,8 +4,8 @@ from hashlib import sha256
 
 import pytest
 
-from greader.core.uploads.models import DocumentStatus
-from greader.core.uploads.service import (
+from questly.core.uploads.models import DocumentStatus
+from questly.core.uploads.service import (
     EmptyUploadError,
     KnowledgeDocumentNotFoundError,
     UploadService,

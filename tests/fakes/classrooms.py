@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from greader.core.classrooms.models import (
+from questly.core.classrooms.models import (
     Classroom,
     InstructorCardStats,
     Membership,

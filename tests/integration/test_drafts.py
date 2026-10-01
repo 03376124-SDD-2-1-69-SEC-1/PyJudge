@@ -3,8 +3,8 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.core.auth.models import Actor, Role
-from greader.core.generation.models import DocumentSummary
+from questly.core.auth.models import Actor, Role
+from questly.core.generation.models import DocumentSummary
 from tests.fakes.app import build_app
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
 from tests.fakes.generation import (
@@ -243,7 +243,7 @@ async def test_step2_keeps_multi_line_test_input() -> None:
     )
     service = campus.app.state.generation_service
     owner = campus.app.state.auth_service.resolve_session(
-        teacher.cookies["greader_session"]
+        teacher.cookies["questly_session"]
     )
 
     assert "<textarea" in page.text and "5\n1 3 5 7 9\n7" in page.text

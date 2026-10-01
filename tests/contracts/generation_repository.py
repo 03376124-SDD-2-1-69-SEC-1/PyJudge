@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from greader.core.generation.models import AssignmentDraft, Citation, TestCaseDraft
-from greader.core.generation.ports import GenerationRepository
+from questly.core.generation.models import AssignmentDraft, Citation, TestCaseDraft
+from questly.core.generation.ports import GenerationRepository
 
 
 def draft(

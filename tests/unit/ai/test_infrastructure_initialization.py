@@ -9,10 +9,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from greader import config, main
-from greader.database import session
-from greader.database.rag import vector_repository as postgres_adapter
-from greader.database.storage import r2
+from questly import config, main
+from questly.database import session
+from questly.database.rag import vector_repository as postgres_adapter
+from questly.database.storage import r2
 
 
 @pytest.fixture(autouse=True)

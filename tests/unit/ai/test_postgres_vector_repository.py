@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from greader.ai.app.models import (
+from questly.ai.app.models import (
     ChunkSearchResult,
     KnowledgeChunk,
     KnowledgeSource,
@@ -19,13 +19,13 @@ from greader.ai.app.models import (
     NewKnowledgeSource,
     SourceCreationResult,
 )
-from greader.ai.app.repository import (
+from questly.ai.app.repository import (
     DuplicateChunkError,
     DuplicateSourceError,
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
-from greader.database.rag.vector_repository import PostgresVectorRepository
+from questly.database.rag.vector_repository import PostgresVectorRepository
 
 MODEL = "model-a"
 

@@ -9,7 +9,7 @@
 # Migrations and the whole database layer they own — see AGENTS.md
 # § "Who may change database and locked files"
 /alembic/                       @Doonminus2
-/src/greader/database/          @Doonminus2
+/src/questly/database/          @Doonminus2
 
 # Credentials and dependency pins
 /.env.example                   @Doonminus2

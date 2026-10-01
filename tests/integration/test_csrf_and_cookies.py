@@ -3,8 +3,8 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.core.auth.models import Role
-from greader.main import create_app
+from questly.core.auth.models import Role
+from questly.main import create_app
 from tests.fakes.app import build_app, fake_settings
 from tests.fakes.assignments import FakeAssignmentRepository
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
@@ -48,7 +48,7 @@ async def test_login_without_the_page_token_is_403(token: str | None) -> None:
         response = await client.post("/login", data=data)
 
     assert response.status_code == 403
-    assert "greader_session" not in response.headers.get("set-cookie", "")
+    assert "questly_session" not in response.headers.get("set-cookie", "")
 
 
 @pytest.mark.anyio
@@ -62,7 +62,7 @@ async def test_anonymous_pages_set_the_csrf_cookie_they_check() -> None:
             page="/login",
         )
 
-    assert "greader_csrf=" in page.headers["set-cookie"]
+    assert "questly_csrf=" in page.headers["set-cookie"]
     assert login.status_code == 303
 
 

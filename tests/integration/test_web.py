@@ -8,7 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from tests.fakes.app import build_app
 
-STATIC_DIR = Path("src/greader/web/static")
+STATIC_DIR = Path("src/questly/web/static")
 
 
 @pytest.mark.anyio
@@ -27,7 +27,7 @@ async def test_stylesheet_url_carries_the_file_version() -> None:
 
 
 def test_asset_url_changes_when_the_file_changes(tmp_path, monkeypatch) -> None:
-    import greader.main as main
+    import questly.main as main
 
     (tmp_path / "css").mkdir()
     built = tmp_path / "css" / "app.css"

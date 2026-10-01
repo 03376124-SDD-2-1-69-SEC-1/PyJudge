@@ -1,14 +1,14 @@
-# GReader
+# Questly
 
 **ภาษา:** [English](README.md) | ภาษาไทย
 
 > **ถูกแทนที่โดย ADR-0007 (ส่วนสถาปัตยกรรม)** ข้อความเก่าใน README นี้บางตอน
 > เล่าว่า Core กับ AI เป็นสอง service คุยกันผ่าน HTTP แบบนั้นเลิกใช้แล้ว
-> GReader คือแอป FastAPI ตัวเดียวใน repo เดียว ใช้ Neon project เดียวแยก schema
+> Questly คือแอป FastAPI ตัวเดียวใน repo เดียว ใช้ Neon project เดียวแยก schema
 > `core` กับ `rag` โดย `core/` และ `ai/` เป็นโมดูลของแอปนี้ เรียกกันผ่าน Python
 > interface อ่านกฎปัจจุบันที่ `AGENTS.md` และ `docs/adr/0007-classroom-centric-flow.md`
 
-GReader คือแอปพลิเคชัน FastAPI ที่ช่วยผู้สอนเตรียมโจทย์เขียนโปรแกรม ชุดทดสอบ
+Questly คือแอปพลิเคชัน FastAPI ที่ช่วยผู้สอนเตรียมโจทย์เขียนโปรแกรม ชุดทดสอบ
 และสื่อการเรียนที่เกี่ยวข้อง โปรเจกต์ใช้สถาปัตยกรรมแบบ modular monolith
 เพื่อให้แต่ละทีมพัฒนาส่วนที่รับผิดชอบได้โดยไม่ผูกกับส่วนอื่นมากเกินไป
 
@@ -133,7 +133,7 @@ uv run --env-file .env alembic upgrade head
 ### 6. เริ่ม Development Server
 
 ```bash
-uv run --env-file .env uvicorn greader.main:app --reload
+uv run --env-file .env uvicorn questly.main:app --reload
 ```
 
 เปิด <http://127.0.0.1:8000> ในเบราว์เซอร์ หยุดเซิร์ฟเวอร์ด้วย `Ctrl+C`
@@ -173,7 +173,7 @@ uv run --env-file .env alembic revision --autogenerate -m "describe the change"
 ## โครงสร้างโปรเจกต์
 
 ```text
-sgreader/
+squestly/
 ├── README.md
 ├── pyproject.toml
 ├── uv.lock
@@ -182,7 +182,7 @@ sgreader/
 ├── docs/
 │
 │
-├── src/greader/
+├── src/questly/
 │   ├── main.py
 │   ├── ai/
 │   │   └── README.md
@@ -270,7 +270,7 @@ from pgvector.sqlalchemy import Vector                   # ชนิดจาก
 ### 2. โครงสร้างโฟลเดอร์
 
 ```text
-src/greader/
+src/questly/
 ├── core/                        ← Core Service (ห้าม import ORM)
 │   ├── topics/                  ✅ reference slice
 │   │   ├── models.py            dataclass(frozen=True, slots=True)
@@ -326,8 +326,8 @@ Adapter ต้องอยู่ฝั่ง `database/` เพราะมั�
 `database/__init__.py`:
 
 ```python
-from greader.database.core import tables as core_tables  # noqa: F401
-from greader.database.rag import tables as rag_tables    # noqa: F401
+from questly.database.core import tables as core_tables  # noqa: F401
+from questly.database.rag import tables as rag_tables    # noqa: F401
 ```
 
 ถ้าลืม มันจะไม่ error — แต่จะ generate migration ที่ขาดตารางไปเงียบๆ

@@ -1,7 +1,7 @@
 """Tests for the stub generation client adapter."""
 
-from greader.ai.client import StubGenerationClient
-from greader.core.generation.schemas import GenerationRequest
+from questly.ai.client import StubGenerationClient
+from questly.core.generation.schemas import GenerationRequest
 
 
 def test_stub_client_returns_draft_with_citations() -> None:

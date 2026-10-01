@@ -3,11 +3,11 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from greader.core.uploads.models import DocumentStatus, KnowledgeDocument
-from greader.database.core.knowledge_document_repository import (
+from questly.core.uploads.models import DocumentStatus, KnowledgeDocument
+from questly.database.core.knowledge_document_repository import (
     SQLKnowledgeDocumentRepository,
 )
-from greader.database.session import SessionFactory
+from questly.database.session import SessionFactory
 
 pytestmark = pytest.mark.postgres
 

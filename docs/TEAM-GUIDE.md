@@ -1,15 +1,15 @@
 # TEAM-GUIDE
 
-คู่มือเริ่มต้นสำหรับทีม GReader กติกาละเอียดอยู่ที่ [`AGENTS.md`](../AGENTS.md)
+คู่มือเริ่มต้นสำหรับทีม Questly กติกาละเอียดอยู่ที่ [`AGENTS.md`](../AGENTS.md)
 และ [`docs/task-scope.md`](task-scope.md) — ไฟล์นี้ไม่ก็อปเนื้อหามาซ้ำ
 
 ## 1. วันแรก
 
 ```bash
 git clone <repo-url>
-cd greader
+cd questly
 uv sync
-uv run fastapi dev src/greader/main.py
+uv run fastapi dev src/questly/main.py
 ```
 
 เปิด `http://127.0.0.1:8000/health` ควรได้ `{"status": "ok", ...}`

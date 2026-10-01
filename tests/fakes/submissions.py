@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable
 from dataclasses import replace
 
-from greader.core.submissions.models import Execution, ExecutionStatus, Submission
+from questly.core.submissions.models import Execution, ExecutionStatus, Submission
 
 
 class FakeSubmissionRepository:
@@ -104,7 +104,7 @@ class LocalUnsafeRunner:
         self, *, code: str, language: str, stdin: str, time_limit_seconds: float
     ) -> Execution:
         started = time.perf_counter()
-        with tempfile.TemporaryDirectory(prefix="greader-run-") as workdir:
+        with tempfile.TemporaryDirectory(prefix="questly-run-") as workdir:
             try:
                 done = subprocess.run(
                     [sys.executable, "-I", "-c", code],

@@ -5,13 +5,13 @@ from datetime import UTC, datetime
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.core.assignments.models import (
+from questly.core.assignments.models import (
     AssignmentContent,
     Difficulty,
     Schedule,
     TestCase,
 )
-from greader.core.auth.models import Actor, Role
+from questly.core.auth.models import Actor, Role
 from tests.fakes.app import build_app
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
 

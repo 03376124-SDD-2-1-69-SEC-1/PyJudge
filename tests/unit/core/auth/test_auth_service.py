@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import pytest
 
-from greader.core.auth.models import (
+from questly.core.auth.models import (
     Actor,
     InstructorRequestStatus,
     Landing,
@@ -14,7 +14,7 @@ from greader.core.auth.models import (
     Role,
     User,
 )
-from greader.core.auth.service import (
+from questly.core.auth.service import (
     AccountDeactivatedError,
     AuthService,
     EmailAlreadyRegisteredError,
@@ -30,7 +30,7 @@ from greader.core.auth.service import (
     hash_password,
     verify_password,
 )
-from greader.integrations.email import StubEmailSender
+from questly.integrations.email import StubEmailSender
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, FakeClock, seed_user
 
 PASSWORD = "correct horse"

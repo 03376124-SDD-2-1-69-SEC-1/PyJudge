@@ -4,8 +4,8 @@ from dataclasses import replace
 
 import pytest
 
-from greader.ai.app.models import NewKnowledgeChunk, NewKnowledgeSource
-from greader.ai.app.service import VectorService, VectorValidationError
+from questly.ai.app.models import NewKnowledgeChunk, NewKnowledgeSource
+from questly.ai.app.service import VectorService, VectorValidationError
 from tests.fakes.vector import FakeVectorRepository
 
 MODEL = "text-embedding-sample"

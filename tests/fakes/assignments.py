@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from greader.core.assignments.models import (
+from questly.core.assignments.models import (
     Assignment,
     AssignmentVersion,
     Posting,

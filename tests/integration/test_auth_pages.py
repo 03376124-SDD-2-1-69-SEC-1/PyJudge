@@ -5,9 +5,9 @@ from datetime import timedelta
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.core.auth.models import Role
-from greader.core.auth.pages import DemoAccount
-from greader.integrations.email import StubEmailSender
+from questly.core.auth.models import Role
+from questly.core.auth.pages import DemoAccount
+from questly.integrations.email import StubEmailSender
 from tests.fakes.app import build_app
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, FakeClock, seed_user
 from tests.integration.forms import post_form
@@ -66,7 +66,7 @@ async def test_login_form_redirects_by_role_and_sets_the_cookie(
 
     assert response.status_code == 303
     assert response.headers["location"] == location
-    assert "greader_session" in response.headers["set-cookie"]
+    assert "questly_session" in response.headers["set-cookie"]
     assert "httponly" in response.headers["set-cookie"].lower()
 
 

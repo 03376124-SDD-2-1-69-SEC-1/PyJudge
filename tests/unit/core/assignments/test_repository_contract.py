@@ -6,7 +6,7 @@ adapter, so a behaviour the two do not share fails there.
 
 import pytest
 
-from greader.core.assignments.ports import AssignmentRepository
+from questly.core.assignments.ports import AssignmentRepository
 from tests.contracts.assignment_repository import AssignmentRepositoryContract
 from tests.fakes.assignments import FakeAssignmentRepository
 

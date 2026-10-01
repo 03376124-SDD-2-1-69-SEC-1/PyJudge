@@ -1,15 +1,15 @@
-# GReader
+# Questly
 
 **Language:** English | [ภาษาไทย](README.th.md)
 
 > **Superseded by ADR-0007 (architecture).** Older passages in this README
 > describe Core and AI as two services that talk over HTTP. That design is
-> replaced: GReader is one FastAPI app in one repo, with one Neon project and
+> replaced: Questly is one FastAPI app in one repo, with one Neon project and
 > the schemas `core` and `rag`. `core/` and `ai/` are modules of it and call
 > each other through Python interfaces. Read `AGENTS.md` and
 > `docs/adr/0007-classroom-centric-flow.md` for the current rules.
 
-GReader is a FastAPI application that helps instructors prepare programming
+Questly is a FastAPI application that helps instructors prepare programming
 assignments, test cases, and related learning materials. It is organized as a
 modular monolith so each team can develop its area without tightly coupling it
 to the rest of the application.
@@ -136,7 +136,7 @@ uv run --env-file .env alembic upgrade head
 ### 6. Start the Development Server
 
 ```bash
-uv run --env-file .env uvicorn greader.main:app --reload
+uv run --env-file .env uvicorn questly.main:app --reload
 ```
 
 Open <http://127.0.0.1:8000> in your browser. Stop the server with `Ctrl+C`.
@@ -186,7 +186,7 @@ as secrets; `R2_TEST_BUCKET_NAME` as a variable) — see
 
 ### Styles (Tailwind CSS v4, standalone CLI)
 
-`src/greader/web/static/css/app.css` is generated from `input.css` next to it
+`src/questly/web/static/css/app.css` is generated from `input.css` next to it
 and is committed, so the app runs without the CLI. Rebuild it whenever you
 change `input.css` or add Tailwind classes to a template (`@source` scans
 `web/templates/`). Never edit `app.css` by hand.
@@ -199,15 +199,15 @@ https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.3.3, then:
 chmod +x tailwindcss-macos-arm64 && mv tailwindcss-macos-arm64 ~/.local/bin/tailwindcss
 
 # build once
-tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css
+tailwindcss -i src/questly/web/static/css/input.css -o src/questly/web/static/css/app.css
 # rebuild on every change while you work
-tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css --watch
+tailwindcss -i src/questly/web/static/css/input.css -o src/questly/web/static/css/app.css --watch
 ```
 
 Design tokens (colours, fonts) and components (`.btn`, `.input`, `.card`,
 `.tabs`, `.badge`, `.modal`, …) live in `input.css` and come from
 `docs/wireframes/`. Pages build forms and buttons only through the Jinja macros
-in `src/greader/web/templates/_components/`.
+in `src/questly/web/templates/_components/`.
 
 Create a migration after changing database models:
 
@@ -218,7 +218,7 @@ uv run --env-file .env alembic revision --autogenerate -m "describe the change"
 ## Project Structure
 
 ```text
-src/greader/
+src/questly/
 ├── main.py             # FastAPI application composition
 ├── core/
 │   ├── topics/         # Reference Topics CRUD feature
@@ -281,7 +281,7 @@ connection string, the driver must be `postgresql+psycopg://`, not the plain
 ### 2. Folder structure
 
 ```text
-src/greader/
+src/questly/
 ├── core/                        ← Core Service (must not import an ORM)
 │   ├── topics/                  ✅ reference slice
 │   │   ├── models.py            dataclass(frozen=True, slots=True)
@@ -337,8 +337,8 @@ classes that have **already been imported**. Dropping a file in place isn't
 enough — it must be imported in `database/__init__.py`:
 
 ```python
-from greader.database.core import tables as core_tables  # noqa: F401
-from greader.database.rag import tables as rag_tables    # noqa: F401
+from questly.database.core import tables as core_tables  # noqa: F401
+from questly.database.rag import tables as rag_tables    # noqa: F401
 ```
 
 Forget this and it won't error — it silently generates a migration missing

@@ -2,7 +2,7 @@
 
 import pytest
 
-from greader.core.submissions.models import ExecutionStatus
+from questly.core.submissions.models import ExecutionStatus
 from tests.fakes.submissions import LocalUnsafeRunner, UnsafeRunnerNotAllowedError
 
 
@@ -44,7 +44,7 @@ def test_runs_in_a_temp_dir_with_stdin(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert result.status is ExecutionStatus.OK
-    assert result.stdout.split() == ["cba", "greader-run-"]
+    assert result.stdout.split() == ["cba", "questly-run-"]
 
 
 def test_times_out_and_reports_crashes(monkeypatch: pytest.MonkeyPatch) -> None:
