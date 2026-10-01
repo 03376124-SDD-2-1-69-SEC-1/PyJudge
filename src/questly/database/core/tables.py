@@ -18,15 +18,21 @@ from typing import Optional
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, Relationship, SQLModel
 
 # No `from __future__ import annotations` here on purpose: SQLModel's
@@ -75,6 +81,48 @@ def _updated_at() -> datetime:
     )
 
 
+def _fk(
+    target: str, *, ondelete: str, nullable: bool = False, unique: bool = False
+) -> int:
+    """BIGINT foreign key into another `core` table."""
+    return Field(
+        default=None if nullable else ...,
+        sa_column=Column(
+            BigInteger,
+            ForeignKey(f"{SCHEMA}.{target}", ondelete=ondelete),
+            nullable=nullable,
+            unique=unique,
+        ),
+    )
+
+
+def _timestamp(*, nullable: bool, server_now: bool = False) -> datetime:
+    return Field(
+        default=None if nullable else ...,
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=nullable,
+            server_default=func.now() if server_now else None,
+        ),
+    )
+
+
+def _jsonb(default_sql: str) -> dict:
+    return Field(
+        default_factory=dict,
+        sa_column=Column(JSONB, nullable=False, server_default=text(default_sql)),
+    )
+
+
+def _bigint_array() -> list[int]:
+    return Field(
+        default_factory=list,
+        sa_column=Column(
+            ARRAY(BigInteger), nullable=False, server_default=text("'{}'::bigint[]")
+        ),
+    )
+
+
 def _metadata_jsonb() -> dict:
     """คอลัมน์ JSONB ชื่อ `metadata` ใน DB — Python attribute ต้องชื่อ
     `metadata_` เพราะ `metadata` เป็นชื่อ reserved ของ SQLModel/SQLAlchemy
@@ -95,14 +143,24 @@ def _metadata_jsonb() -> dict:
 class User(SQLModel, table=True):
     __tablename__ = "users"
     __table_args__ = (
-        CheckConstraint("role IN ('instructor', 'admin')", name="ck_users_role"),
+        CheckConstraint(
+            "role IN ('student', 'instructor', 'admin')", name="ck_users_role"
+        ),
         {"schema": SCHEMA},
     )
 
     id: int | None = _pk()
     email: str = Field(nullable=False, unique=True, index=True)
-    display_name: str | None = Field(default=None)
-    role: str = Field(nullable=False, default="instructor")
+    full_name: str = Field(sa_column=Column(String(120), nullable=False))
+    password_hash: str = Field(sa_column=Column(Text, nullable=False))
+    role: str = Field(
+        sa_column=Column(String, nullable=False, server_default="student")
+    )
+    email_verified_at: datetime | None = _timestamp(nullable=True)
+    is_active: bool = Field(
+        sa_column=Column(Boolean, nullable=False, server_default=text("true"))
+    )
+    last_active_at: datetime | None = _timestamp(nullable=True)
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
@@ -129,6 +187,7 @@ class KnowledgeDocument(SQLModel, table=True):
     content_hash: str = Field(nullable=False)  # sha256 กันไฟล์ซ้ำ
     status: str = Field(nullable=False, default="uploaded")
     metadata_: dict = _metadata_jsonb()  # topic, difficulty, course
+    # Nullable until CORE-16 gives the domain an uploader (ADR-0008).
     uploaded_by: int | None = Field(
         default=None,
         sa_column=Column(
@@ -137,6 +196,11 @@ class KnowledgeDocument(SQLModel, table=True):
             nullable=True,
         ),
     )
+    page_count: int | None = Field(default=None)
+    progress: int = Field(
+        sa_column=Column(Integer, nullable=False, server_default=text("0"))
+    )
+    error_code: str | None = Field(default=None)
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
@@ -162,18 +226,15 @@ class GenerationRequest(SQLModel, table=True):
     )
     status: str = Field(nullable=False, default="pending")
     error_code: str | None = Field(default=None)
-    requested_by: int | None = Field(
-        default=None,
-        sa_column=Column(
-            BigInteger,
-            ForeignKey(f"{SCHEMA}.users.id", ondelete="SET NULL"),
-            nullable=True,
-        ),
-    )
+    # ADR-0007 columns; nothing writes this table since Drafts got their own
+    # (ADR-0008).
+    requested_by: int = _fk("users.id", ondelete="RESTRICT")
+    classroom_id: int = _fk("classrooms.id", ondelete="CASCADE")
+    document_ids: list[int] = _bigint_array()
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
-    requester: User | None = Relationship(back_populates="generation_requests")
+    requester: User = Relationship(back_populates="generation_requests")
     artifacts: list["GenerationArtifact"] = Relationship(back_populates="request")
 
 
@@ -251,7 +312,22 @@ class Assignment(SQLModel, table=True):
     title: str = Field(nullable=False)
     problem_statement: str = Field(nullable=False)
     difficulty: str = Field(nullable=False)
-    metadata_: dict = _metadata_jsonb()  # topic, language, course
+    metadata_: dict = _metadata_jsonb()
+    topic_id: int | None = _fk("topics.id", ondelete="SET NULL", nullable=True)
+    owner_id: int | None = _fk("users.id", ondelete="SET NULL", nullable=True)
+    current_version: int = Field(
+        sa_column=Column(Integer, nullable=False, server_default=text("0"))
+    )
+    # Judging settings; each Version keeps its own copy (ADR-0008).
+    time_limit_ms: int = Field(
+        sa_column=Column(Integer, nullable=False, server_default=text("1000"))
+    )
+    language: str = Field(
+        sa_column=Column(String, nullable=False, server_default="python3")
+    )
+    show_hidden_names: bool = Field(
+        sa_column=Column(Boolean, nullable=False, server_default=text("false"))
+    )
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
 
@@ -270,6 +346,9 @@ class TestCase(SQLModel, table=True):
         # UniqueConstraint(
         #     "assignment_id", "order_index", name="uq_test_cases_assignment_order"
         # ),
+        CheckConstraint(
+            "kind IN ('sample', 'hidden', 'edge')", name="ck_test_cases_kind"
+        ),
         {"schema": SCHEMA},
     )
 
@@ -283,7 +362,8 @@ class TestCase(SQLModel, table=True):
     )
     input_data: str = Field(nullable=False)
     expected_output: str = Field(nullable=False)
-    is_hidden: bool = Field(nullable=False, default=False)
+    kind: str = Field(sa_column=Column(String, nullable=False, server_default="sample"))
+    note: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     order_index: int = Field(nullable=False, default=0)
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()
@@ -311,4 +391,279 @@ class Topic(SQLModel, table=True):
     name: str = Field(nullable=False)
     description: str | None = Field(default=None)
     created_at: datetime = _created_at()
+    updated_at: datetime = _updated_at()
+
+
+# ---------------------------------------------------------------------------
+# OPS-15: ADR-0007 "Schema changes" as amended by ADR-0008
+# ---------------------------------------------------------------------------
+
+
+class EmailVerificationToken(SQLModel, table=True):
+    __tablename__ = "email_verification_tokens"
+    __table_args__ = ({"schema": SCHEMA},)
+
+    id: int | None = _pk()
+    user_id: int = _fk("users.id", ondelete="CASCADE")
+    token_hash: str = Field(nullable=False, unique=True)
+    expires_at: datetime = _timestamp(nullable=False)
+    used_at: datetime | None = _timestamp(nullable=True)
+    created_at: datetime = _created_at()
+
+
+class UserSession(SQLModel, table=True):
+    """A login Session; named so it does not shadow `sqlmodel.Session`."""
+
+    __tablename__ = "sessions"
+    __table_args__ = ({"schema": SCHEMA},)
+
+    id: int | None = _pk()
+    user_id: int = _fk("users.id", ondelete="CASCADE")
+    token_hash: str = Field(nullable=False, unique=True)
+    csrf_token: str = Field(nullable=False)
+    expires_at: datetime = _timestamp(nullable=False)
+    revoked_at: datetime | None = _timestamp(nullable=True)
+    created_at: datetime = _created_at()
+
+
+class InstructorRequestRow(SQLModel, table=True):
+    __tablename__ = "instructor_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected')",
+            name="ck_instructor_requests_status",
+        ),
+        {"schema": SCHEMA},
+    )
+
+    id: int | None = _pk()
+    user_id: int = _fk("users.id", ondelete="CASCADE")
+    faculty: str = Field(nullable=False)
+    status: str = Field(
+        sa_column=Column(String, nullable=False, server_default="pending")
+    )
+    requested_at: datetime = _timestamp(nullable=False, server_now=True)
+    reviewed_by: int | None = _fk("users.id", ondelete="SET NULL", nullable=True)
+    reviewed_at: datetime | None = _timestamp(nullable=True)
+    note: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+
+
+class Classroom(SQLModel, table=True):
+    __tablename__ = "classrooms"
+    __table_args__ = ({"schema": SCHEMA},)
+
+    id: int | None = _pk()
+    instructor_id: int = _fk("users.id", ondelete="RESTRICT")
+    course_code: str = Field(nullable=False)
+    course_name: str = Field(nullable=False)
+    section: str = Field(nullable=False)
+    semester: str = Field(nullable=False)
+    # NULL once join codes are turned off; Postgres lets NULLs repeat under UNIQUE.
+    join_code: str | None = Field(default=None, unique=True, nullable=True)
+    archived_at: datetime | None = _timestamp(nullable=True)
+    created_at: datetime = _created_at()
+    updated_at: datetime = _updated_at()
+
+
+class ClassroomMember(SQLModel, table=True):
+    __tablename__ = "classroom_members"
+    __table_args__ = (
+        UniqueConstraint(
+            "classroom_id", "student_id", name="uq_classroom_members_pair"
+        ),
+        {"schema": SCHEMA},
+    )
+
+    id: int | None = _pk()
+    classroom_id: int = _fk("classrooms.id", ondelete="CASCADE")
+    student_id: int = _fk("users.id", ondelete="CASCADE")
+    joined_at: datetime = _timestamp(nullable=False)
+
+
+class AssignmentVersionRow(SQLModel, table=True):
+    __tablename__ = "assignment_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "assignment_id", "number", name="uq_assignment_versions_number"
+        ),
+        CheckConstraint(
+            "difficulty IN ('easy', 'medium', 'hard')",
+            name="ck_assignment_versions_difficulty",
+        ),
+        {"schema": SCHEMA},
+    )
+
+    id: int | None = _pk()
+    assignment_id: int = _fk("assignments.id", ondelete="CASCADE")
+    number: int = Field(nullable=False)
+    title: str = Field(nullable=False)
+    problem_statement: str = Field(nullable=False)
+    difficulty: str = Field(nullable=False)
+    # [{input_data, expected_output, kind, note, order_index}], immutable.
+    test_cases: list[dict] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    )
+    time_limit_ms: int = Field(nullable=False)
+    language: str = Field(nullable=False)
+    show_hidden_names: bool = Field(nullable=False)
+    reason: str = Field(sa_column=Column(Text, nullable=False))
+    created_at: datetime = _created_at()
+
+
+class Posting(SQLModel, table=True):
+    """An Assignment posted to a Classroom (CONTEXT.md "Posting")."""
+
+    __tablename__ = "classroom_assignments"
+    __table_args__ = (
+        UniqueConstraint(
+            "classroom_id", "assignment_id", name="uq_classroom_assignments_pair"
+        ),
+        {"schema": SCHEMA},
+    )
+
+    id: int | None = _pk()
+    classroom_id: int = _fk("classrooms.id", ondelete="CASCADE")
+    assignment_id: int = _fk("assignments.id", ondelete="CASCADE")
+    deadline: datetime = _timestamp(nullable=False)
+    max_score: int = Field(nullable=False)
+    allow_late: bool = Field(nullable=False)
+    allow_resubmission: bool = Field(nullable=False)
+    published_at: datetime = _timestamp(nullable=False)
+    closed_at: datetime | None = _timestamp(nullable=True)
+
+
+class SubmissionRow(SQLModel, table=True):
+    __tablename__ = "submissions"
+    __table_args__ = (
+        UniqueConstraint(
+            "posting_id", "student_id", "attempt", name="uq_submissions_attempt"
+        ),
+        {"schema": SCHEMA},
+    )
+
+    id: int | None = _pk()
+    # CASCADE: unposting removes the Posting's Submissions (ADR-0008).
+    posting_id: int = _fk("classroom_assignments.id", ondelete="CASCADE")
+    student_id: int = _fk("users.id", ondelete="CASCADE")
+    version_number: int = Field(nullable=False)
+    code: str = Field(sa_column=Column(Text, nullable=False))
+    language: str = Field(nullable=False)
+    submitted_at: datetime = _timestamp(nullable=False)
+    is_late: bool = Field(nullable=False)
+    score: int = Field(nullable=False)
+    max_score: int = Field(nullable=False)
+    attempt: int = Field(nullable=False)
+
+
+class SubmissionTestResult(SQLModel, table=True):
+    __tablename__ = "submission_test_results"
+    __table_args__ = (
+        UniqueConstraint(
+            "submission_id", "position", name="uq_submission_test_results_position"
+        ),
+        CheckConstraint(
+            "kind IN ('sample', 'hidden', 'edge')",
+            name="ck_submission_test_results_kind",
+        ),
+        CheckConstraint(
+            "verdict IN ('passed', 'wrong_answer', 'time_limit', 'runtime_error')",
+            name="ck_submission_test_results_verdict",
+        ),
+        {"schema": SCHEMA},
+    )
+
+    id: int | None = _pk()
+    submission_id: int = _fk("submissions.id", ondelete="CASCADE")
+    position: int = Field(nullable=False)
+    ordinal: int = Field(nullable=False)
+    kind: str = Field(nullable=False)
+    note: str = Field(sa_column=Column(Text, nullable=False))
+    verdict: str = Field(nullable=False)
+    time_seconds: float = Field(sa_column=Column(Float, nullable=False))
+    expected_output: str = Field(sa_column=Column(Text, nullable=False))
+    actual_output: str = Field(sa_column=Column(Text, nullable=False))
+    error: str = Field(sa_column=Column(Text, nullable=False))
+
+
+class Notification(SQLModel, table=True):
+    __tablename__ = "notifications"
+    __table_args__ = ({"schema": SCHEMA},)
+
+    id: int | None = _pk()
+    user_id: int = _fk("users.id", ondelete="CASCADE")
+    kind: str = Field(nullable=False)  # CORE-18 defines the kinds
+    payload: dict = _jsonb("'{}'::jsonb")
+    created_at: datetime = _created_at()
+    read_at: datetime | None = _timestamp(nullable=True)
+
+
+class DraftRow(SQLModel, table=True):
+    __tablename__ = "drafts"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('reviewing', 'published')", name="ck_drafts_status"
+        ),
+        {"schema": SCHEMA},
+    )
+
+    id: int | None = _pk()
+    classroom_id: int = _fk("classrooms.id", ondelete="CASCADE")
+    requested_by: int = _fk("users.id", ondelete="CASCADE")
+    prompt: str = Field(sa_column=Column(Text, nullable=False))
+    # Read and written whole by the T-04 stepper, never queried by field.
+    content: dict = _jsonb("'{}'::jsonb")
+    citations: list[dict] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    )
+    settings: dict = _jsonb("'{}'::jsonb")
+    document_ids: list[int] = _bigint_array()
+    classroom_ids: list[int] = _bigint_array()
+    status: str = Field(
+        sa_column=Column(String, nullable=False, server_default="reviewing")
+    )
+    assignment_id: int | None = _fk(
+        "assignments.id", ondelete="SET NULL", nullable=True
+    )
+    generated_at: datetime = _timestamp(nullable=False)
+    created_at: datetime = _created_at()
+    updated_at: datetime = _updated_at()
+
+
+class GenerationEvent(SQLModel, table=True):
+    """One successful generation or regeneration; the daily Quota counts these."""
+
+    __tablename__ = "generation_events"
+    __table_args__ = (
+        Index("ix_generation_events_user_occurred", "user_id", "occurred_at"),
+        {"schema": SCHEMA},
+    )
+
+    id: int | None = _pk()
+    user_id: int = _fk("users.id", ondelete="CASCADE")
+    occurred_at: datetime = _timestamp(nullable=False)
+
+
+class AiSettings(SQLModel, table=True):
+    """The one row of Admin AI settings. API keys and base URLs stay in the
+    environment; this stores only which provider and model (ADR-0008)."""
+
+    __tablename__ = "ai_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_ai_settings_single_row"),
+        CheckConstraint("daily_quota > 0", name="ck_ai_settings_daily_quota"),
+        CheckConstraint("max_pages > 0", name="ck_ai_settings_max_pages"),
+        {"schema": SCHEMA},
+    )
+
+    id: int = Field(
+        default=1,
+        sa_column=Column(BigInteger, primary_key=True, server_default=text("1")),
+    )
+    provider: str = Field(nullable=False)
+    model: str = Field(nullable=False)
+    daily_quota: int = Field(nullable=False)
+    max_pages: int = Field(nullable=False)
+    require_citations: bool = Field(nullable=False)
     updated_at: datetime = _updated_at()
