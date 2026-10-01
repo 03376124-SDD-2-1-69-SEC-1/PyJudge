@@ -19,7 +19,7 @@ from questly.database.session import SessionFactory
 TestCaseJson = dict[str, str | int | None]
 
 
-def test_case_to_json(test_case: TestCase) -> TestCaseJson:
+def encode_test_case(test_case: TestCase) -> TestCaseJson:
     """Serialize a Test Case; Draft content reuses this shape."""
     return {
         "id": test_case.id,
@@ -31,7 +31,7 @@ def test_case_to_json(test_case: TestCase) -> TestCaseJson:
     }
 
 
-def test_case_from_json(data: TestCaseJson) -> TestCase:
+def decode_test_case(data: TestCaseJson) -> TestCase:
     return TestCase(
         id=data["id"],
         input_data=data["input_data"],
@@ -57,7 +57,7 @@ def _version(row: VersionRow) -> AssignmentVersion:
         ),
         reason=row.reason,
         changed_at=row.created_at,
-        test_cases=[test_case_from_json(item) for item in row.test_cases],
+        test_cases=[decode_test_case(item) for item in row.test_cases],
     )
 
 
@@ -77,7 +77,7 @@ class SQLVersionRepository:
                 title=version.title,
                 problem_statement=version.problem_statement,
                 difficulty=version.difficulty.value,
-                test_cases=[test_case_to_json(tc) for tc in version.test_cases],
+                test_cases=[encode_test_case(tc) for tc in version.test_cases],
                 time_limit_ms=version.settings.time_limit_ms,
                 language=version.settings.language.value,
                 show_hidden_names=version.settings.show_hidden_names,

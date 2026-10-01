@@ -1,17 +1,16 @@
 """Ports the generation slice needs.
 
 ADR-0007 Drafts use DraftRepository, DocumentCatalog, ClassroomLookup and
-AssignmentPublisher; production wires the pending adapter for the first two
-until OPS-15 and the documents slice, ClassroomService for the lookup, and
+AssignmentPublisher; production wires the SQL adapters in `database/core/`
+for the first two (OPS-15), ClassroomService for the lookup, and
 AssignmentService as the publisher. GenerationRepository (requests and
-artifacts) is the pre-ADR shape: its SQL adapter stays but is not wired.
-
+artifacts) is the pre-ADR shape: no service uses it, and since OPS-15 it has
+no SQL adapter, only the in-memory one in `tests/fakes/generation.py`
+(ADR-0008).
 
 `ai/client.py` satisfies `GenerationClient`, with a stub today and an HTTP
-adapter later (OPS-04). `database/core/generation_repository.py` provides the
-SQL adapter for `GenerationRepository` and `tests/fakes/generation.py` the
-in-memory one. Nothing in `core/` may import any of them; only `main.py`
-wires them in.
+adapter later (OPS-04). Nothing in `core/` may import an adapter; only
+`main.py` wires them in.
 """
 
 from datetime import datetime

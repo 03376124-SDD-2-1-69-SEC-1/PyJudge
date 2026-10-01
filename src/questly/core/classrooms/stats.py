@@ -1,10 +1,11 @@
-"""ClassroomStats computed on read from stored records (ADR-0007 §7, OPS-15).
+"""ClassroomStats computed on read from stored records (ADR-0007 §7, ADR-0008).
 
-Built only on the repository ports, so the numbers follow the same rules
-whichever store sits behind them, and the contract in
-`tests/contracts/classroom_stats.py` runs over both the fakes and SQL. It reuses
-the domain's own rules: `counted_submissions` for the Counted Submission,
-`Posting.is_closed` for Closed and `Submission.all_passed` for Passed.
+Fills the classrooms slice's `ClassroomStats` port, which C-01 reads, the way
+`core/submissions/stats.py` fills `PostingStats`. Built only on repository
+ports, so the contract in `tests/contracts/classroom_stats.py` runs it over the
+fakes and over SQL alike. It reuses the domain's own rules: `counted_submissions`
+for the Counted Submission, `Posting.is_closed` for Closed and
+`Submission.all_passed` for Passed.
 """
 
 from __future__ import annotations

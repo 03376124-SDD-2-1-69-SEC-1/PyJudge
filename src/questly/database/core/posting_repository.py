@@ -47,16 +47,8 @@ class SQLPostingRepository:
     def create(self, posting: Posting) -> Posting:
         """Insert a Posting; posting twice to one Classroom raises ValueError."""
         with self._session_factory() as db:
-            row = PostingRow(
-                classroom_id=posting.classroom_id,
-                assignment_id=posting.assignment_id,
-                deadline=posting.schedule.deadline,
-                max_score=posting.schedule.max_score,
-                allow_late=posting.schedule.allow_late,
-                allow_resubmission=posting.schedule.allow_resubmission,
-                published_at=posting.published_at,
-                closed_at=posting.closed_at,
-            )
+            row = PostingRow()
+            _write(row, posting)
             db.add(row)
             try:
                 db.commit()

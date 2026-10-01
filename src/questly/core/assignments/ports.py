@@ -1,11 +1,9 @@
 """Ports the assignments slice needs.
 
 `tests/fakes/assignments.py` provides in-memory adapters for all three
-repositories and PostingStats. Production wires `database/pending.py` for
-them until OPS-15 (ADR-0007 §10.4); `database/core/assignment_repository.py`
-still implements the old AssignmentRepository shape and is not wired.
-main.py fills ClassroomAccess with ClassroomService, and PostingStats with the
-submissions slice once it exists.
+repositories and PostingStats; production wires the SQL adapters in
+`database/core/` (OPS-15). main.py fills ClassroomAccess with ClassroomService,
+and PostingStats with the submissions slice's `SubmissionPostingStats`.
 """
 
 from __future__ import annotations

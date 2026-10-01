@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlmodel import select
 
 from questly.core.generation.models import DocumentSummary
+from questly.core.uploads.models import DocumentStatus
 from questly.database.core.tables import KnowledgeDocument as DocumentRow
 from questly.database.session import SessionFactory
 
@@ -33,7 +34,8 @@ class SQLDocumentCatalog:
             rows = db.exec(
                 select(DocumentRow)
                 .where(
-                    DocumentRow.uploaded_by == owner_id, DocumentRow.status == "ready"
+                    DocumentRow.uploaded_by == owner_id,
+                    DocumentRow.status == DocumentStatus.READY.value,
                 )
                 .order_by(DocumentRow.id)
             ).all()

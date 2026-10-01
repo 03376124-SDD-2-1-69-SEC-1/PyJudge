@@ -133,11 +133,7 @@ class SQLAssignmentRepository:
         sequence gave it, exactly as the parent does.
         """
         with self._session_factory() as session:
-            row = AssignmentRow(
-                title=assignment.title,
-                problem_statement=assignment.problem_statement,
-                difficulty=assignment.difficulty.value,
-            )
+            row = AssignmentRow()
             _write_fields(row, assignment)
             session.add(row)
             session.flush()

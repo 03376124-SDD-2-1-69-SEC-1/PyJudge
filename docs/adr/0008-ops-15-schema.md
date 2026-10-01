@@ -92,6 +92,13 @@ nullable `note`; `kind` is backfilled as `hidden` where `is_hidden` was true,
 then `is_hidden` is dropped. Downgrade restores `is_hidden = kind <> 'sample'`,
 so an `edge` Test Case comes back as hidden.
 
+## Instructor requests record when they were filed
+
+ADR-0007 lists `instructor_requests` as (user, faculty, status, reviewed_by,
+reviewed_at, note). The domain `InstructorRequest` also carries the moment it
+was filed, which A-01 sorts and shows, so the table gets `requested_at`
+(NOT NULL, default `now()`).
+
 ## Sessions store the CSRF token
 
 ADR-0007 §9.7 keeps the logged-in synchronizer token on the Session, but its

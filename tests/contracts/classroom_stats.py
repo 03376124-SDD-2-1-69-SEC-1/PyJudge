@@ -21,11 +21,11 @@ from questly.core.classrooms.models import (
     StudentProgress,
 )
 from questly.core.classrooms.ports import ClassroomRepository
+from questly.core.classrooms.stats import ComputedClassroomStats
 from questly.core.generation.models import DraftStatus
 from questly.core.generation.ports import DraftRepository
 from questly.core.submissions.models import Submission, TestResult, Verdict
 from questly.core.submissions.ports import SubmissionRepository
-from questly.database.core.classroom_stats_repository import ComputedClassroomStats
 from tests.contracts.draft_repository import draft
 from tests.contracts.support import IdFactory, NeedsAssignments
 from tests.fakes.auth import DEFAULT_NOW, FakeClock

@@ -26,8 +26,8 @@ from questly.database.core.generation_repository import (
 )
 from questly.database.core.tables import DraftRow, GenerationEvent
 from questly.database.core.version_repository import (
-    test_case_from_json,
-    test_case_to_json,
+    decode_test_case,
+    encode_test_case,
 )
 from questly.database.session import SessionFactory
 
@@ -40,7 +40,7 @@ def _content_to_json(content: AssignmentContent) -> ContentJson:
         "title": content.title,
         "problem_statement": content.problem_statement,
         "difficulty": content.difficulty.value,
-        "test_cases": [test_case_to_json(tc) for tc in content.test_cases],
+        "test_cases": [encode_test_case(tc) for tc in content.test_cases],
         "topic_id": content.topic_id,
         "settings": {
             "time_limit_ms": content.settings.time_limit_ms,
@@ -56,7 +56,7 @@ def _content_from_json(data: ContentJson) -> AssignmentContent:
         title=data["title"],
         problem_statement=data["problem_statement"],
         difficulty=Difficulty(data["difficulty"]),
-        test_cases=[test_case_from_json(item) for item in data["test_cases"]],
+        test_cases=[decode_test_case(item) for item in data["test_cases"]],
         topic_id=data["topic_id"],
         settings=JudgingSettings(
             time_limit_ms=judging["time_limit_ms"],

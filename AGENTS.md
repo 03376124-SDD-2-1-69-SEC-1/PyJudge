@@ -102,11 +102,10 @@ one executable reference; prose in this file does not override it.
   across the two schemas is done by the application, not by a cascade.
 - `assignments.artifact_id` is nullable and UNIQUE.
 - `test_cases` has no `title` column. Do not add one. The per-test label is
-  `note`, and `kind` (sample, hidden, edge) replaces `is_hidden` — both
-  arrive with the ADR-0007 schema task, not before.
-- Tables for classrooms, postings, versions, submissions, notifications and
-  auth are proposed in ADR-0007 "Schema changes". Until that OPS task merges
-  they do not exist; do not write SQL adapters for them.
+  `note`, and `kind` (sample, hidden, edge) replaced `is_hidden` (OPS-15).
+- The classroom schema is ADR-0007 "Schema changes" as amended by ADR-0008
+  (OPS-15, revision `c4e8a2f17b90`). A table or column beyond it is a new OPS
+  task with its own migration and ADR entry.
 - Embeddings are `VECTOR(768)`.
 - Some columns look redundant on purpose — `knowledge_sources.r2_object_key`,
   `knowledge_sources.metadata`, `knowledge_chunks.embedding_model`,
@@ -236,8 +235,8 @@ tailwindcss -i src/questly/web/static/css/input.css -o src/questly/web/static/cs
 before OPS-15 creates the tables. G-01 lists every seeded account under "log in
 as"; verification links are logged, not emailed; data is lost on restart. It
 lives outside `src/` because fakes may not ship in the package. When a slice
-lands, extend `DemoSeed` so its pages have data. `fastapi dev` still wires the
-real adapters, and every classroom slice answers 503 there until OPS-15.
+lands, extend `DemoSeed` so its pages have data. `fastapi dev` wires the real
+SQL adapters, so it reads and writes the database in `.env`.
 
 `tests/unit/` domain + service · `tests/integration/` HTTP via ASGI transport ·
 `tests/architecture/` import direction and the no-JavaScript rule ·

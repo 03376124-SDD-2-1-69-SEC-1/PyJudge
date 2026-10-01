@@ -53,6 +53,7 @@ from questly.core.classrooms.pages import router as classroom_page_router
 from questly.core.classrooms.ports import ClassroomRepository, ClassroomStats
 from questly.core.classrooms.routes import router as classroom_router
 from questly.core.classrooms.service import ClassroomService
+from questly.core.classrooms.stats import ComputedClassroomStats
 from questly.core.generation.pages import router as generation_page_router
 from questly.core.generation.ports import (
     DocumentCatalog,
@@ -79,7 +80,6 @@ from questly.core.uploads.service import UploadService
 from questly.database.core.assignment_repository import SQLAssignmentRepository
 from questly.database.core.auth_repository import SQLAuthRepository
 from questly.database.core.classroom_repository import SQLClassroomRepository
-from questly.database.core.classroom_stats_repository import ComputedClassroomStats
 from questly.database.core.document_catalog_repository import SQLDocumentCatalog
 from questly.database.core.draft_repository import SQLDraftRepository
 from questly.database.core.knowledge_document_repository import (
@@ -90,7 +90,6 @@ from questly.database.core.submission_repository import SQLSubmissionRepository
 from questly.database.core.topic_repository import SQLTopicRepository
 from questly.database.core.version_repository import SQLVersionRepository
 from questly.database.health import check_db
-from questly.database.pending import SliceNotPersistedError
 from questly.database.rag.vector_repository import PostgresVectorRepository
 from questly.database.session import (
     SessionFactory,
@@ -337,16 +336,6 @@ def create_app(
         return HTMLResponse(
             "<h1>403 · This form expired</h1><p>Go back, reload and try again.</p>",
             status_code=403,
-        )
-
-    @application.exception_handler(SliceNotPersistedError)
-    def slice_not_persisted(
-        request: Request, error: SliceNotPersistedError
-    ) -> Response:
-        """A slice whose tables OPS-15 has not created yet."""
-        return JSONResponse(
-            status_code=503,
-            content={"detail": {"code": "not_persisted_yet", "message": str(error)}},
         )
 
     @application.exception_handler(RequestValidationError)

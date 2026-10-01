@@ -1,10 +1,9 @@
 """Contract every GenerationRepository implementation must satisfy.
 
-Bound to the in-memory adapter in `tests/unit/core/generation/` and to
-`SQLGenerationRepository` in `tests/db/`. The round-trip test is the reason
-this contract exists: `FakeGenerationRepository` used to hand the submitted
-draft/citations back by reference, so it could never catch a bug in the JSON
-codec `SQLGenerationRepository` actually uses.
+Bound to the in-memory adapter in `tests/unit/core/generation/`. Its SQL
+adapter was removed in OPS-15 (ADR-0008); the round-trip test still guards the
+JSON codecs in `database/core/generation_repository.py`, which the fake
+round-trips through.
 """
 
 from __future__ import annotations
