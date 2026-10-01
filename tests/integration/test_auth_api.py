@@ -5,13 +5,8 @@ from httpx import ASGITransport, AsyncClient
 
 from questly.core.auth.models import Role
 from questly.integrations.email import StubEmailSender
-from questly.main import create_app
-from tests.fakes.app import build_app, fake_settings
-from tests.fakes.assignments import FakeAssignmentRepository
+from tests.fakes.app import build_app
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
-from tests.fakes.topics import FakeTopicRepository
-from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
-from tests.fakes.vector import FakeVectorRepository
 
 SIGN_UP = {
     "full_name": "Somchai Prasert",
@@ -149,22 +144,3 @@ async def test_instructor_request_is_forbidden_to_an_instructor() -> None:
         )
 
     assert response.status_code == 403
-
-
-@pytest.mark.anyio
-async def test_production_wiring_answers_503_until_the_schema_lands() -> None:
-    app = create_app(
-        settings=fake_settings(),
-        topic_repository=FakeTopicRepository(),
-        assignment_repository=FakeAssignmentRepository(),
-        knowledge_document_repository=FakeKnowledgeDocumentRepository(),
-        object_storage=FakeObjectStorage(),
-        vector_repository=FakeVectorRepository(),
-    )
-    async with _client(app) as client:
-        response = await client.post("/api/v1/auth/signup", json=SIGN_UP)
-        docs = await client.get("/openapi.json")
-
-    assert response.status_code == 503
-    assert response.json()["detail"]["code"] == "not_persisted_yet"
-    assert "/api/v1/auth/signup" in docs.json()["paths"]
