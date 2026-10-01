@@ -6,12 +6,12 @@ task: OPS-14
 
 # Classroom-centric flow
 
-GReader moves from an instructor-only authoring tool (Dashboard → Generate →
+Questly moves from an instructor-only authoring tool (Dashboard → Generate →
 Review → Save) to a classroom system in the shape of MS Teams: everybody logs
 in, lands on a classroom picker, and sees a role-specific page inside each
 classroom. Students now submit code that is judged, which the old flow never
 had. This ADR records every decision from the OPS-14 interview. The UI
-contract is `docs/wireframes/GReader wireframes - Prototype.html` (67 screens);
+contract is `docs/wireframes/Questly wireframes - Prototype.html` (67 screens);
 the "Page 1" frames of the Figma file are the old flow and are void.
 
 Terms used below are defined in `CONTEXT.md`.
@@ -195,7 +195,7 @@ There is no admin dashboard.
    role (a Student on an instructor page) gets 403.
 7. CSRF (added 2026-09-24): logged-in form posts carry the synchronizer
    token stored on the Session; anonymous forms (login, sign-up, resend
-   link) carry a token from the `greader_csrf` cookie (double-submit). One
+   link) carry a token from the `questly_csrf` cookie (double-submit). One
    check, `require_csrf`, runs first in every POST page handler; a mismatch
    is 403. The JSON API relies on FastAPI parsing bodies only with
    `Content-Type: application/json` and on allowing no CORS origins.
@@ -207,7 +207,7 @@ There is no admin dashboard.
 
 ## 10. Code structure
 
-1. Slices under `src/greader/core/`:
+1. Slices under `src/questly/core/`:
    - new: `auth`, `classrooms`, `submissions` (`CodeRunner` port),
      `notifications` (`EmailSender` port), `admin`;
    - extended: `assignments` (Versions, Postings), `generation` (Drafts,
@@ -218,7 +218,7 @@ There is no admin dashboard.
    `ports.py`, `service.py`, `routes.py`, plus `pages.py`. In-memory
    adapters live in `tests/fakes/<slice>.py`, never in `src/`.
 3. Concrete Judge0 and email adapters live in a new
-   `src/greader/integrations/` package. Stubs come first.
+   `src/questly/integrations/` package. Stubs come first.
 4. Until Phase 3 lands the tables, a new slice's `create_app` keyword
    defaults to `None`; with no adapter the service is not placed on
    `app.state` and its handlers return 503 "not persisted yet". Routers are

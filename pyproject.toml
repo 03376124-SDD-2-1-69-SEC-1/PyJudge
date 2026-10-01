@@ -1,5 +1,5 @@
 [project]
-name = "greader"
+name = "questly"
 version = "0.1.0"
 description = "Team scaffold for instructor-facing assignment authoring"
 readme = "README.md"
@@ -51,7 +51,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["greader"]
+source = ["questly"]
 
 [tool.coverage.report]
 show_missing = true
@@ -67,8 +67,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN401"]
 
 [tool.ruff.lint.isort]
 # `tests` is an import root too (see pytest pythonpath), so the fakes and
-# contracts sort with greader instead of landing among third-party packages.
-known-first-party = ["greader", "tests"]
+# contracts sort with questly instead of landing among third-party packages.
+known-first-party = ["questly", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/env.py" = ["E402", "I001"]

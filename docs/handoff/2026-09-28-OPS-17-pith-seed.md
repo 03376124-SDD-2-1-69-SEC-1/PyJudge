@@ -99,7 +99,7 @@
 
 **ชื่อ branch:** `scriptupload-R2-PDF` ไม่ตรงรูปแบบ `<type>/<TASK-ID>-<slug>` ให้ย้ายงานไป branch `chore/OPS-17-seed-pith-pdfs` ที่แตกจาก `dev` ล่าสุด แล้ว cherry-pick เฉพาะ 2 ไฟล์ใต้ `scripts/`
 
-**import ของสคริปต์ (ไม่บังคับ):** ตอนนี้ `seed_pith_to_r2.py` เช็ค endpoint เองในไฟล์ เพราะตอนรันครั้งแรกเรียก `greader.r2_safety` ซึ่งถูกย้ายไปแล้ว บน `dev` ตัวนี้อยู่ที่ `greader.database.storage.safety.assert_valid_r2_endpoint` จะเปลี่ยนไป import จากตรงนั้นก็ได้ เพื่อให้มีจุดเช็คแค่ที่เดียว
+**import ของสคริปต์ (ไม่บังคับ):** ตอนนี้ `seed_pith_to_r2.py` เช็ค endpoint เองในไฟล์ เพราะตอนรันครั้งแรกเรียก `questly.r2_safety` ซึ่งถูกย้ายไปแล้ว บน `dev` ตัวนี้อยู่ที่ `questly.database.storage.safety.assert_valid_r2_endpoint` จะเปลี่ยนไป import จากตรงนั้นก็ได้ เพื่อให้มีจุดเช็คแค่ที่เดียว
 
 **Resolved (session 2026-09-28, executed on `chore/OPS-17-seed-pith-pdfs`):**
 - Branch rebuilt from `origin/dev`, only `scripts/seed_pith_to_r2.py` and
@@ -109,7 +109,7 @@
 - `.claude/settings.json` plugin toggle: confirmed intentional, kept disabled.
 - `dd` / `message.txt`: confirmed junk, kept deleted (not restored).
 - Import consolidation: done — `seed_pith_to_r2.py` now imports
-  `assert_valid_r2_endpoint` from `greader.database.storage.safety`, wrapped
+  `assert_valid_r2_endpoint` from `questly.database.storage.safety`, wrapped
   in the same `try/except ValueError: sys.exit(str(error))` pattern
   `scripts/ci_r2_cleanup.py` uses.
 - Old branch `scriptupload-R2-PDF` deleted, local and origin, after the new

@@ -178,7 +178,7 @@ def _check_status(row: Row) -> None:
 
 
 def _path_exists(root: Path, path: str) -> bool:
-    for base in (root, root / "src" / "greader"):
+    for base in (root, root / "src" / "questly"):
         if "*" in path:
             if any(base.glob(path)):
                 return True

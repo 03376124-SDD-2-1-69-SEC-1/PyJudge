@@ -4,7 +4,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from scripts.demo import BINARY_SEARCH, UPDATE_REASON, DemoSeed, build_demo_app
 
-from greader.core.auth.models import Actor
+from questly.core.auth.models import Actor
 from tests.fakes.auth import DEFAULT_PASSWORD
 from tests.fakes.submissions import ScriptedCodeRunner
 from tests.integration.forms import log_in, post_form

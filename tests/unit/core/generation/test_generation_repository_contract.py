@@ -6,7 +6,7 @@ adapter, so a behaviour the two do not share fails there.
 
 import pytest
 
-from greader.core.generation.ports import GenerationRepository
+from questly.core.generation.ports import GenerationRepository
 from tests.contracts.generation_repository import GenerationRepositoryContract
 from tests.fakes.generation import FakeGenerationRepository
 

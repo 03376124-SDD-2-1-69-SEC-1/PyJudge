@@ -9,7 +9,7 @@ from collections.abc import Generator
 import pytest
 from sqlalchemy import create_engine, text
 
-from greader.database.session import SessionFactory, build_session_factory
+from questly.database.session import SessionFactory, build_session_factory
 
 CORE_TABLES = (
     "core.assignments",

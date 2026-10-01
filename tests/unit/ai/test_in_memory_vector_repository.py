@@ -2,9 +2,9 @@
 
 import pytest
 
-from greader.ai.app.models import NewKnowledgeChunk, NewKnowledgeSource
-from greader.ai.app.repository import DuplicateChunkError, DuplicateSourceError
-from greader.ai.app.service import VectorService
+from questly.ai.app.models import NewKnowledgeChunk, NewKnowledgeSource
+from questly.ai.app.repository import DuplicateChunkError, DuplicateSourceError
+from questly.ai.app.service import VectorService
 from tests.fakes.vector import FakeVectorRepository
 
 MODEL_A = "model-a"

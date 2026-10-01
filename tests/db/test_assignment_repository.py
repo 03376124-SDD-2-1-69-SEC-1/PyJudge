@@ -8,14 +8,14 @@ database facts a fake cannot prove.
 import pytest
 from sqlalchemy import text
 
-from greader.core.assignments.models import (
+from questly.core.assignments.models import (
     Assignment,
     Difficulty,
     TestCase,
     TestCaseKind,
 )
-from greader.database.core.assignment_repository import SQLAssignmentRepository
-from greader.database.session import SessionFactory
+from questly.database.core.assignment_repository import SQLAssignmentRepository
+from questly.database.session import SessionFactory
 from tests.contracts.assignment_repository import AssignmentRepositoryContract
 
 pytestmark = pytest.mark.postgres

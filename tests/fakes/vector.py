@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from math import sqrt
 
-from greader.ai.app.models import (
+from questly.ai.app.models import (
     ChunkSearchResult,
     Embedding,
     KnowledgeChunk,
@@ -13,7 +13,7 @@ from greader.ai.app.models import (
     NewKnowledgeSource,
     SourceCreationResult,
 )
-from greader.ai.app.repository import DuplicateChunkError, DuplicateSourceError
+from questly.ai.app.repository import DuplicateChunkError, DuplicateSourceError
 
 
 class FakeVectorRepository:

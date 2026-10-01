@@ -3,7 +3,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.core.auth.models import Role
+from questly.core.auth.models import Role
 from tests.fakes.app import build_app
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
 from tests.integration.forms import log_in, post_form

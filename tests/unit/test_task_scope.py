@@ -28,7 +28,7 @@ def ids(listing_rows: tuple[Row, ...]) -> list[str]:
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    (tmp_path / "src" / "greader" / "core" / "topics").mkdir(parents=True)
+    (tmp_path / "src" / "questly" / "core" / "topics").mkdir(parents=True)
     (tmp_path / "docs").mkdir()
     return tmp_path
 
@@ -127,7 +127,7 @@ def test_creates_does_not_excuse_a_missing_existing_path(repo: Path) -> None:
     assert offered(text, "นัด", repo) == []
 
 
-def test_path_under_src_greader_or_the_repo_root_counts(repo: Path) -> None:
+def test_path_under_src_questly_or_the_repo_root_counts(repo: Path) -> None:
     (repo / "docs" / "note.md").write_text("x", encoding="utf-8")
     text = table("| A-1 | นัด | open | `core/topics/`, `docs/note.md` | done |")
 
@@ -135,8 +135,8 @@ def test_path_under_src_greader_or_the_repo_root_counts(repo: Path) -> None:
 
 
 def test_glob_path_needs_a_match(repo: Path) -> None:
-    (repo / "src" / "greader" / "web").mkdir()
-    (repo / "src" / "greader" / "web" / "g01.html").write_text("x", encoding="utf-8")
+    (repo / "src" / "questly" / "web").mkdir()
+    (repo / "src" / "questly" / "web" / "g01.html").write_text("x", encoding="utf-8")
     text = table(
         "| A-1 | นัด | open | `web/g*` | done |",
         "| A-2 | นัด | open | `web/z*` | done |",

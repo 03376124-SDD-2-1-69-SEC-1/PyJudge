@@ -5,15 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime
 
-from greader.core.generation.models import (
+from questly.core.generation.models import (
     AssignmentDraft,
     Citation,
     DocumentSummary,
     Draft,
     GenerationArtifact,
 )
-from greader.core.generation.schemas import GenerationRequest, GenerationResponse
-from greader.database.core.generation_repository import (
+from questly.core.generation.schemas import GenerationRequest, GenerationResponse
+from questly.database.core.generation_repository import (
     citation_from_json,
     citation_to_json,
     draft_from_json,

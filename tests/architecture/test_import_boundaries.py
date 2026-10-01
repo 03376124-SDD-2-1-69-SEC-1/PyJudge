@@ -4,7 +4,7 @@ import ast
 import importlib
 from pathlib import Path
 
-CORE_ROOT = Path("src/greader/core")
+CORE_ROOT = Path("src/questly/core")
 
 # Every slice now has a service layer: generation lost its exemption once its
 # route started persisting a request/artifact through GenerationService instead
@@ -15,7 +15,7 @@ ROUTE_SERVICE_EXCEPTIONS: set[str] = set()
 
 def test_core_never_imports_ai() -> None:
     for source_file in CORE_ROOT.rglob("*.py"):
-        assert "greader.ai" not in source_file.read_text(), source_file
+        assert "questly.ai" not in source_file.read_text(), source_file
 
 
 def test_core_never_imports_integrations() -> None:
@@ -23,19 +23,19 @@ def test_core_never_imports_integrations() -> None:
     violations = [
         str(source_file)
         for source_file in sorted(CORE_ROOT.rglob("*.py"))
-        if "greader.integrations" in source_file.read_text()
+        if "questly.integrations" in source_file.read_text()
     ]
 
     assert not violations, (
         "core/ must reach Judge0/email through its own Protocol, never "
-        "greader.integrations (AGENTS.md 'Ports and adapters'). Violations:\n"
+        "questly.integrations (AGENTS.md 'Ports and adapters'). Violations:\n"
         + "\n".join(violations)
     )
 
 
 def test_core_never_imports_an_orm_or_storage_client() -> None:
     """`core/` sees a Protocol and a dataclass, never SQLModel or boto3."""
-    forbidden = ("sqlmodel", "sqlalchemy", "boto3", "botocore", "greader.database")
+    forbidden = ("sqlmodel", "sqlalchemy", "boto3", "botocore", "questly.database")
     violations = []
     for source_file in sorted(CORE_ROOT.rglob("*.py")):
         text = source_file.read_text()
@@ -91,4 +91,4 @@ def test_every_slice_module_is_importable() -> None:
     }
     for slice_name, modules in slices.items():
         for module in modules:
-            importlib.import_module(f"greader.core.{slice_name}.{module}")
+            importlib.import_module(f"questly.core.{slice_name}.{module}")

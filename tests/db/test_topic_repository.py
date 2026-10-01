@@ -7,10 +7,10 @@ live only in Python, where two workers could both pass it.
 import pytest
 from sqlalchemy import text
 
-from greader.core.topics.models import Topic
-from greader.core.topics.service import TopicNameConflictError
-from greader.database.core.topic_repository import SQLTopicRepository
-from greader.database.session import SessionFactory
+from questly.core.topics.models import Topic
+from questly.core.topics.service import TopicNameConflictError
+from questly.database.core.topic_repository import SQLTopicRepository
+from questly.database.session import SessionFactory
 from tests.contracts.topic_repository import TopicRepositoryContract
 
 pytestmark = pytest.mark.postgres

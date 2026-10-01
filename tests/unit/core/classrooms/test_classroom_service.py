@@ -4,9 +4,9 @@ from datetime import timedelta
 
 import pytest
 
-from greader.core.auth.models import Actor, PermissionDeniedError, Role
-from greader.core.auth.service import AuthService
-from greader.core.classrooms.models import (
+from questly.core.auth.models import Actor, PermissionDeniedError, Role
+from questly.core.auth.service import AuthService
+from questly.core.classrooms.models import (
     ClassroomFilter,
     InstructorCardStats,
     InstructorClassroomView,
@@ -15,14 +15,14 @@ from greader.core.classrooms.models import (
     StudentPicker,
     StudentProgress,
 )
-from greader.core.classrooms.service import (
+from questly.core.classrooms.service import (
     JOIN_CODE_ALPHABET,
     ClassroomNotFoundError,
     ClassroomService,
     InvalidJoinCodeError,
     MemberNotFoundError,
 )
-from greader.integrations.email import StubEmailSender
+from questly.integrations.email import StubEmailSender
 from tests.fakes.auth import FakeAuthRepository, FakeClock, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
 

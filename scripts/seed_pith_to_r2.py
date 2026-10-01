@@ -30,7 +30,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-from greader.database.storage.safety import assert_valid_r2_endpoint
+from questly.database.storage.safety import assert_valid_r2_endpoint
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "scripts" / "seed" / "pith-100-manifest.csv"
@@ -47,7 +47,7 @@ REQUIRED_VARS = (
 def fetch_pdf(url: str, dest: Path) -> bytes:
     if dest.exists():
         return dest.read_bytes()
-    req = urllib.request.Request(url, headers={"User-Agent": "greader-seed/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "questly-seed/1.0"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         if not resp.headers.get("Content-Type", "").startswith("application/pdf"):
             raise RuntimeError(f"not a PDF: {url}")

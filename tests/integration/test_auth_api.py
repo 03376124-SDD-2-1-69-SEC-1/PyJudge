@@ -3,9 +3,9 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from greader.core.auth.models import Role
-from greader.integrations.email import StubEmailSender
-from greader.main import create_app
+from questly.core.auth.models import Role
+from questly.integrations.email import StubEmailSender
+from questly.main import create_app
 from tests.fakes.app import build_app, fake_settings
 from tests.fakes.assignments import FakeAssignmentRepository
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user

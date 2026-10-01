@@ -8,7 +8,7 @@ Branch `refactor/OPS-12-real-persistence`, off `dev`. Read this before
 touching code.
 
 **Update:** the blocker in section 2 is fixed and verified end-to-end against
-the real Neon database and the real `greader` R2 bucket (พาย applied the
+the real Neon database and the real `questly` R2 bucket (พาย applied the
 `tables.py` fix and ran the pending migration in this session — see the final
 commits on this branch). Section 2 is kept below as the record of what the bug
 was and why the fix looks the way it does; it is no longer an open item.
@@ -70,7 +70,7 @@ from sqlalchemy.orm import Mapped
 from typing import Optional
 ```
 
-Then, in `src/greader/database/core/tables.py`:
+Then, in `src/questly/database/core/tables.py`:
 
 | Line | Current | Change to |
 |---|---|---|
@@ -96,10 +96,10 @@ attributes need this.
    `configure_mappers()` no longer raises. Quick repro:
    ```bash
    uv run python -c "
-   from greader.database.session import build_engine, build_session_factory
-   from greader.database.core.assignment_repository import SQLAssignmentRepository
-   from greader.core.assignments.models import Assignment, Difficulty
-   from greader.config import get_settings
+   from questly.database.session import build_engine, build_session_factory
+   from questly.database.core.assignment_repository import SQLAssignmentRepository
+   from questly.core.assignments.models import Assignment, Difficulty
+   from questly.config import get_settings
    repo = SQLAssignmentRepository(build_session_factory(build_engine(get_settings())))
    print(repo.create(Assignment(title='t', problem_statement='p', difficulty=Difficulty.EASY)))
    "

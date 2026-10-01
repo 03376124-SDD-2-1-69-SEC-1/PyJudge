@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from greader.core.rounding import average, half_up
+from questly.core.rounding import average, half_up
 
 
 @pytest.mark.parametrize(

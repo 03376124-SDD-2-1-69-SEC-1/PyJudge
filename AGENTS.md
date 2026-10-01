@@ -1,4 +1,4 @@
-# AGENTS.md — GReader
+# AGENTS.md — Questly
 
 Modular monolith: one FastAPI + Jinja2 app in one repo, one Neon project.
 `core/` and `ai/` are modules of that app, not separate services; they call
@@ -11,7 +11,7 @@ Domain words: `CONTEXT.md`.
 
 **UI source of truth:** the Figma file GradeFlow (fileKey
 `WecQlqyFS71jLCNmD6U1jE`) for the pages พาย has mocked. A page without a mock
-follows `docs/wireframes/GReader wireframes - Prototype.html` until it has one.
+follows `docs/wireframes/Questly wireframes - Prototype.html` until it has one.
 Do not call the Figma MCP in a task unless the task says so (the Starter plan
 quota is used up). UI-01 in `docs/task-scope.md` tracks which template matches
 which Figma frame.
@@ -132,7 +132,7 @@ If a task looks like it needs a schema change, stop and say so.
 
 ## Who may change database and locked files
 
-All of `src/greader/database/` and `alembic/` belong to พาย (GitHub
+All of `src/questly/database/` and `alembic/` belong to พาย (GitHub
 `Doonminus2`), in every case. A task whose description seems to need a
 `database/` or `alembic/` edit is not an exception — stop and ask พาย instead
 of editing it. `docs/task-scope.md` enforces this at the row level: it never
@@ -198,9 +198,9 @@ concrete client type directly.
   (submissions; Judge0 CE), `EmailSender` (notifications — auth sends mail
   through `NotificationService`, not its own Protocol), `AssignmentPublisher`
   (generation, filled with `AssignmentService`).
-- Concrete adapters for outside services live in `src/greader/integrations/`
+- Concrete adapters for outside services live in `src/questly/integrations/`
   (Judge0, email); database and storage adapters stay in `database/`.
-  `core/` never imports `greader.integrations`.
+  `core/` never imports `questly.integrations`.
 - Concrete implementations are adapters: a stub for tests/mocks, a real one
   for production. Both satisfy the same Protocol.
 - Callers (services, routes) type-hint against the Protocol only. They must
@@ -217,7 +217,7 @@ should reach past it.
 
 ```bash
 uv sync
-uv run fastapi dev src/greader/main.py
+uv run fastapi dev src/questly/main.py
 
 uv run pytest
 uv run ruff check .
@@ -227,8 +227,8 @@ uv run python -m scripts.demo  # demo mode, http://127.0.0.1:8000/login
 ALLOW_UNSAFE_RUNNER=1 uv run python -m scripts.demo  # also execute Run/Submit code, unsandboxed
 
 # app.css from input.css — Tailwind v4.3.3 standalone binary, see README "Styles"
-tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css
-tailwindcss -i src/greader/web/static/css/input.css -o src/greader/web/static/css/app.css --watch
+tailwindcss -i src/questly/web/static/css/input.css -o src/questly/web/static/css/app.css
+tailwindcss -i src/questly/web/static/css/input.css -o src/questly/web/static/css/app.css --watch
 ```
 
 **Demo mode** (`scripts/demo.py`) runs the app on the in-memory fakes from

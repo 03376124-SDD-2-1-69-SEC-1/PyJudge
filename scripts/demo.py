@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 import uvicorn
 from fastapi import FastAPI
 
-from greader.core.assignments.models import (
+from questly.core.assignments.models import (
     AssignmentContent,
     Difficulty,
     PublishedAssignment,
@@ -30,21 +30,21 @@ from greader.core.assignments.models import (
     TestCase,
     TestCaseKind,
 )
-from greader.core.auth.models import Actor, InstructorRequest, Role, User
-from greader.core.auth.pages import DemoAccount
-from greader.core.classrooms.models import (
+from questly.core.auth.models import Actor, InstructorRequest, Role, User
+from questly.core.auth.pages import DemoAccount
+from questly.core.classrooms.models import (
     Classroom,
     InstructorCardStats,
     Membership,
     StudentCardStats,
     StudentProgress,
 )
-from greader.core.generation.models import DocumentSummary
-from greader.core.submissions.models import Submission, TestResult, Verdict
-from greader.core.submissions.ports import CodeRunner
-from greader.core.submissions.service import score_for
-from greader.integrations.clock import SystemClock
-from greader.integrations.judge0 import StubCodeRunner
+from questly.core.generation.models import DocumentSummary
+from questly.core.submissions.models import Submission, TestResult, Verdict
+from questly.core.submissions.ports import CodeRunner
+from questly.core.submissions.service import score_for
+from questly.integrations.clock import SystemClock
+from questly.integrations.judge0 import StubCodeRunner
 from tests.fakes.app import build_app
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
@@ -72,7 +72,7 @@ STUDENTS = [
 ]
 # The prototype's six Programming I problems: title, difficulty, deadline
 # (Bangkok date, 23:59), one sample test, one hidden test.
-logger = logging.getLogger("greader.demo")
+logger = logging.getLogger("questly.demo")
 
 PROBLEMS = [
     ("Sum of a list", Difficulty.EASY, (9, 10), ("3\n1 2 3", "6"), ("0\n", "0")),
@@ -539,7 +539,7 @@ def main() -> None:
         raise SystemExit(
             "scripts.demo runs student code unsandboxed; not in production"
         )
-    port = int(os.environ.get("GREADER_DEMO_PORT", "8000"))
+    port = int(os.environ.get("QUESTLY_DEMO_PORT", "8000"))
     seed = DemoSeed()
     if os.environ.get("ALLOW_UNSAFE_RUNNER", "").strip() == "1":
         seed.code_runner = LocalUnsafeRunner()

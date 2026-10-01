@@ -2,8 +2,8 @@
 
 import pytest
 
-from greader.database.core.generation_repository import SQLGenerationRepository
-from greader.database.session import SessionFactory
+from questly.database.core.generation_repository import SQLGenerationRepository
+from questly.database.session import SessionFactory
 from tests.contracts.generation_repository import GenerationRepositoryContract
 
 pytestmark = pytest.mark.postgres

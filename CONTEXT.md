@@ -1,4 +1,4 @@
-# GReader
+# Questly
 
 A classroom system for programming courses at KMITL. Instructors publish
 programming Assignments (drafted with AI from their lecture notes) to their

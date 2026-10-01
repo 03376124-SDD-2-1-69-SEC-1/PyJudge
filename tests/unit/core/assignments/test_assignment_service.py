@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from greader.core.assignments.models import (
+from questly.core.assignments.models import (
     AssignmentContent,
     Difficulty,
     InstructorProblemList,
@@ -19,17 +19,17 @@ from greader.core.assignments.models import (
     TestCase,
     TestCaseKind,
 )
-from greader.core.assignments.service import (
+from questly.core.assignments.service import (
     AssignmentNotFoundError,
     AssignmentService,
     ClassroomNotVisibleError,
     PostingNotFoundError,
     TestCaseNotFoundError,
 )
-from greader.core.auth.models import Actor, PermissionDeniedError, Role
-from greader.core.auth.service import AuthService
-from greader.core.classrooms.service import ClassroomService
-from greader.integrations.email import StubEmailSender
+from questly.core.auth.models import Actor, PermissionDeniedError, Role
+from questly.core.auth.service import AuthService
+from questly.core.classrooms.service import ClassroomService
+from questly.integrations.email import StubEmailSender
 from tests.fakes.assignments import (
     FakeAssignmentRepository,
     FakePostingRepository,

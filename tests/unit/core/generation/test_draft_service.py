@@ -4,13 +4,13 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from greader.core.assignments.models import Difficulty, TestCase
-from greader.core.assignments.service import AssignmentService
-from greader.core.auth.models import Actor, PermissionDeniedError, Role
-from greader.core.auth.service import AuthService
-from greader.core.classrooms.service import ClassroomService
-from greader.core.generation.models import DocumentSummary, DraftPart, DraftSettings
-from greader.core.generation.service import (
+from questly.core.assignments.models import Difficulty, TestCase
+from questly.core.assignments.service import AssignmentService
+from questly.core.auth.models import Actor, PermissionDeniedError, Role
+from questly.core.auth.service import AuthService
+from questly.core.classrooms.service import ClassroomService
+from questly.core.generation.models import DocumentSummary, DraftPart, DraftSettings
+from questly.core.generation.service import (
     ClassroomNotVisibleError,
     DocumentNotAllowedError,
     DraftNotFoundError,
@@ -19,7 +19,7 @@ from greader.core.generation.service import (
     MissingFieldsError,
     QuotaExceededError,
 )
-from greader.integrations.email import StubEmailSender
+from questly.integrations.email import StubEmailSender
 from tests.fakes.assignments import (
     FakeAssignmentRepository,
     FakePostingRepository,
