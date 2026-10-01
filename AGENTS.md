@@ -24,20 +24,20 @@ setup and background live in `README.md` and `docs/adr/`.
 | Area                          | State                                                                                              | Owner (task)        |
 | ----------------------------- | -------------------------------------------------------------------------------------------------- | ------------------- |
 | `core/topics`                 | Working. **The reference slice — copy its shape.**                                                 | shared              |
-| `core/auth`, `classrooms`     | Working on fakes (demo mode); **503 in production until OPS-15**                                   | done (CORE-12, 13)  |
-| `core/assignments`            | Versions and Postings on fakes; **503 in production until OPS-15**                                 | done (CORE-14)      |
-| `core/generation`             | Drafts, T-03/T-04, daily Quota on fakes; **503 until OPS-15**; production client is a stub         | done (CORE-15)      |
-| `core/submissions`            | Run vs Submit, PostingStats on fakes; **503 until OPS-15**; production `CodeRunner` is a stub      | พาย (CORE-17)       |
+| `core/auth`, `classrooms`     | Working; persisted on Neon. No Admin approval path until CORE-19                                   | done (CORE-12, 13)  |
+| `core/assignments`            | Working; Versions and Postings persisted on Neon                                                   | done (CORE-14)      |
+| `core/generation`             | Drafts, T-03/T-04, daily Quota persisted on Neon; production client is a stub                      | done (CORE-15)      |
+| `core/submissions`            | Run vs Submit, PostingStats persisted on Neon; production `CodeRunner` is a stub                   | พาย (CORE-17)       |
 | `core/uploads`                | Working; to be renamed `core/documents`                                                            | open (CORE-16)      |
 | `core/notifications`, `admin` | Not started                                                                                        | open (CORE-18, 19)  |
-| `database/`                   | 9 tables live on Neon; classroom, posting, version, submission, notification and auth tables wait for OPS-15 | พาย (OPS-15)        |
+| `database/`                   | ADR-0007 + ADR-0008 schema live on Neon (head `c4e8a2f17b90`); a SQL adapter per port, each held to a contract in `tests/contracts/` | done (OPS-15)       |
 | `ai/`                         | Vector storage works (AI-01). Ingestion, retrieval and a real `GenerationClient` are not started; the standalone app in `ai/app/main.py` is unused. Seed corpus: 100 PDFs on R2 under `sources/programming-in-th/` (OPS-17), not yet in `core.knowledge_documents` (OPS-18) or `rag` (AI-08). | ฟิล์ม (AI-02 to 07), พาย (OPS-16) |
 | `web/templates/`              | Every page of ADR-0007 except T-05, T-06 and A-01 exists; matching them to Figma is UI-01          | พาย (UI-01)         |
 
-"Working on fakes" means the slice runs in demo mode (`scripts/demo.py`) and in
-tests. In production it is wired to `database/pending.py`, which refuses every
-call, so its routes answer 503 until OPS-15 lands the tables and SQL adapters.
-Every SQL adapter is OPS-15's work; a slice's task never lists one.
+Every slice also runs on the in-memory fakes in demo mode (`scripts/demo.py`)
+and in tests. In production `main.py` wires the SQL adapters in
+`database/core/`; a new SQL adapter is an OPS task's work, and a slice's task
+never lists one.
 
 Do not implement another area's placeholder unless the task says to.
 
@@ -102,11 +102,10 @@ one executable reference; prose in this file does not override it.
   across the two schemas is done by the application, not by a cascade.
 - `assignments.artifact_id` is nullable and UNIQUE.
 - `test_cases` has no `title` column. Do not add one. The per-test label is
-  `note`, and `kind` (sample, hidden, edge) replaces `is_hidden` — both
-  arrive with the ADR-0007 schema task, not before.
-- Tables for classrooms, postings, versions, submissions, notifications and
-  auth are proposed in ADR-0007 "Schema changes". Until that OPS task merges
-  they do not exist; do not write SQL adapters for them.
+  `note`, and `kind` (sample, hidden, edge) replaced `is_hidden` (OPS-15).
+- The classroom schema is ADR-0007 "Schema changes" as amended by ADR-0008
+  (OPS-15, revision `c4e8a2f17b90`). A table or column beyond it is a new OPS
+  task with its own migration and ADR entry.
 - Embeddings are `VECTOR(768)`.
 - Some columns look redundant on purpose — `knowledge_sources.r2_object_key`,
   `knowledge_sources.metadata`, `knowledge_chunks.embedding_model`,
@@ -236,8 +235,8 @@ tailwindcss -i src/questly/web/static/css/input.css -o src/questly/web/static/cs
 before OPS-15 creates the tables. G-01 lists every seeded account under "log in
 as"; verification links are logged, not emailed; data is lost on restart. It
 lives outside `src/` because fakes may not ship in the package. When a slice
-lands, extend `DemoSeed` so its pages have data. `fastapi dev` still wires the
-real adapters, and every classroom slice answers 503 there until OPS-15.
+lands, extend `DemoSeed` so its pages have data. `fastapi dev` wires the real
+SQL adapters, so it reads and writes the database in `.env`.
 
 `tests/unit/` domain + service · `tests/integration/` HTTP via ASGI transport ·
 `tests/architecture/` import direction and the no-JavaScript rule ·

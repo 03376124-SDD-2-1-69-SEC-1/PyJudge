@@ -11,8 +11,23 @@ from sqlalchemy import create_engine, text
 
 from questly.database.session import SessionFactory, build_session_factory
 
+# Every core table a test may write. `core.ai_settings` is left out on purpose:
+# it holds the one seeded row the migration inserts.
 CORE_TABLES = (
+    "core.users",
+    "core.email_verification_tokens",
+    "core.sessions",
+    "core.instructor_requests",
+    "core.classrooms",
+    "core.classroom_members",
     "core.assignments",
+    "core.assignment_versions",
+    "core.classroom_assignments",
+    "core.submissions",
+    "core.submission_test_results",
+    "core.notifications",
+    "core.drafts",
+    "core.generation_events",
     "core.topics",
     "core.knowledge_documents",
     "core.generation_requests",

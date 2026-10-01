@@ -53,6 +53,7 @@ from questly.core.classrooms.pages import router as classroom_page_router
 from questly.core.classrooms.ports import ClassroomRepository, ClassroomStats
 from questly.core.classrooms.routes import router as classroom_router
 from questly.core.classrooms.service import ClassroomService
+from questly.core.classrooms.stats import ComputedClassroomStats
 from questly.core.generation.pages import router as generation_page_router
 from questly.core.generation.ports import (
     DocumentCatalog,
@@ -76,12 +77,19 @@ from questly.core.topics.service import TopicService
 from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from questly.core.uploads.routes import router as upload_router
 from questly.core.uploads.service import UploadService
+from questly.database.core.assignment_repository import SQLAssignmentRepository
+from questly.database.core.auth_repository import SQLAuthRepository
+from questly.database.core.classroom_repository import SQLClassroomRepository
+from questly.database.core.document_catalog_repository import SQLDocumentCatalog
+from questly.database.core.draft_repository import SQLDraftRepository
 from questly.database.core.knowledge_document_repository import (
     SQLKnowledgeDocumentRepository,
 )
+from questly.database.core.posting_repository import SQLPostingRepository
+from questly.database.core.submission_repository import SQLSubmissionRepository
 from questly.database.core.topic_repository import SQLTopicRepository
+from questly.database.core.version_repository import SQLVersionRepository
 from questly.database.health import check_db
-from questly.database.pending import PendingRepository, SliceNotPersistedError
 from questly.database.rag.vector_repository import PostgresVectorRepository
 from questly.database.session import (
     SessionFactory,
@@ -188,39 +196,47 @@ def create_app(
     if clock is None:
         clock = SystemClock()
 
-    # ADR-0007 §10.4: no tables until OPS-15, so production gets a pending
-    # adapter that answers every call with 503.
+    # Every classroom slice persists to Postgres (OPS-15); a caller may inject
+    # any adapter instead, as the tests and scripts/demo.py do. Repositories
+    # are resolved before the services because ClassroomStats reads four of
+    # them.
     if auth_repository is None:
-        auth_repository = PendingRepository("auth")
+        auth_repository = SQLAuthRepository(use_session_factory())
+    if classroom_repository is None:
+        classroom_repository = SQLClassroomRepository(use_session_factory())
+    if assignment_repository is None:
+        assignment_repository = SQLAssignmentRepository(use_session_factory())
+    if version_repository is None:
+        version_repository = SQLVersionRepository(use_session_factory())
+    if posting_repository is None:
+        posting_repository = SQLPostingRepository(use_session_factory())
+    if submission_repository is None:
+        submission_repository = SQLSubmissionRepository(use_session_factory())
+    if draft_repository is None:
+        draft_repository = SQLDraftRepository(use_session_factory())
+    if document_catalog is None:
+        document_catalog = SQLDocumentCatalog(use_session_factory())
+    if classroom_stats is None:
+        classroom_stats = ComputedClassroomStats(
+            posting_repository,
+            submission_repository,
+            classroom_repository,
+            draft_repository,
+            clock,
+        )
+
     if verification_mailer is None:
         verification_mailer = StubEmailSender()
     auth_service = AuthService(auth_repository, verification_mailer, clock)
     application.state.auth_service = auth_service
 
-    if classroom_repository is None:
-        classroom_repository = PendingRepository("classrooms")
-    # Card numbers come from assignments and submissions, which have no
-    # tables yet either.
-    if classroom_stats is None:
-        classroom_stats = PendingRepository("classroom stats")
     classroom_service = ClassroomService(
         classroom_repository, auth_service, classroom_stats, clock
     )
     application.state.classroom_service = classroom_service
 
-    # The ADR-0007 shape (owner, topic, kind/note, Versions, Postings) has no
-    # columns until OPS-15; database/core/assignment_repository.py still has
-    # the old shape and is not wired meanwhile.
-    if assignment_repository is None:
-        assignment_repository = PendingRepository("assignments")
-    if version_repository is None:
-        version_repository = PendingRepository("assignment versions")
-    if posting_repository is None:
-        posting_repository = PendingRepository("postings")
-    # Submissions have no table until OPS-15. T-01/S-01 numbers are computed
-    # from them unless a test injects its own PostingStats.
-    if submission_repository is None:
-        submission_repository = PendingRepository("submissions")
+    # T-01/S-01 numbers are computed from Submissions unless a test injects its
+    # own PostingStats.
     if posting_stats is None:
         posting_stats = SubmissionPostingStats(
             submission_repository, assignment_repository
@@ -241,15 +257,8 @@ def create_app(
         submission_repository, code_runner, assignment_service, classroom_service, clock
     )
 
-    # Drafts have no table until OPS-15 and the Document library arrives with
-    # the documents slice; database/core/generation_repository.py holds the
-    # pre-ADR request/artifact shape and is not wired.
     if generation_client is None:
         generation_client = StubGenerationClient()
-    if draft_repository is None:
-        draft_repository = PendingRepository("drafts")
-    if document_catalog is None:
-        document_catalog = PendingRepository("documents")
     application.state.generation_service = GenerationService(
         draft_repository,
         generation_client,
@@ -327,16 +336,6 @@ def create_app(
         return HTMLResponse(
             "<h1>403 · This form expired</h1><p>Go back, reload and try again.</p>",
             status_code=403,
-        )
-
-    @application.exception_handler(SliceNotPersistedError)
-    def slice_not_persisted(
-        request: Request, error: SliceNotPersistedError
-    ) -> Response:
-        """A slice whose tables OPS-15 has not created yet."""
-        return JSONResponse(
-            status_code=503,
-            content={"detail": {"code": "not_persisted_yet", "message": str(error)}},
         )
 
     @application.exception_handler(RequestValidationError)

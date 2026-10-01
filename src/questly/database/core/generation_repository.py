@@ -1,9 +1,9 @@
-"""SQL adapter for the GenerationRepository port (OPS-12).
+"""JSON codecs for the pre-ADR generation artifact shape.
 
-Translates between the `core.generation_requests` / `core.generation_artifacts`
-rows and the plain dataclasses in `core/generation/models.py`. This seam must
-live here, not on the `core/` side, because it is the only layer allowed to
-see both.
+The SQL adapter that used them was removed in OPS-15: the ADR-0007 columns on
+`core.generation_requests` (classroom, requester NOT NULL) are ones its port
+cannot fill, and Drafts now have their own table (ADR-0008). The codecs stay
+because `tests/fakes/generation.py` round-trips through them.
 """
 
 from __future__ import annotations
@@ -11,13 +11,8 @@ from __future__ import annotations
 from questly.core.generation.models import (
     AssignmentDraft,
     Citation,
-    GenerationArtifact,
-    ReviewStatus,
     TestCaseDraft,
 )
-from questly.database.core.tables import GenerationArtifact as GenerationArtifactRow
-from questly.database.core.tables import GenerationRequest as GenerationRequestRow
-from questly.database.session import SessionFactory
 
 
 def _test_case_to_json(test_case: TestCaseDraft) -> dict[str, object]:
@@ -85,83 +80,3 @@ def citation_from_json(data: dict[str, object]) -> Citation:
         score=float(data["score"]),
         text_snapshot=str(data["text_snapshot"]),
     )
-
-
-def _to_domain(row: GenerationArtifactRow) -> GenerationArtifact:
-    return GenerationArtifact(
-        id=row.id,
-        draft=draft_from_json(row.draft),
-        citations=[citation_from_json(item) for item in row.citations],
-        review_status=ReviewStatus(row.review_status),
-    )
-
-
-class SQLGenerationRepository:
-    """Store generation requests and artifacts in the `core` schema.
-
-    One session per method: the service is built once at startup, so there is
-    no per-request session to join. Each call is its own unit of work.
-    """
-
-    def __init__(self, session_factory: SessionFactory) -> None:
-        """Initialize the adapter with a session factory."""
-        self._session_factory = session_factory
-
-    def create_request(self, prompt: str, filters: dict[str, object]) -> int:
-        """Insert a pending request row and return its generated id."""
-        with self._session_factory() as session:
-            row = GenerationRequestRow(prompt=prompt, filters=dict(filters))
-            session.add(row)
-            session.commit()
-            session.refresh(row)
-            return row.id
-
-    def mark_request_completed(self, request_id: int) -> None:
-        """Mark a request as completed.
-
-        Raises KeyError when the id does not exist: the service only ever
-        calls this right after `create_request` returns that same id, so a
-        missing row is a programming error, not something a caller recovers
-        from.
-        """
-        with self._session_factory() as session:
-            row = session.get(GenerationRequestRow, request_id)
-            if row is None:
-                raise KeyError(request_id)
-            row.status = "completed"
-            session.add(row)
-            session.commit()
-
-    def mark_request_failed(self, request_id: int, error_code: str) -> None:
-        """Mark a request as failed, recording why."""
-        with self._session_factory() as session:
-            row = session.get(GenerationRequestRow, request_id)
-            if row is None:
-                raise KeyError(request_id)
-            row.status = "failed"
-            row.error_code = error_code
-            session.add(row)
-            session.commit()
-
-    def create_artifact(
-        self, request_id: int, draft: AssignmentDraft, citations: list[Citation]
-    ) -> GenerationArtifact:
-        """Insert an artifact linked to `request_id` and return it with an id."""
-        with self._session_factory() as session:
-            row = GenerationArtifactRow(
-                request_id=request_id,
-                draft=draft_to_json(draft),
-                citations=[citation_to_json(citation) for citation in citations],
-            )
-            session.add(row)
-            session.commit()
-            session.refresh(row)
-            return _to_domain(row)
-
-    def get(self, artifact_id: int) -> GenerationArtifact | None:
-        """Return an artifact by id when present."""
-        with self._session_factory() as session:
-            row = session.get(GenerationArtifactRow, artifact_id)
-            if row is None:
-                return None
-            return _to_domain(row)

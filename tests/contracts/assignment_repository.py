@@ -6,10 +6,19 @@ Bound to the in-memory adapter in `tests/unit/core/assignments/` and to
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
-from questly.core.assignments.models import Assignment, Difficulty, TestCase
+from questly.core.assignments.models import (
+    Assignment,
+    Difficulty,
+    JudgingSettings,
+    TestCase,
+    TestCaseKind,
+)
 from questly.core.assignments.ports import AssignmentRepository
+from tests.contracts.support import IdFactory, NeedsTopics, NeedsUsers
 
 
 def assignment(
@@ -204,3 +213,77 @@ class AssignmentRepositoryContract:
                     difficulty=Difficulty.EASY,
                 )
             )
+
+
+class AssignmentShapeContract(NeedsUsers, NeedsTopics):
+    """The ADR-0007 shape: owner, Topic, judging settings, Version, kind/note."""
+
+    def test_new_fields_round_trip(
+        self,
+        repository: AssignmentRepository,
+        new_user: IdFactory,
+        new_topic: IdFactory,
+    ) -> None:
+        created = repository.create(
+            replace(
+                assignment(
+                    test_cases=[
+                        TestCase("1", "1", kind=TestCaseKind.SAMPLE),
+                        TestCase(
+                            "2",
+                            "2",
+                            kind=TestCaseKind.HIDDEN,
+                            note="big n",
+                            order_index=1,
+                        ),
+                        TestCase("3", "3", kind=TestCaseKind.EDGE, order_index=2),
+                    ]
+                ),
+                owner_id=new_user(),
+                topic_id=new_topic(),
+                current_version=2,
+                settings=JudgingSettings(time_limit_ms=2500, show_hidden_names=True),
+            )
+        )
+
+        fetched = repository.get(created.id)
+
+        assert fetched == created
+        assert fetched.settings == JudgingSettings(
+            time_limit_ms=2500, show_hidden_names=True
+        )
+        assert [tc.kind for tc in fetched.test_cases] == [
+            TestCaseKind.SAMPLE,
+            TestCaseKind.HIDDEN,
+            TestCaseKind.EDGE,
+        ]
+        assert [tc.note for tc in fetched.test_cases] == ["", "big n", ""]
+
+    def test_owner_and_topic_are_optional(
+        self, repository: AssignmentRepository
+    ) -> None:
+        created = repository.create(assignment())
+
+        assert created.owner_id is None
+        assert created.topic_id is None
+        assert created.current_version == 0
+        assert created.settings == JudgingSettings()
+
+    def test_update_changes_settings_and_version(
+        self, repository: AssignmentRepository, new_user: IdFactory
+    ) -> None:
+        created = repository.create(replace(assignment(), owner_id=new_user()))
+        changed = replace(
+            created,
+            current_version=1,
+            settings=JudgingSettings(time_limit_ms=3000),
+        )
+
+        assert repository.update(changed) == changed
+        assert repository.get(created.id) == changed
+
+    def test_list_is_in_id_order(self, repository: AssignmentRepository) -> None:
+        first = repository.create(assignment(title="First"))
+        second = repository.create(assignment(title="Second"))
+
+        assert repository.list() == [first, second]
