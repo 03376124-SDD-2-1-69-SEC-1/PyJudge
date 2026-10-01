@@ -327,7 +327,7 @@ Unchanged: `/api/v1/topics`, the AI vector endpoints.
 
 Not applied by this ADR. One hand-written Alembic migration, tested by CI on
 its own Neon branch. All new ids are `BIGSERIAL`; no cross-schema foreign
-keys.
+keys. ADR-0008 records where OPS-15 departs from or adds to this list.
 
 - `users`: role CHECK gains `student`, default becomes `student`; add
   `password_hash`, `email_verified_at`, `is_active`, `last_active_at`.
@@ -374,6 +374,7 @@ keys.
    max 5 is 2.5 → 2 or 3. Changing it changes every stored score, so
    decide before OPS-15 persists Submissions. `score_for` in
    `core/submissions/service.py` is the one place to change.
+   **Decided 2026-10-01 in ADR-0008: floor.**
 
 ## Consequences
 

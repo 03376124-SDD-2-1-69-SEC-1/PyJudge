@@ -81,7 +81,7 @@ _Avoid_: Credits, limit
 ## Solving
 
 **Submission**:
-A Student's code sent for grading against every Test Case of a Posting; always kept. Its ordinal number is the "attempt" shown in the UI.
+A Student's code sent for grading against every Test Case of a Posting; kept for as long as its Posting exists. Its ordinal number is the "attempt" shown in the UI.
 _Avoid_: Attempt (as a noun for the record), answer, entry
 
 **Run**:
