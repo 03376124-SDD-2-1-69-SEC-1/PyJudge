@@ -38,6 +38,35 @@ def _encrypted_pdf() -> bytes:
     return pdf_bytes
 
 
+def _scan_like_pdf() -> bytes:
+    image = pymupdf.Pixmap(
+        pymupdf.csRGB,
+        pymupdf.IRect(0, 0, 10, 10),
+        False,
+    )
+    image.clear_with(255)
+    image_bytes = image.tobytes("png")
+
+    document = pymupdf.open()
+    scanned_page = document.new_page()
+    scanned_page.insert_image(scanned_page.rect, stream=image_bytes)
+
+    partial_text_page = document.new_page()
+    partial_text_page.insert_image(partial_text_page.rect, stream=image_bytes)
+    partial_text_page.insert_text((72, 72), "partial text layer")
+
+    digital_page = document.new_page()
+    digital_page.insert_image(
+        pymupdf.Rect(20, 20, 60, 60),
+        stream=image_bytes,
+    )
+    digital_page.insert_text((72, 72), "usable digital text")
+
+    pdf_bytes = document.tobytes()
+    document.close()
+    return pdf_bytes
+
+
 def test_extracts_every_page_in_source_order() -> None:
     result = PyMuPDFPageExtractor().extract(_pdf_with_text_blank_and_vector_pages())
 
@@ -59,6 +88,17 @@ def test_rejects_corrupt_pdf_without_parser_error_leakage() -> None:
 def test_rejects_password_protected_pdf() -> None:
     with pytest.raises(EncryptedDocumentError, match="password"):
         PyMuPDFPageExtractor().extract(_encrypted_pdf())
+
+
+def test_marks_scan_like_pages_for_ocr_and_retains_partial_text() -> None:
+    result = PyMuPDFPageExtractor().extract(_scan_like_pdf())
+
+    assert result.pages[0].outcome == PageExtractionOutcome.NEEDS_OCR
+    assert result.pages[0].text == ""
+    assert result.pages[1].outcome == PageExtractionOutcome.NEEDS_OCR
+    assert "partial text layer" in result.pages[1].text
+    assert result.pages[2].outcome == PageExtractionOutcome.EXTRACTED
+    assert "usable digital text" in result.pages[2].text
 
 
 def test_normalizes_only_line_endings_and_preserves_thai_and_indentation() -> None:
