@@ -3,7 +3,7 @@
   "summary": {
     "title": "Questly — Data Flow & Threat Model",
     "owner": "Questly team",
-    "description": "STRIDE assessment for Questly, a single FastAPI/Jinja2 classroom app. AI generation and production code execution are stubs; classroom SQL persistence is pending OPS-15.",
+    "description": "การประเมินภัยคุกคามแบบ STRIDE ของ Questly ซึ่งเป็นแอป classroom แบบ FastAPI/Jinja2 ตัวเดียว ส่วน AI generation และการรันโค้ดใน production ยังเป็น stub และการบันทึกข้อมูล Classroom ลง SQL ยังรอ OPS-15",
     "id": 0
   },
   "detail": {
@@ -190,8 +190,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "8.1 (CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:N)",
-                  "description": "A stolen session can submit code or expose Classroom data as that Student.",
-                  "mitigation": "Use secure, rotated sessions, revocation, login rate limits, and CSRF tokens.",
+                  "description": "ผู้โจมตีที่ขโมย session ของ Student ไปได้ สามารถส่งโค้ดหรือดูข้อมูลใน Classroom ในนามของ Student คนนั้น",
+                  "mitigation": "ใช้ session ที่ปลอดภัยและหมุนเวียน (rotate) ได้ เพิกถอน session ได้ จำกัดจำนวนครั้งการ login และใช้ CSRF token",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 1
@@ -321,8 +321,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "8.3 (CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:L)",
-                  "description": "Account takeover could expose lecture PDFs, Drafts, and hidden Test Cases.",
-                  "mitigation": "Protect sessions, rate-limit login, verify accounts, and audit Instructor actions.",
+                  "description": "หากบัญชี Instructor ถูกยึด ผู้โจมตีจะเข้าถึง PDF ประกอบการสอน, Draft และ Test Case แบบซ่อน (hidden) ได้",
+                  "mitigation": "ป้องกัน session, จำกัดอัตราการ login, ยืนยันตัวตนบัญชี และบันทึก audit log การกระทำของ Instructor",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 2
@@ -452,8 +452,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "7.2 (CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H)",
-                  "description": "A compromised Admin could change roles, deactivate users, or alter AI settings.",
-                  "mitigation": "Apply least privilege and audit privileged actions.",
+                  "description": "Admin ที่ถูกยึดบัญชีสามารถเปลี่ยนบทบาทผู้ใช้ ปิดการใช้งานผู้ใช้ หรือแก้ไขการตั้งค่า AI ได้",
+                  "mitigation": "ให้สิทธิ์เท่าที่จำเป็น (least privilege) และบันทึก audit log ทุกการกระทำที่ใช้สิทธิ์สูง",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 3
@@ -583,8 +583,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "8.1 (CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N)",
-                  "description": "Changing a resource ID may expose another user's data if membership or ownership checks are missed.",
-                  "mitigation": "Authorize every use case in services; test all role and membership boundaries.",
+                  "description": "การเปลี่ยน ID ของทรัพยากรใน request อาจเปิดเผยข้อมูลของผู้ใช้อื่น หากระบบไม่ได้ตรวจการเป็นสมาชิกหรือความเป็นเจ้าของ",
+                  "mitigation": "ตรวจสิทธิ์ในทุก use case ที่ชั้น service และเขียนเทสให้ครอบคลุมขอบเขตของทุกบทบาทและการเป็นสมาชิก",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 4
@@ -596,8 +596,8 @@
                   "status": "Open",
                   "severity": "Medium",
                   "score": "5.3 (CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:N/I:H/A:N)",
-                  "description": "A logged-in user's browser could be induced to submit a form.",
-                  "mitigation": "Require CSRF tokens on every POST page handler and use SameSite cookies.",
+                  "description": "เบราว์เซอร์ของผู้ใช้ที่ login อยู่อาจถูกหลอกให้ส่งฟอร์มโดยผู้ใช้ไม่ได้ตั้งใจ",
+                  "mitigation": "บังคับใช้ CSRF token ในทุก POST page handler และตั้ง cookie แบบ SameSite",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 5
@@ -609,8 +609,8 @@
                   "status": "Open",
                   "severity": "Medium",
                   "score": "6.5 (CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H)",
-                  "description": "Repeated requests or oversized PDFs can exhaust application or storage resources.",
-                  "mitigation": "Rate-limit; cap uploads; use timeouts, concurrency limits, and monitoring.",
+                  "description": "การส่ง request ซ้ำ ๆ หรืออัปโหลด PDF ขนาดใหญ่เกินไป อาจทำให้ทรัพยากรของแอปหรือพื้นที่จัดเก็บหมด",
+                  "mitigation": "จำกัดอัตรา request, จำกัดขนาดไฟล์อัปโหลด, ตั้ง timeout, จำกัดงานที่ทำพร้อมกัน (concurrency) และมีระบบ monitoring",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 6
@@ -748,8 +748,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "7.4 (CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N)",
-                  "description": "Over-privileged DB credentials or unsafe queries could expose or alter accounts, Classrooms, Assignments, or Submissions.",
-                  "mitigation": "Use least privilege, parameterized queries, encrypted DB connections, backups, and audit logs.",
+                  "description": "credential ของฐานข้อมูลที่มีสิทธิ์มากเกินไป หรือ query ที่ไม่ปลอดภัย อาจทำให้ข้อมูลบัญชี, Classroom, Assignment หรือ Submission ถูกเปิดเผยหรือแก้ไข",
+                  "mitigation": "ใช้สิทธิ์เท่าที่จำเป็น, parameterized query, เชื่อมต่อฐานข้อมูลแบบเข้ารหัส, สำรองข้อมูล และเก็บ audit log",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 7
@@ -887,8 +887,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "7.5 (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N)",
-                  "description": "A public bucket, guessable key, or missing owner check could expose lecture PDFs.",
-                  "mitigation": "Keep R2 private; authorize by owner; validate files; use short-lived signed access only when required.",
+                  "description": "bucket ที่เปิดสาธารณะ, object key ที่เดาได้ หรือการไม่ตรวจความเป็นเจ้าของ อาจทำให้ PDF ประกอบการสอนรั่วไหล",
+                  "mitigation": "ตั้ง R2 เป็น private, ตรวจสิทธิ์ตามเจ้าของไฟล์, ตรวจสอบไฟล์ และใช้ signed URL อายุสั้นเฉพาะเมื่อจำเป็น",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 8
@@ -1026,8 +1026,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "8.5 (CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:L/A:N)",
-                  "description": "A retrieval defect could return another Instructor's chunks; malicious PDF text may influence future AI output.",
-                  "mitigation": "Filter by document ownership; treat PDF text as untrusted; verify citations.",
+                  "description": "ข้อผิดพลาดในการ retrieval อาจดึง chunk ของ Instructor คนอื่นมา และข้อความแอบแฝงใน PDF ที่เป็นอันตรายอาจชักนำผลลัพธ์ของ AI ในอนาคต (prompt injection)",
+                  "mitigation": "กรองตามความเป็นเจ้าของเอกสาร, ถือว่าข้อความใน PDF เป็นข้อมูลที่ไม่น่าเชื่อถือ และตรวจสอบ citation",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 9
@@ -1151,7 +1151,7 @@
               "type": "tm.Actor",
               "isTrustBoundary": false,
               "outOfScope": true,
-              "reasonOutOfScope": "Production GenerationClient is a stub; provider connection is planned.",
+              "reasonOutOfScope": "GenerationClient ใน production ยังเป็น stub การเชื่อมต่อกับผู้ให้บริการ AI ยังอยู่ในแผน",
               "threats": [
                 {
                   "id": "fd007f1d-a9ef-51d5-96fd-06fab2c099c2",
@@ -1160,8 +1160,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "7.7 (CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N)",
-                  "description": "When connected, prompts and retrieved lecture text may leave Questly or be retained externally.",
-                  "mitigation": "Review provider retention terms, minimize personal data, and scope retrieval to authorized documents.",
+                  "description": "เมื่อเชื่อมต่อจริง prompt และเนื้อหาเอกสารประกอบการสอนที่ดึงมาอาจถูกส่งออกนอก Questly หรือถูกเก็บไว้โดยผู้ให้บริการภายนอก",
+                  "mitigation": "ตรวจสอบเงื่อนไขการเก็บข้อมูลของผู้ให้บริการ, ลดการส่งข้อมูลส่วนบุคคล และจำกัดการดึงข้อมูลเฉพาะเอกสารที่มีสิทธิ์",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 10
@@ -1282,7 +1282,7 @@
               "type": "tm.Actor",
               "isTrustBoundary": false,
               "outOfScope": true,
-              "reasonOutOfScope": "Production CodeRunner is a stub and does not execute code; Judge0 CE is only a candidate.",
+              "reasonOutOfScope": "CodeRunner ใน production ยังเป็น stub และไม่ได้รันโค้ดจริง Judge0 CE เป็นเพียงตัวเลือกที่กำลังพิจารณา",
               "threats": [
                 {
                   "id": "25c8411e-3baa-5fa9-87a6-0d9c73b2c4b4",
@@ -1291,8 +1291,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "8.5 (CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:C/C:H/I:H/A:H)",
-                  "description": "A future runner without strong isolation could compromise the host; production runner is currently a stub.",
-                  "mitigation": "Before enabling execution, use a no-network sandbox with strict CPU, memory, time, output, and filesystem limits.",
+                  "description": "ตัวรันโค้ดในอนาคตที่ไม่มีการแยกสภาพแวดล้อม (isolation) ที่แข็งแรงพอ อาจทำให้เครื่อง host ถูกยึด ปัจจุบันตัวรันโค้ดใน production ยังเป็น stub",
+                  "mitigation": "ก่อนเปิดให้รันโค้ด ต้องใช้ sandbox ที่ไม่มี network และจำกัด CPU, หน่วยความจำ, เวลา, ขนาด output และระบบไฟล์อย่างเข้มงวด",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 11
@@ -1367,8 +1367,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "7.1 (CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N)",
-                  "description": "A stolen session or failed ownership check could permit publishing or document access.",
-                  "mitigation": "Verify Instructor accounts; enforce ownership; audit publishing and membership changes.",
+                  "description": "session ที่ถูกขโมย หรือการตรวจความเป็นเจ้าของที่ผิดพลาด อาจทำให้มีการ publish โจทย์หรือเข้าถึงเอกสารโดยไม่ได้รับอนุญาต",
+                  "mitigation": "ยืนยันตัวตนบัญชี Instructor, บังคับตรวจความเป็นเจ้าของ และบันทึก audit log การ publish และการเปลี่ยนแปลงสมาชิก",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 12
@@ -1450,8 +1450,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "8.1 (CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:N)",
-                  "description": "Sessions may be exposed if transport or cookie protections are misconfigured.",
-                  "mitigation": "Enforce HTTPS, Secure/HttpOnly/SameSite cookies, CSRF checks, rotation, and login limits.",
+                  "description": "session อาจรั่วไหลหากตั้งค่าการป้องกันของการรับส่งข้อมูลหรือ cookie ผิดพลาด",
+                  "mitigation": "บังคับใช้ HTTPS, cookie แบบ Secure/HttpOnly/SameSite, ตรวจ CSRF, หมุนเวียน session และจำกัดการ login",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 13
@@ -1533,8 +1533,8 @@
                   "status": "Open",
                   "severity": "Medium",
                   "score": "4.9 (CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:H/A:N)",
-                  "description": "Without reliable audit records, a privileged account could deny changing roles or settings.",
-                  "mitigation": "Log actor, action, target, time, and outcome; protect logs from alteration.",
+                  "description": "หากไม่มี audit log ที่เชื่อถือได้ บัญชีที่มีสิทธิ์สูงอาจปฏิเสธว่าไม่ได้เปลี่ยนบทบาทหรือการตั้งค่า",
+                  "mitigation": "บันทึกผู้กระทำ, การกระทำ, เป้าหมาย, เวลา และผลลัพธ์ และป้องกันไม่ให้ log ถูกแก้ไข",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 14
@@ -1616,8 +1616,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "7.4 (CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N)",
-                  "description": "Compromised credentials or unsafe queries could enable unauthorized reads or writes.",
-                  "mitigation": "Use parameterized queries, least-privilege roles, encryption, and auditing.",
+                  "description": "credential ที่ถูกขโมยหรือ query ที่ไม่ปลอดภัย อาจทำให้มีการอ่านหรือเขียนข้อมูลโดยไม่ได้รับอนุญาต",
+                  "mitigation": "ใช้ parameterized query, role ฐานข้อมูลที่มีสิทธิ์น้อยที่สุด, การเข้ารหัส และ audit log",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 15
@@ -1699,8 +1699,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "7.5 (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N)",
-                  "description": "A public bucket, predictable key, or missing authorization could expose teaching material.",
-                  "mitigation": "Keep R2 private; authorize by owner; validate uploads; avoid logging file contents.",
+                  "description": "bucket ที่เปิดสาธารณะ, object key ที่คาดเดาได้ หรือการขาดการตรวจสิทธิ์ อาจทำให้สื่อการสอนรั่วไหล",
+                  "mitigation": "ตั้ง R2 เป็น private, ตรวจสิทธิ์ตามเจ้าของ, ตรวจสอบไฟล์ที่อัปโหลด และไม่บันทึกเนื้อหาไฟล์ลง log",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 16
@@ -1782,8 +1782,8 @@
                   "status": "Open",
                   "severity": "High",
                   "score": "7.7 (CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N)",
-                  "description": "A retrieval filter defect could return another Instructor's document chunks.",
-                  "mitigation": "Apply ownership filters before retrieval reaches generation; add isolation checks.",
+                  "description": "ข้อผิดพลาดของตัวกรองในการ retrieval อาจดึง chunk เอกสารของ Instructor คนอื่นมา",
+                  "mitigation": "กรองตามความเป็นเจ้าของก่อนส่งผล retrieval ไปยังขั้นตอน generation และเพิ่มการตรวจสอบการแยกข้อมูล (isolation)",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 17
