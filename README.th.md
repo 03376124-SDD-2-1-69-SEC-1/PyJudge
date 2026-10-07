@@ -1,8 +1,14 @@
-# GReader
+# Questly
 
 **ภาษา:** [English](README.md) | ภาษาไทย
 
-GReader คือแอปพลิเคชัน FastAPI ที่ช่วยผู้สอนเตรียมโจทย์เขียนโปรแกรม ชุดทดสอบ
+> **ถูกแทนที่โดย ADR-0007 (ส่วนสถาปัตยกรรม)** ข้อความเก่าใน README นี้บางตอน
+> เล่าว่า Core กับ AI เป็นสอง service คุยกันผ่าน HTTP แบบนั้นเลิกใช้แล้ว
+> Questly คือแอป FastAPI ตัวเดียวใน repo เดียว ใช้ Neon project เดียวแยก schema
+> `core` กับ `rag` โดย `core/` และ `ai/` เป็นโมดูลของแอปนี้ เรียกกันผ่าน Python
+> interface อ่านกฎปัจจุบันที่ `AGENTS.md` และ `docs/adr/0007-classroom-centric-flow.md`
+
+Questly คือแอปพลิเคชัน FastAPI ที่ช่วยผู้สอนเตรียมโจทย์เขียนโปรแกรม ชุดทดสอบ
 และสื่อการเรียนที่เกี่ยวข้อง โปรเจกต์ใช้สถาปัตยกรรมแบบ modular monolith
 เพื่อให้แต่ละทีมพัฒนาส่วนที่รับผิดชอบได้โดยไม่ผูกกับส่วนอื่นมากเกินไป
 
@@ -127,7 +133,7 @@ uv run --env-file .env alembic upgrade head
 ### 6. เริ่ม Development Server
 
 ```bash
-uv run --env-file .env uvicorn greader.main:app --reload
+uv run --env-file .env uvicorn questly.main:app --reload
 ```
 
 เปิด <http://127.0.0.1:8000> ในเบราว์เซอร์ หยุดเซิร์ฟเวอร์ด้วย `Ctrl+C`
@@ -167,7 +173,7 @@ uv run --env-file .env alembic revision --autogenerate -m "describe the change"
 ## โครงสร้างโปรเจกต์
 
 ```text
-sgreader/
+squestly/
 ├── README.md
 ├── pyproject.toml
 ├── uv.lock
@@ -176,7 +182,7 @@ sgreader/
 ├── docs/
 │
 │
-├── src/greader/
+├── src/questly/
 │   ├── main.py
 │   ├── ai/
 │   │   └── README.md
@@ -264,18 +270,19 @@ from pgvector.sqlalchemy import Vector                   # ชนิดจาก
 ### 2. โครงสร้างโฟลเดอร์
 
 ```text
-src/greader/
+src/questly/
 ├── core/                        ← Core Service (ห้าม import ORM)
 │   ├── topics/                  ✅ reference slice
 │   │   ├── models.py            dataclass(frozen=True, slots=True)
 │   │   ├── repository.py        typing.Protocol + InMemory impl
 │   │   ├── service.py           sync ล้วน รับ repo ผ่าน constructor
 │   │   └── routes.py            sync def, ดึง service จาก app.state
-│   └── assignments/             🔒 teammate — ยังเป็น docstring
+│   └── assignments/             ✅ slice ที่สมบูรณ์แล้ว — มี SQL adapter ใน database/core/
 │       ├── models.py            dataclass ล้วน
-│       ├── repository.py        Protocol interface
+│       ├── ports.py             typing.Protocol
 │       ├── service.py
-│       └── routes.py
+│       ├── routes.py
+│       └── testcase_routes.py
 │
 ├── database/                    ← ของ tech lead คนเดียว ที่เดียวที่ import ORM ได้
 │   │                              (ดู AGENTS.md หัวข้อ "Who may change database and locked files")
@@ -285,12 +292,12 @@ src/greader/
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── tables.py            ✅ SQLModel — schema `core`
-│   │   └── assignment_repository.py   ⏳ adapter ของ tech lead (รอ Protocol จาก teammate)
+│   │   └── assignment_repository.py   ✅ implement core/assignments/ports.py
 │   └── rag/
 │       ├── __init__.py
 │       └── tables.py            ✅ SQLModel — schema `rag`
 │
-├── ai/                          ← AI/RAG Service (ยังไม่เริ่ม)
+├── ai/                          ← โมดูล AI ในแอปเดียวกัน (vector storage ใช้ได้แล้ว ส่วน ingestion ยังไม่เริ่ม)
 └── web/                         ← Jinja2 templates
 
 alembic/                         ← root ตาม convention
@@ -304,7 +311,7 @@ alembic/                         ← root ตาม convention
 
 ```text
 core/assignments/models.py      (dataclass)
-core/assignments/repository.py  (Protocol)
+core/assignments/ports.py       (Protocol)
             ↑ implement โดย ↓
 database/core/assignment_repository.py   ← adapter ของ tech lead อยู่ตรงนี้เท่านั้น
             ↓ ใช้ ↓
@@ -319,8 +326,8 @@ Adapter ต้องอยู่ฝั่ง `database/` เพราะมั�
 `database/__init__.py`:
 
 ```python
-from greader.database.core import tables as core_tables  # noqa: F401
-from greader.database.rag import tables as rag_tables    # noqa: F401
+from questly.database.core import tables as core_tables  # noqa: F401
+from questly.database.rag import tables as rag_tables    # noqa: F401
 ```
 
 ถ้าลืม มันจะไม่ error — แต่จะ generate migration ที่ขาดตารางไปเงียบๆ
@@ -346,7 +353,7 @@ erDiagram
 
     knowledge_documents {
         BIGSERIAL id PK
-        TEXT r2_object_key UK "natural key ใช้ cross-check ตอน mirror"
+        TEXT r2_object_key UK "natural key ใช้ cross-check ตอนคัดลอก"
         TEXT filename
         TEXT content_hash "sha256 กันไฟล์ซ้ำ"
         TEXT status "CHECK: uploaded | ingesting | ready | failed"
@@ -411,7 +418,7 @@ erDiagram
         TEXT status "CHECK: pending | processing | ready | failed"
         TEXT embedding_model "nullable"
         INT embedding_dim "nullable"
-        JSONB metadata "GIN index — mirror มาเพื่อ filter"
+        JSONB metadata "GIN index — คัดลอกมาเพื่อ filter"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
@@ -439,7 +446,7 @@ erDiagram
     generation_artifacts ||--o| assignments : "applied to"
     assignments ||--o{ test_cases : "has"
     knowledge_sources ||--o{ knowledge_chunks : "split into"
-    knowledge_documents ||..o| knowledge_sources : "mirror ข้ามschema (ไม่มี FK จริง)"
+    knowledge_documents ||..o| knowledge_sources : "คัดลอกข้าม schema (ไม่มี FK จริง)"
 ```
 
 ### 4. สิ่งที่ ORM สร้างให้ไม่ได้ — ต้องเขียนมือใน migration
@@ -465,8 +472,8 @@ USING hnsw (embedding vector_cosine_ops);
 
 **4.3 Cross-schema cleanup ไม่มี cascade.** ลบ `core.knowledge_documents`
 แล้ว `rag.knowledge_sources` + `knowledge_chunks` **ไม่หายตาม**
-เพราะไม่มี FK จริง ต้องเขียน cleanup ระดับ application (Core ยิง
-`DELETE /v1/knowledge/{id}` ไป AI service) ไม่งั้นจะมี orphan chunk
+เพราะไม่มี FK จริง ต้องเขียน cleanup ระดับ application (Core เรียก
+use case ลบของโมดูล AI ผ่าน Python interface) ไม่งั้นจะมี orphan chunk
 ที่ยัง retrieve เจอ ทั้งที่ไฟล์ต้นฉบับถูกลบแล้ว
 
 ### 5. Decision ที่ปิดแล้ว
@@ -500,9 +507,7 @@ USING hnsw (embedding vector_cosine_ops);
 
 | เรื่อง | สถานะ |
 |---|---|
-| `main.py` ยังไม่ mount assignment router | ต้องตกลงว่าใครใส่ |
 | Embedding model ตัวจริง | `VECTOR(768)` เป็น one-way door เปลี่ยนมิติทีหลัง = migrate ทั้งตาราง |
-| Protocol ใน `core/assignments/repository.py` | รอ teammate กำหนดก่อน ถึงจะเขียน adapter ได้ |
 
 ## เทคโนโลยีที่ใช้
 

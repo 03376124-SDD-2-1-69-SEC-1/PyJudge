@@ -1,6 +1,6 @@
 # Repository-assigned int ids for Assignment and TestCase
 
-GReader runs on a single node with one Postgres database, so a client-generated
+Questly runs on a single node with one Postgres database, so a client-generated
 UUID buys nothing — no offline writes, no multi-master merge, nothing a
 `BIGSERIAL` can't do more cheaply. `core/topics` generates `str(uuid4())` in
 the service layer because it predates this decision and was built as the

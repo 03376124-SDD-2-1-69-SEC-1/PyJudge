@@ -1,8 +1,15 @@
-# GReader
+# Questly
 
 **Language:** English | [ภาษาไทย](README.th.md)
 
-GReader is a FastAPI application that helps instructors prepare programming
+> **Superseded by ADR-0007 (architecture).** Older passages in this README
+> describe Core and AI as two services that talk over HTTP. That design is
+> replaced: Questly is one FastAPI app in one repo, with one Neon project and
+> the schemas `core` and `rag`. `core/` and `ai/` are modules of it and call
+> each other through Python interfaces. Read `AGENTS.md` and
+> `docs/adr/0007-classroom-centric-flow.md` for the current rules.
+
+Questly is a FastAPI application that helps instructors prepare programming
 assignments, test cases, and related learning materials. It is organized as a
 modular monolith so each team can develop its area without tightly coupling it
 to the rest of the application.
@@ -129,7 +136,7 @@ uv run --env-file .env alembic upgrade head
 ### 6. Start the Development Server
 
 ```bash
-uv run --env-file .env uvicorn greader.main:app --reload
+uv run --env-file .env uvicorn questly.main:app --reload
 ```
 
 Open <http://127.0.0.1:8000> in your browser. Stop the server with `Ctrl+C`.
@@ -177,6 +184,31 @@ CI reads these same four names from repo secrets/variables
 as secrets; `R2_TEST_BUCKET_NAME` as a variable) — see
 `.github/workflows/ci.yml`.
 
+### Styles (Tailwind CSS v4, standalone CLI)
+
+`src/questly/web/static/css/app.css` is generated from `input.css` next to it
+and is committed, so the app runs without the CLI. Rebuild it whenever you
+change `input.css` or add Tailwind classes to a template (`@source` scans
+`web/templates/`). Never edit `app.css` by hand.
+
+The CLI is a single binary, not a Python or npm dependency. Download
+`tailwindcss-<platform>` for **v4.3.3** from
+https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.3.3, then:
+
+```bash
+chmod +x tailwindcss-macos-arm64 && mv tailwindcss-macos-arm64 ~/.local/bin/tailwindcss
+
+# build once
+tailwindcss -i src/questly/web/static/css/input.css -o src/questly/web/static/css/app.css
+# rebuild on every change while you work
+tailwindcss -i src/questly/web/static/css/input.css -o src/questly/web/static/css/app.css --watch
+```
+
+Design tokens (colours, fonts) and components (`.btn`, `.input`, `.card`,
+`.tabs`, `.badge`, `.modal`, …) live in `input.css` and come from
+`docs/wireframes/`. Pages build forms and buttons only through the Jinja macros
+in `src/questly/web/templates/_components/`.
+
 Create a migration after changing database models:
 
 ```bash
@@ -186,7 +218,7 @@ uv run --env-file .env alembic revision --autogenerate -m "describe the change"
 ## Project Structure
 
 ```text
-src/greader/
+src/questly/
 ├── main.py             # FastAPI application composition
 ├── core/
 │   ├── topics/         # Reference Topics CRUD feature
@@ -249,18 +281,19 @@ connection string, the driver must be `postgresql+psycopg://`, not the plain
 ### 2. Folder structure
 
 ```text
-src/greader/
+src/questly/
 ├── core/                        ← Core Service (must not import an ORM)
 │   ├── topics/                  ✅ reference slice
 │   │   ├── models.py            dataclass(frozen=True, slots=True)
 │   │   ├── repository.py        typing.Protocol + in-memory impl
 │   │   ├── service.py           pure sync, receives repo via constructor
 │   │   └── routes.py            sync def, pulls service from app.state
-│   └── assignments/              🔒 teammate — still docstrings only
+│   └── assignments/              ✅ complete slice — SQL adapter in database/core/
 │       ├── models.py            plain dataclasses
-│       ├── repository.py        Protocol interface
+│       ├── ports.py             typing.Protocol
 │       ├── service.py
-│       └── routes.py
+│       ├── routes.py
+│       └── testcase_routes.py
 │
 ├── database/                    ← tech lead only; the only place allowed to import an ORM
 │   │                              (see AGENTS.md § "Who may change database and locked files")
@@ -270,12 +303,12 @@ src/greader/
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── tables.py            ✅ SQLModel — schema `core`
-│   │   └── assignment_repository.py   ⏳ tech lead's adapter (waiting on teammate's Protocol)
+│   │   └── assignment_repository.py   ✅ implements core/assignments/ports.py
 │   └── rag/
 │       ├── __init__.py
 │       └── tables.py            ✅ SQLModel — schema `rag`
 │
-├── ai/                          ← AI/RAG Service (not started)
+├── ai/                          ← AI module of the same app (vector storage works; ingestion not started)
 └── web/                         ← Jinja2 templates
 
 alembic/                         ← at repo root, by convention
@@ -289,7 +322,7 @@ Hard rule — import direction:
 
 ```text
 core/assignments/models.py      (dataclass)
-core/assignments/repository.py  (Protocol)
+core/assignments/ports.py       (Protocol)
             ↑ implemented by ↓
 database/core/assignment_repository.py   ← tech lead's adapter lives here, and only here
             ↓ uses ↓
@@ -304,8 +337,8 @@ classes that have **already been imported**. Dropping a file in place isn't
 enough — it must be imported in `database/__init__.py`:
 
 ```python
-from greader.database.core import tables as core_tables  # noqa: F401
-from greader.database.rag import tables as rag_tables    # noqa: F401
+from questly.database.core import tables as core_tables  # noqa: F401
+from questly.database.rag import tables as rag_tables    # noqa: F401
 ```
 
 Forget this and it won't error — it silently generates a migration missing
@@ -332,7 +365,7 @@ erDiagram
 
     knowledge_documents {
         BIGSERIAL id PK
-        TEXT r2_object_key UK "natural key, cross-checked when mirroring"
+        TEXT r2_object_key UK "natural key, cross-checked when copying"
         TEXT filename
         TEXT content_hash "sha256, prevents duplicate files"
         TEXT status "CHECK: uploaded | ingesting | ready | failed"
@@ -397,7 +430,7 @@ erDiagram
         TEXT status "CHECK: pending | processing | ready | failed"
         TEXT embedding_model "nullable"
         INT embedding_dim "nullable"
-        JSONB metadata "GIN index — mirrored for filtering"
+        JSONB metadata "GIN index — copied for filtering"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
@@ -425,7 +458,7 @@ erDiagram
     generation_artifacts ||--o| assignments : "applied to"
     assignments ||--o{ test_cases : "has"
     knowledge_sources ||--o{ knowledge_chunks : "split into"
-    knowledge_documents ||..o| knowledge_sources : "cross-schema mirror (no real FK)"
+    knowledge_documents ||..o| knowledge_sources : "cross-schema copy (no real FK)"
 ```
 
 ### 4. What the ORM can't create — hand-write these in migrations
@@ -452,9 +485,9 @@ but slow immediately once chunks reach the tens of thousands.
 **4.3 Cross-schema cleanup has no cascade.** Deleting
 `core.knowledge_documents` does **not** cascade to `rag.knowledge_sources` +
 `knowledge_chunks`, because there is no real FK between them. Cleanup must be
-handled at the application level (Core calls `DELETE /v1/knowledge/{id}` on
-the AI service) — otherwise orphaned chunks stay retrievable even after the
-source file has been deleted.
+handled at the application level (Core calls the AI module's delete use case
+through its Python interface) — otherwise orphaned chunks stay retrievable
+even after the source file has been deleted.
 
 ### 5. Decisions already closed
 
@@ -490,9 +523,7 @@ forgotten split.
 
 | Topic | Status |
 |---|---|
-| `main.py` doesn't mount the assignment router yet | Need to agree who adds it |
 | Real embedding model | `VECTOR(768)` is a one-way door — changing dimensions later means migrating the whole table |
-| Protocol in `core/assignments/repository.py` | Waiting on the teammate to define it before the adapter can be written |
 
 ## Technology Stack
 

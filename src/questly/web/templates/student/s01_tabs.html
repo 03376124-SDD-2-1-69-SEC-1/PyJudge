@@ -1,0 +1,4 @@
+{% from "_components/ui.html" import page_header, tabs %}
+{% set base = "/classes/" ~ view.classroom.id %}
+{{ page_header(view.classroom.course_name ~ " · Sec " ~ view.classroom.section, view.instructor_name ~ " · semester " ~ view.classroom.semester) }}
+{{ tabs([("problems", "Problems", base ~ "?tab=problems"), ("summary", "Summary", base ~ "?tab=summary")], tab, label="Classroom tabs") }}

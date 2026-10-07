@@ -1,0 +1,13 @@
+{# Back / Save draft / Next (or the step's final action). Buttons post `action`. #}
+{% from "_components/forms.html" import button with context %}
+<div class="mt-6 flex justify-between gap-2.5">
+  {{ button("Back", name="action", value="back") }}
+  <div class="flex gap-2.5">
+    {{ button("Save draft", name="action", value="save") }}
+    {% if step < 4 %}
+      {{ button("Next", variant="primary", name="action", value="next") }}
+    {% else %}
+      {{ button("Approve and publish", variant="primary", name="action", value="publish") }}
+    {% endif %}
+  </div>
+</div>

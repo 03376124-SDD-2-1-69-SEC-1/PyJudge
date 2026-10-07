@@ -1,1 +1,0 @@
-"""GReader package."""

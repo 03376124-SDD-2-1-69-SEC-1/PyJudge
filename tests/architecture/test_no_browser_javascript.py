@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-TEMPLATE_ROOT = Path("src/greader/web/templates")
+TEMPLATE_ROOT = Path("src/questly/web/templates")
 FORBIDDEN = re.compile(r"<script\b|javascript:|\son[a-z]+\s*=", re.IGNORECASE)
 
 
