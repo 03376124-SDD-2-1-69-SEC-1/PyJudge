@@ -6,9 +6,11 @@ OpenRouterGenerationClient tests use monkeypatch to avoid real HTTP calls.
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
+from openai import OpenAIError
 
 from questly.ai.client import (
     OpenRouterGenerationClient,
@@ -169,6 +171,33 @@ def test_openrouter_client_citations_are_empty(monkeypatch: pytest.MonkeyPatch) 
         response = client.generate(GenerationRequest(prompt="find max"))
 
     assert response.citations == []
+
+
+def test_openrouter_client_retries_transient_errors() -> None:
+    client = _make_client()
+
+    assert client._client.max_retries == 4
+
+
+def test_openrouter_client_logs_and_reraises_api_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The service hides the cause, so the client must log it."""
+    client = _make_client(model="some/model:free")
+
+    with (
+        patch.object(
+            client._client.chat.completions,
+            "create",
+            side_effect=OpenAIError("429 rate limited"),
+        ),
+        caplog.at_level(logging.ERROR, logger="questly.ai.client"),
+        pytest.raises(OpenAIError),
+    ):
+        client.generate(GenerationRequest(prompt="anything"))
+
+    assert "some/model:free" in caplog.text
+    assert "429 rate limited" in caplog.text
 
 
 def test_openrouter_client_bad_json_raises(monkeypatch: pytest.MonkeyPatch) -> None:

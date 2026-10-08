@@ -23,7 +23,7 @@ class MissingConfigurationError(RuntimeError):
     """Raised when a required environment variable is absent or unusable."""
 
 
-DEFAULT_GENERATION_MODEL = "google/gemma-3-27b-it:free"
+DEFAULT_GENERATION_MODEL = "poolside/laguna-s-2.1:free"
 
 
 @dataclass(frozen=True, slots=True)

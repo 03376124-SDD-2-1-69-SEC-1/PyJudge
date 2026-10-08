@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import logging
 
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 
 from questly.core.generation.schemas import (
     AssignmentDraft,
@@ -26,6 +26,9 @@ from questly.core.generation.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 4
+_TIMEOUT_SECONDS = 60.0
 
 # ---------------------------------------------------------------------------
 # System prompt
@@ -97,9 +100,13 @@ class OpenRouterGenerationClient:
 
     def __init__(self, api_key: str, model: str) -> None:
         self._model = model
+        # The SDK retries 429 and 5xx with exponential backoff and honours
+        # Retry-After; free models hit transient upstream 429s often.
         self._client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
+            max_retries=_MAX_RETRIES,
+            timeout=_TIMEOUT_SECONDS,
         )
 
     def generate(self, request: GenerationRequest) -> GenerationResponse:
@@ -110,13 +117,19 @@ class OpenRouterGenerationClient:
 
         logger.debug("OpenRouterGenerationClient.generate model=%s", self._model)
 
-        completion = self._client.chat.completions.create(
-            model=self._model,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-        )
+        try:
+            completion = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": user_content},
+                ],
+            )
+        except OpenAIError:
+            # GenerationService turns every client failure into one generic
+            # GenerationFailedError, so this is the only place the cause is seen.
+            logger.exception("OpenRouter call failed model=%s", self._model)
+            raise
 
         raw = completion.choices[0].message.content or ""
         return _parse_response(raw)
