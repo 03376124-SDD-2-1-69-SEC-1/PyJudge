@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import uvicorn
@@ -30,6 +30,7 @@ from questly.core.assignments.models import (
     TestCase,
     TestCaseKind,
 )
+from questly.core.assignments.ports import Clock
 from questly.core.auth.models import Actor, InstructorRequest, Role, User
 from questly.core.auth.pages import DemoAccount
 from questly.core.classrooms.models import (
@@ -71,54 +72,58 @@ STUDENTS = [
     ("66010010", "Wipada Sook"),
 ]
 # The prototype's six Programming I problems: title, difficulty, deadline
-# (Bangkok date, 23:59), one sample test, one hidden test.
+# (days from the seed Clock's date, negative = already past; due 23:59 Bangkok),
+# one sample test, one hidden test. Offsets rather than dates, so the same
+# problems are open or closed whenever the demo runs. They are the prototype's
+# dates counted from its "today", 28 Sep; never 0, which would depend on the
+# time of day the seed runs.
 logger = logging.getLogger("questly.demo")
 
 PROBLEMS = [
-    ("Sum of a list", Difficulty.EASY, (9, 10), ("3\n1 2 3", "6"), ("0\n", "0")),
-    ("Reverse a string", Difficulty.EASY, (9, 17), ("hello", "olleh"), ("a", "a")),
+    ("Sum of a list", Difficulty.EASY, -18, ("3\n1 2 3", "6"), ("0\n", "0")),
+    ("Reverse a string", Difficulty.EASY, -11, ("hello", "olleh"), ("a", "a")),
     (
         "Count word frequency",
         Difficulty.MEDIUM,
-        (9, 24),
+        -4,
         ("the cat the", "the 2\ncat 1"),
         ("", ""),
     ),
     (
         "Binary search on sorted input",
         Difficulty.MEDIUM,
-        (10, 1),
+        3,
         ("5\n1 3 5 7 9\n7", "3"),
         ("4\n2 4 6 8\n5", "-1"),
     ),
     (
         "Matrix transpose",
         Difficulty.HARD,
-        (10, 8),
+        10,
         ("2 2\n1 2\n3 4", "1 3\n2 4"),
         ("1 1\n5", "5"),
     ),
     (
         "Stack with min()",
         Difficulty.HARD,
-        (10, 15),
+        17,
         ("push 3\nmin", "3"),
         ("min", "EMPTY"),
     ),
 ]
 DATA_STRUCTURES = [
-    ("Reverse a linked list", Difficulty.MEDIUM, (10, 5), ("1 2 3", "3 2 1"), ("", "")),
+    ("Reverse a linked list", Difficulty.MEDIUM, 7, ("1 2 3", "3 2 1"), ("", "")),
     (
         "Balanced parentheses",
         Difficulty.EASY,
-        (10, 12),
+        14,
         ("(()())", "YES"),
         ("(()", "NO"),
     ),
     (
         "Queue with two stacks",
         Difficulty.HARD,
-        (10, 19),
+        21,
         ("enq 1\ndeq", "1"),
         ("deq", "EMPTY"),
     ),
@@ -200,8 +205,9 @@ REQUESTERS = [
 class DemoSeed:
     """The seeded repositories plus the accounts listed on G-01."""
 
-    def __init__(self) -> None:
-        self.clock = SystemClock()
+    def __init__(self, clock: Clock | None = None) -> None:
+        # The demo runs on the wall clock; a test passes a pinned one.
+        self.clock: Clock = SystemClock() if clock is None else clock
         self.users = FakeAuthRepository()
         self.classrooms = FakeClassroomRepository()
         self.stats = FakeClassroomStats()
@@ -341,13 +347,19 @@ def _actor(user: User) -> Actor:
     )
 
 
-def _deadline(month_day: tuple[int, int]) -> datetime:
-    month, day = month_day
-    return datetime(2026, month, day, 23, 59, tzinfo=BANGKOK).astimezone(UTC)
+def _deadline(clock: Clock, days_from_today: int) -> datetime:
+    """23:59 Bangkok time, `days_from_today` after the clock's Bangkok date."""
+    today = clock.now().astimezone(BANGKOK).date()
+    day = today + timedelta(days=days_from_today)
+    return datetime.combine(day, time(23, 59), tzinfo=BANGKOK).astimezone(UTC)
 
 
 def _publish_problems(
-    app: FastAPI, owner: User, problems: list, classroom_ids: list[int]
+    app: FastAPI,
+    clock: Clock,
+    owner: User,
+    problems: list,
+    classroom_ids: list[int],
 ) -> list[PublishedAssignment]:
     """Publish through the real use case, in problem-number order."""
     service = app.state.assignment_service
@@ -373,7 +385,7 @@ def _publish_problems(
                     difficulty=difficulty,
                     test_cases=test_cases,
                 ),
-                Schedule(deadline=_deadline(deadline)),
+                Schedule(deadline=_deadline(clock, deadline)),
                 classroom_ids,
             )
         )
@@ -383,11 +395,14 @@ def _publish_problems(
 def _seed_coursework(app: FastAPI, seed: DemoSeed) -> None:
     published = _publish_problems(
         app,
+        seed.clock,
         seed.somchai,
         PROBLEMS,
         [seed.programming_1.id, seed.programming_2.id],
     )
-    _publish_problems(app, seed.warunee, DATA_STRUCTURES, [seed.data_structures.id])
+    _publish_problems(
+        app, seed.clock, seed.warunee, DATA_STRUCTURES, [seed.data_structures.id]
+    )
     _seed_submissions(app, seed, [item.assignment.id for item in published])
 
 
