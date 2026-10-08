@@ -4,13 +4,13 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from greader.ai.ingestion.models import (
+from questly.ai.ingestion.models import (
     DocumentExtraction,
     ExtractedPage,
     PageExtractionOutcome,
 )
-from greader.ai.ingestion.ports import CorruptDocumentError
-from greader.ai.ingestion.service import PageExtractionService
+from questly.ai.ingestion.ports import CorruptDocumentError
+from questly.ai.ingestion.service import PageExtractionService
 
 
 @dataclass(slots=True)

@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from greader.ai.ingestion.models import DocumentExtraction
+from questly.ai.ingestion.models import DocumentExtraction
 
 
 class PageExtractionError(Exception):

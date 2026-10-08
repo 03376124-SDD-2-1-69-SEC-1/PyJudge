@@ -1,7 +1,7 @@
 """Page-extraction use case independent of a concrete PDF parser."""
 
-from greader.ai.ingestion.models import DocumentExtraction
-from greader.ai.ingestion.ports import PageExtractor
+from questly.ai.ingestion.models import DocumentExtraction
+from questly.ai.ingestion.ports import PageExtractor
 
 
 class PageExtractionService:

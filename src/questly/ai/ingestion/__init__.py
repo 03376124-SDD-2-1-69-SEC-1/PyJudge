@@ -1,1 +1,1 @@
-"""Ingestion pipeline for the knowledge corpus."""
+"""Page-preserving extraction and problem-statement chunking."""

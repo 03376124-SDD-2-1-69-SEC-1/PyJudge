@@ -5,13 +5,13 @@ from collections.abc import Iterator
 import pymupdf
 import pytest
 
-from greader.ai.ingestion import pdf_extractor
-from greader.ai.ingestion.models import PageExtractionOutcome
-from greader.ai.ingestion.pdf_extractor import (
+from questly.ai.ingestion import pdf_extractor
+from questly.ai.ingestion.models import PageExtractionOutcome
+from questly.ai.ingestion.pdf_extractor import (
     PyMuPDFPageExtractor,
     _normalize_line_endings,
 )
-from greader.ai.ingestion.ports import CorruptDocumentError, EncryptedDocumentError
+from questly.ai.ingestion.ports import CorruptDocumentError, EncryptedDocumentError
 
 
 def _pdf_with_text_blank_and_vector_pages() -> bytes:
