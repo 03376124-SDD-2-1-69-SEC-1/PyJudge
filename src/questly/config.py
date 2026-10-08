@@ -23,6 +23,9 @@ class MissingConfigurationError(RuntimeError):
     """Raised when a required environment variable is absent or unusable."""
 
 
+DEFAULT_GENERATION_MODEL = "google/gemma-3-27b-it:free"
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     """Everything Questly needs from its environment, resolved once."""
@@ -33,6 +36,9 @@ class Settings:
     r2_access_key_id: str
     r2_secret_access_key: str
     max_upload_size_bytes: int = DEFAULT_MAX_UPLOAD_SIZE_BYTES
+    # OpenRouter — optional: empty string means demo/stub mode
+    openrouter_api_key: str = ""
+    generation_model: str = DEFAULT_GENERATION_MODEL
 
 
 def _required(variable: str) -> str:
@@ -83,4 +89,9 @@ def get_settings() -> Settings:
         r2_access_key_id=_required("R2_ACCESS_KEY_ID"),
         r2_secret_access_key=_required("R2_SECRET_ACCESS_KEY"),
         max_upload_size_bytes=_upload_size_limit(),
+        openrouter_api_key=os.environ.get("OPENROUTER_API_KEY", "").strip(),
+        generation_model=(
+            os.environ.get("GENERATION_MODEL", DEFAULT_GENERATION_MODEL).strip()
+            or DEFAULT_GENERATION_MODEL
+        ),
     )

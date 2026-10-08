@@ -24,7 +24,7 @@ from questly.ai.app.repository import VectorRepository
 from questly.ai.app.routes import router as vector_router
 from questly.ai.app.schemas import ApplicationErrorResponse
 from questly.ai.app.service import VectorService
-from questly.ai.client import StubGenerationClient
+from questly.ai.client import OpenRouterGenerationClient, StubGenerationClient
 from questly.config import Settings, get_settings
 from questly.core.assignments.ports import (
     AssignmentRepository,
@@ -258,7 +258,13 @@ def create_app(
     )
 
     if generation_client is None:
-        generation_client = StubGenerationClient()
+        if use_settings().openrouter_api_key:
+            generation_client = OpenRouterGenerationClient(
+                api_key=use_settings().openrouter_api_key,
+                model=use_settings().generation_model,
+            )
+        else:
+            generation_client = StubGenerationClient()
     application.state.generation_service = GenerationService(
         draft_repository,
         generation_client,
