@@ -5,7 +5,7 @@ from httpx import ASGITransport, AsyncClient
 from scripts.demo import BINARY_SEARCH, UPDATE_REASON, DemoSeed, build_demo_app
 
 from questly.core.auth.models import Actor
-from tests.fakes.auth import DEFAULT_PASSWORD
+from tests.fakes.auth import DEFAULT_PASSWORD, FakeClock
 from tests.fakes.submissions import ScriptedCodeRunner
 from tests.integration.forms import log_in, post_form
 
@@ -14,7 +14,7 @@ SAMPLES = {"5\n1 3 5 7 9\n7": "3", "4\n2 4 6 8\n5": "-1"}
 
 class Demo:
     def __init__(self) -> None:
-        self.seed = DemoSeed()
+        self.seed = DemoSeed(clock=FakeClock())
         self.runner = ScriptedCodeRunner(SAMPLES)
         self.seed.code_runner = self.runner
         self.app = build_demo_app(self.seed)
