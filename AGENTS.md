@@ -16,23 +16,25 @@ Do not call the Figma MCP in a task unless the task says so (the Starter plan
 quota is used up). UI-01 in `docs/task-scope.md` tracks which template matches
 which Figma frame.
 
+Do not write Attribution line: drop the Co-Authored-By claude header
+
 This file holds the rules an agent needs to not break things. Human-facing
 setup and background live in `README.md` and `docs/adr/`.
 
 ## Status
 
-| Area                          | State                                                                                              | Owner (task)        |
-| ----------------------------- | -------------------------------------------------------------------------------------------------- | ------------------- |
-| `core/topics`                 | Working. **The reference slice — copy its shape.**                                                 | shared              |
-| `core/auth`, `classrooms`     | Working; persisted on Neon. No Admin approval path until CORE-19                                   | done (CORE-12, 13)  |
-| `core/assignments`            | Working; Versions and Postings persisted on Neon                                                   | done (CORE-14)      |
-| `core/generation`             | Drafts, T-03/T-04, daily Quota persisted on Neon; production client is a stub                      | done (CORE-15)      |
-| `core/submissions`            | Run vs Submit, PostingStats persisted on Neon; production `CodeRunner` is a stub                   | พาย (CORE-17)       |
-| `core/uploads`                | Working; to be renamed `core/documents`                                                            | open (CORE-16)      |
-| `core/notifications`, `admin` | Not started                                                                                        | open (CORE-18, 19)  |
-| `database/`                   | ADR-0007 + ADR-0008 schema live on Neon (head `c4e8a2f17b90`); a SQL adapter per port, each held to a contract in `tests/contracts/` | done (OPS-15)       |
+| Area                          | State                                                                                                                                                                                                                                                                                         | Owner (task)                      |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `core/topics`                 | Working. **The reference slice — copy its shape.**                                                                                                                                                                                                                                            | shared                            |
+| `core/auth`, `classrooms`     | Working; persisted on Neon. No Admin approval path until CORE-19                                                                                                                                                                                                                              | done (CORE-12, 13)                |
+| `core/assignments`            | Working; Versions and Postings persisted on Neon                                                                                                                                                                                                                                              | done (CORE-14)                    |
+| `core/generation`             | Drafts, T-03/T-04, daily Quota persisted on Neon; production client is a stub                                                                                                                                                                                                                 | done (CORE-15)                    |
+| `core/submissions`            | Run vs Submit, PostingStats persisted on Neon; production `CodeRunner` is a stub                                                                                                                                                                                                              | พาย (CORE-17)                     |
+| `core/uploads`                | Working; to be renamed `core/documents`                                                                                                                                                                                                                                                       | open (CORE-16)                    |
+| `core/notifications`, `admin` | Not started                                                                                                                                                                                                                                                                                   | open (CORE-18, 19)                |
+| `database/`                   | ADR-0007 + ADR-0008 schema live on Neon (head `c4e8a2f17b90`); a SQL adapter per port, each held to a contract in `tests/contracts/`                                                                                                                                                          | done (OPS-15)                     |
 | `ai/`                         | Vector storage works (AI-01). Ingestion, retrieval and a real `GenerationClient` are not started; the standalone app in `ai/app/main.py` is unused. Seed corpus: 100 PDFs on R2 under `sources/programming-in-th/` (OPS-17), not yet in `core.knowledge_documents` (OPS-18) or `rag` (AI-08). | ฟิล์ม (AI-02 to 07), พาย (OPS-16) |
-| `web/templates/`              | Every page of ADR-0007 except T-05, T-06 and A-01 exists; matching them to Figma is UI-01          | พาย (UI-01)         |
+| `web/templates/`              | Every page of ADR-0007 except T-05, T-06 and A-01 exists; matching them to Figma is UI-01                                                                                                                                                                                                     | พาย (UI-01)                       |
 
 Every slice also runs on the in-memory fakes in demo mode (`scripts/demo.py`)
 and in tests. In production `main.py` wires the SQL adapters in
@@ -69,14 +71,14 @@ BigInteger` is expected and correct.
 routes.py → service.py → ports.py (Protocol) → adapter
 ```
 
-| File            | Holds                                     | Must not import              |
-| --------------- | ----------------------------------------- | ---------------------------- |
-| `models.py`     | domain model (frozen slotted dataclass)   | FastAPI, ORM, storage client |
-| `schemas.py`    | request/response shapes for OpenAPI       | business rules               |
-| `ports.py`      | `typing.Protocol`                         | HTTP                         |
-| `service.py`    | use cases; takes the repo via constructor | FastAPI, ORM, SQL            |
-| `routes.py`     | JSON API under `/api/v1/`: HTTP in, service call, error mapping | business rules, SQL, templates |
-| `pages.py`      | HTML pages: HTTP in, service call, pick a template | business rules, SQL, `/api` prefix |
+| File         | Holds                                                           | Must not import                    |
+| ------------ | --------------------------------------------------------------- | ---------------------------------- |
+| `models.py`  | domain model (frozen slotted dataclass)                         | FastAPI, ORM, storage client       |
+| `schemas.py` | request/response shapes for OpenAPI                             | business rules                     |
+| `ports.py`   | `typing.Protocol`                                               | HTTP                               |
+| `service.py` | use cases; takes the repo via constructor                       | FastAPI, ORM, SQL                  |
+| `routes.py`  | JSON API under `/api/v1/`: HTTP in, service call, error mapping | business rules, SQL, templates     |
+| `pages.py`   | HTML pages: HTTP in, service call, pick a template              | business rules, SQL, `/api` prefix |
 
 The in-memory adapter is not part of the slice — it lives in
 `tests/fakes/<slice>.py` (e.g. `tests/fakes/topics.py`), satisfying the same
