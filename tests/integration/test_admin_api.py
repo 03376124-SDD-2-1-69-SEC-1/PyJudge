@@ -12,6 +12,7 @@ from tests.fakes.auth import (
     FakeAuthRepository,
     seed_user,
 )
+from tests.fakes.generation import FakeGenerationClient, binary_search_response
 
 ADMIN = "admin@kmitl.ac.th"
 INSTRUCTOR = "instructor@kmitl.ac.th"
@@ -30,10 +31,12 @@ class AdminApi:
         self.student = seed_user(self.auth, email=STUDENT, full_name="Nattapong Suwan")
         self.settings = FakeAdminRepository()
         self.health = FakeSystemHealthChecker()
+        self.generation_client = FakeGenerationClient(binary_search_response())
         self.app = build_app(
             auth_repository=self.auth,
             admin_repository=self.settings,
             system_health_checker=self.health,
+            generation_client=self.generation_client,
         )
 
     async def client_for(self, email: str) -> AsyncClient:
@@ -123,6 +126,41 @@ async def test_admin_can_approve_or_reject_instructor_requests() -> None:
 
 
 @pytest.mark.anyio
+async def test_admin_endpoints_validate_missing_and_invalid_inputs() -> None:
+    api = AdminApi()
+    client = await api.client_for(ADMIN)
+
+    invalid_role_filter = await client.get(
+        "/api/v1/admin/users", params={"role": "superuser"}
+    )
+    invalid_page = await client.get("/api/v1/admin/users", params={"page": 0})
+    missing_role_target = await client.patch(
+        "/api/v1/admin/users/99999", json={"role": "student"}
+    )
+    invalid_role = await client.patch(
+        f"/api/v1/admin/users/{api.student.id}", json={"role": "superuser"}
+    )
+    missing_deactivation_target = await client.post(
+        "/api/v1/admin/users/99999/deactivate"
+    )
+    invalid_quota = await client.put(
+        "/api/v1/admin/ai-settings", json={"daily_quota": 0}
+    )
+    null_quota = await client.put(
+        "/api/v1/admin/ai-settings", json={"daily_quota": None}
+    )
+
+    assert invalid_role_filter.status_code == 422
+    assert invalid_page.status_code == 422
+    assert missing_role_target.status_code == 404
+    assert invalid_role.status_code == 422
+    assert missing_deactivation_target.status_code == 404
+    assert invalid_quota.status_code == 422
+    assert null_quota.status_code == 422
+    await client.aclose()
+
+
+@pytest.mark.anyio
 async def test_admin_can_search_change_role_and_deactivate_users() -> None:
     api = AdminApi()
     client = await api.client_for(ADMIN)
@@ -192,6 +230,44 @@ async def test_ai_settings_update_changes_generation_quota() -> None:
     assert model_rejected.status_code == 422
     assert current.json()["daily_quota"] == 7
     assert quota.limit == 7
+    await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_generation_is_rejected_after_updated_daily_quota_is_used() -> None:
+    api = AdminApi()
+    instructor = Actor(
+        user_id=api.instructor.id,
+        role=Role.INSTRUCTOR,
+        full_name=api.instructor.full_name,
+        email=api.instructor.email,
+    )
+    classroom = api.app.state.classroom_service.create(
+        instructor,
+        course_code="01076001",
+        course_name="Programming I",
+        section="1",
+        semester="1/2569",
+    )
+    admin = await api.client_for(ADMIN)
+
+    settings = await admin.put("/api/v1/admin/ai-settings", json={"daily_quota": 1})
+    client = await api.client_for(INSTRUCTOR)
+    first = await client.post(
+        f"/api/v1/classrooms/{classroom.id}/drafts",
+        json={"prompt": "Binary search"},
+    )
+    second = await client.post(
+        f"/api/v1/classrooms/{classroom.id}/drafts",
+        json={"prompt": "Another problem"},
+    )
+
+    assert settings.status_code == 200
+    assert first.status_code == 201
+    assert second.status_code == 429
+    assert second.json()["detail"]["code"] == "quota_exceeded"
+    assert len(api.generation_client.requests) == 1
+    await admin.aclose()
     await client.aclose()
 
 

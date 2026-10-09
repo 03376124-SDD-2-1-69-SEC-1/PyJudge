@@ -77,6 +77,8 @@ def _request(row: InstructorRequestRow) -> InstructorRequest:
         faculty=row.faculty,
         requested_at=row.requested_at,
         status=InstructorRequestStatus(row.status),
+        reviewed_by=row.reviewed_by,
+        reviewed_at=row.reviewed_at,
     )
 
 
@@ -114,6 +116,41 @@ class SQLAuthRepository:
         with self._session_factory() as db:
             rows = db.exec(select(UserRow).order_by(UserRow.id)).all()
             return [_user(row) for row in rows]
+
+    def search_users(
+        self,
+        *,
+        q: str | None = None,
+        role: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> tuple[list[User], int]:
+        """Search accounts by email/name or role, returning one ordered page."""
+        filters: list[ColumnElement[bool]] = []
+        if q:
+            escaped_query = (
+                q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            pattern = f"%{escaped_query}%"
+            filters.append(
+                UserRow.email.ilike(pattern, escape="\\")
+                | UserRow.full_name.ilike(pattern, escape="\\")
+            )
+        if role:
+            filters.append(UserRow.role == role)
+
+        with self._session_factory() as db:
+            total = db.exec(
+                select(func.count()).select_from(UserRow).where(*filters)
+            ).one()
+            rows = db.exec(
+                select(UserRow)
+                .where(*filters)
+                .order_by(UserRow.id)
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            ).all()
+            return [_user(row) for row in rows], total
 
     def create_user(self, user: User) -> User:
         """Insert an account and return it with its new id."""
@@ -256,16 +293,49 @@ class SQLAuthRepository:
             return _request(row)
 
     def list_instructor_requests(
-        self, status: InstructorRequestStatus
+        self, status: InstructorRequestStatus | None = None
     ) -> list[InstructorRequest]:
-        """Return the requests in this status, in id order."""
+        """Return requests in id order, optionally filtered by status."""
         with self._session_factory() as db:
-            rows = db.exec(
-                select(InstructorRequestRow)
-                .where(InstructorRequestRow.status == status.value)
-                .order_by(InstructorRequestRow.id)
-            ).all()
+            statement = select(InstructorRequestRow).order_by(InstructorRequestRow.id)
+            if status is not None:
+                statement = statement.where(InstructorRequestRow.status == status.value)
+            rows = db.exec(statement).all()
             return [_request(row) for row in rows]
+
+    def review_instructor_request(
+        self, request_id: int, reviewer_id: int, approve: bool
+    ) -> InstructorRequest:
+        """Review a pending request once, atomically promoting its applicant."""
+        with self._session_factory() as db:
+            row = db.exec(
+                select(InstructorRequestRow)
+                .where(InstructorRequestRow.id == request_id)
+                .with_for_update()
+            ).first()
+            if row is None:
+                raise KeyError(f"Instructor request {request_id} not found")
+            if row.status != InstructorRequestStatus.PENDING.value:
+                raise ValueError(
+                    f"Instructor request {request_id} has already been reviewed"
+                )
+
+            if approve:
+                applicant = db.get(UserRow, row.user_id)
+                if applicant is None:
+                    raise KeyError(f"User {row.user_id} not found")
+                applicant.role = Role.INSTRUCTOR.value
+
+            row.status = (
+                InstructorRequestStatus.APPROVED.value
+                if approve
+                else InstructorRequestStatus.REJECTED.value
+            )
+            row.reviewed_by = reviewer_id
+            row.reviewed_at = func.now()
+            db.commit()
+            db.refresh(row)
+            return _request(row)
 
     def find_pending_instructor_request(self, user_id: int) -> InstructorRequest | None:
         """Return this account's pending request, if it has one."""
