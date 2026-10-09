@@ -26,6 +26,9 @@ from questly.ai.app.schemas import ApplicationErrorResponse
 from questly.ai.app.service import VectorService
 from questly.ai.client import OpenRouterGenerationClient, StubGenerationClient
 from questly.config import Settings, get_settings
+from questly.core.admin.ports import AdminRepository, SystemHealthChecker
+from questly.core.admin.routes import router as admin_router
+from questly.core.admin.service import AdminService
 from questly.core.assignments.ports import (
     AssignmentRepository,
     PostingRepository,
@@ -143,6 +146,8 @@ def create_app(
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
+    admin_repository: AdminRepository | None = None,
+    system_health_checker: SystemHealthChecker | None = None,
     verification_mailer: VerificationMailer | None = None,
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
@@ -229,6 +234,18 @@ def create_app(
         verification_mailer = StubEmailSender()
     auth_service = AuthService(auth_repository, verification_mailer, clock)
     application.state.auth_service = auth_service
+    admin_service = AdminService(
+        admin_repository,
+        auth_repository,
+        system_health_checker,
+        allowed_models=(use_settings().generation_model,),
+    )
+    application.state.admin_service = admin_service
+
+    def get_daily_quota() -> int:
+        if admin_repository is None:
+            raise RuntimeError("AdminRepository is not wired; see paired OPS-22")
+        return admin_repository.get_ai_settings().daily_quota
 
     classroom_service = ClassroomService(
         classroom_repository, auth_service, classroom_stats, clock
@@ -272,6 +289,7 @@ def create_app(
         classroom_service,
         assignment_service,
         clock,
+        daily_quota=get_daily_quota,
     )
 
     if topic_repository is None:
@@ -308,6 +326,7 @@ def create_app(
     application.include_router(vector_router)
     application.include_router(auth_router)
     application.include_router(auth_page_router)
+    application.include_router(admin_router)
     application.include_router(classroom_router)
     application.include_router(classroom_page_router)
     application.include_router(submission_router)

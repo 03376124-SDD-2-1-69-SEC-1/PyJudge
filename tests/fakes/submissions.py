@@ -3,7 +3,10 @@
 import contextlib
 import math
 import os
-import resource
+try:
+    import resource
+except ImportError:
+    resource = None  # fallback สำหรับ Windows environment
 import subprocess
 import sys
 import tempfile

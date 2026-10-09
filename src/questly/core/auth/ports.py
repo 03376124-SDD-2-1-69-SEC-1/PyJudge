@@ -30,6 +30,15 @@ class AuthRepository(Protocol):
 
     def list_users(self) -> list[User]: ...
 
+    def search_users(
+        self,
+        *,
+        q: str | None = None,
+        role: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> tuple[list[User], int]: ...
+
     def create_user(self, user: User) -> User: ...
 
     def update_user(self, user: User) -> User: ...
@@ -57,8 +66,12 @@ class AuthRepository(Protocol):
     ) -> InstructorRequest: ...
 
     def list_instructor_requests(
-        self, status: InstructorRequestStatus
+        self, status: InstructorRequestStatus | None = None
     ) -> list[InstructorRequest]: ...
+
+    def review_instructor_request(
+        self, request_id: int, reviewer_id: int, approve: bool
+    ) -> InstructorRequest: ...
 
     def find_pending_instructor_request(
         self, user_id: int

@@ -166,6 +166,8 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "last_active_at",
     # auth: A-01 pending Instructor requests, "Requested" column.
     "requested_at",
+    # auth (ADR-0007 §8): A-01 records when an Instructor request was reviewed.
+    "reviewed_at",
     # classrooms: T-01 Members "Joined" column and its ordering.
     "joined_at",
     # assignments: Posting.is_closed reads closed_at; published_at orders the
