@@ -15,7 +15,7 @@ ROUTE_SERVICE_EXCEPTIONS: set[str] = set()
 
 def test_core_never_imports_ai() -> None:
     for source_file in CORE_ROOT.rglob("*.py"):
-        assert "questly.ai" not in source_file.read_text(), source_file
+        assert "questly.ai" not in source_file.read_text(encoding="utf-8"), source_file
 
 
 def test_core_never_imports_integrations() -> None:
@@ -23,7 +23,7 @@ def test_core_never_imports_integrations() -> None:
     violations = [
         str(source_file)
         for source_file in sorted(CORE_ROOT.rglob("*.py"))
-        if "questly.integrations" in source_file.read_text()
+        if "questly.integrations" in source_file.read_text(encoding="utf-8")
     ]
 
     assert not violations, (
@@ -38,7 +38,7 @@ def test_core_never_imports_an_orm_or_storage_client() -> None:
     forbidden = ("sqlmodel", "sqlalchemy", "boto3", "botocore", "questly.database")
     violations = []
     for source_file in sorted(CORE_ROOT.rglob("*.py")):
-        text = source_file.read_text()
+        text = source_file.read_text(encoding="utf-8")
         violations.extend(
             f"{source_file}: {name}" for name in forbidden if name in text
         )
@@ -54,7 +54,7 @@ def test_routes_do_not_call_repository_ports_directly() -> None:
         if source_file.parent.name in ROUTE_SERVICE_EXCEPTIONS:
             continue
 
-        tree = ast.parse(source_file.read_text())
+        tree = ast.parse(source_file.read_text(encoding="utf-8"))
         port_imports = [
             node
             for node in ast.walk(tree)

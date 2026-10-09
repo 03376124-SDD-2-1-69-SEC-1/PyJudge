@@ -3,8 +3,8 @@
 Built the way production builds it — only settings, R2 and the vector store
 swapped out — and pointed at the throwaway branch. The services on `app.state`
 then write through whatever `main.py` wired, so rows in the database prove the
-SQL adapters are the ones in use. (HTTP-level checks live in
-`tests/integration/`, which runs on fakes.)
+SQL adapters are the ones in use. Fake-backed HTTP tests live in
+`test_admin_api.py`.
 """
 
 from dataclasses import replace

@@ -117,7 +117,12 @@ DISPLAY_ZONE = ZoneInfo("Asia/Bangkok")
 
 def local_time(value: datetime, pattern: str = "%-d %b, %H:%M") -> str:
     """Render a stored UTC time in Bangkok time for templates (`|local`)."""
-    return value.astimezone(DISPLAY_ZONE).strftime(pattern)
+    local_value = value.astimezone(DISPLAY_ZONE)
+    day_placeholder = "\x00LOCAL_TIME_DAY\x00"
+    portable_pattern = pattern.replace("%-d", day_placeholder)
+    return local_value.strftime(portable_pattern).replace(
+        day_placeholder, str(local_value.day)
+    )
 
 
 def asset_url(path: str) -> str:
