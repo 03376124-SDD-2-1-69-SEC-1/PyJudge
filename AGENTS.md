@@ -131,6 +131,22 @@ one executable reference; prose in this file does not override it.
 
 If a task looks like it needs a schema change, stop and say so.
 
+## The old project name is gone
+
+The project was renamed to Questly. The package is `src/questly/`, imports are
+`questly.*`, and there is no other package under `src/`. A branch cut before the rename
+(`chore/rename-questly`) brings the old name back, usually as a second package
+tree next to `src/questly/`.
+
+- Before you start work and before you open a PR: `git pull origin dev`.
+- New code goes under `src/questly/`. If your branch has `src/<old name>/`, move
+  the files into the matching `src/questly/` folder, fix the imports, and delete
+  the old folder.
+- `tests/architecture/test_conventions.py::test_old_project_name_is_gone` fails
+  CI when any tracked file path or line contains the old name. Two things are
+  exempt: the CI R2 bucket `greader-ci` (a real resource name) and dated
+  snapshots under `docs/handoff/`.
+
 ## Who may change database and locked files
 
 All of `src/questly/database/` and `alembic/` belong to พาย (GitHub
