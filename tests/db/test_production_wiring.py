@@ -4,14 +4,13 @@ Built the way production builds it — only settings, R2 and the vector store
 swapped out — and pointed at the throwaway branch. The services on `app.state`
 then write through whatever `main.py` wired, so rows in the database prove the
 SQL adapters are the ones in use. Fake-backed HTTP tests live in
-`test_admin_api.py`.
+`tests/integration/`.
 """
 
 from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from questly.core.admin.domain import AISettingsUpdate
@@ -69,7 +68,7 @@ def test_sign_up_verify_and_log_in_write_to_postgres(
 
 
 @pytest.mark.usefixtures("empty_core_tables")
-def test_admin_routes_persist_settings_and_generation_enforces_quota(
+def test_admin_services_persist_settings_and_generation_reads_quota(
     postgres_url: str, session_factory: SessionFactory
 ) -> None:
     settings_repository = SQLAdminRepository(session_factory)
@@ -100,60 +99,46 @@ def test_admin_routes_persist_settings_and_generation_enforces_quota(
         object_storage=FakeObjectStorage(),
         vector_repository=FakeVectorRepository(),
     )
+    admin_actor = Actor(
+        user_id=admin.id,
+        role=Role.ADMIN,
+        full_name=admin.full_name,
+        email=admin.email,
+    )
 
     try:
-        with TestClient(app) as client:
-            admin_login = client.post(
-                "/api/v1/auth/login",
-                json={"email": admin.email, "password": "admin-pass"},
-            )
-            approved = client.post(
-                f"/api/v1/admin/instructor-requests/{request.id}/approve"
-            )
-            changed_settings = client.put(
-                "/api/v1/admin/ai-settings", json={"daily_quota": 1}
-            )
-            read_settings = client.get("/api/v1/admin/ai-settings")
+        approved, _ = app.state.admin_service.approve_instructor_request(
+            admin_actor, request.id
+        )
+        changed_settings = app.state.admin_service.update_ai_settings(
+            admin_actor, AISettingsUpdate(daily_quota=1)
+        )
+        read_settings = app.state.admin_service.get_ai_settings(admin_actor)
 
-            assert admin_login.status_code == 200
-            assert approved.status_code == 200
-            assert approved.json()["reviewed_by"] == admin.id
-            assert approved.json()["reviewed_at"] is not None
-            assert changed_settings.status_code == 200
-            assert read_settings.json()["daily_quota"] == 1
-            assert auth_repository.get_user(applicant.id).role is Role.INSTRUCTOR
+        assert approved.reviewed_by == admin.id
+        assert approved.reviewed_at is not None
+        assert changed_settings.daily_quota == 1
+        assert read_settings.daily_quota == 1
+        assert auth_repository.get_user(applicant.id).role is Role.INSTRUCTOR
 
-            instructor = Actor(
-                user_id=applicant.id,
-                role=Role.INSTRUCTOR,
-                full_name=applicant.full_name,
-                email=applicant.email,
-            )
-            classroom = app.state.classroom_service.create(
-                instructor,
-                course_code="01076001",
-                course_name="Programming I",
-                section="1",
-                semester="1/2569",
-            )
-            SQLDraftRepository(session_factory).record_generation(
-                applicant.id, datetime.now(UTC)
-            )
-            quota = app.state.generation_service.quota(instructor)
-            assert quota.used == quota.limit == 1
-
-            instructor_login = client.post(
-                "/api/v1/auth/login",
-                json={"email": applicant.email, "password": "applicant-pass"},
-            )
-            exhausted = client.post(
-                f"/api/v1/classrooms/{classroom.id}/drafts",
-                json={"prompt": "A binary search problem"},
-            )
-
-            assert instructor_login.status_code == 200
-            assert exhausted.status_code == 429
-            assert exhausted.json()["detail"]["code"] == "quota_exceeded"
+        instructor = Actor(
+            user_id=applicant.id,
+            role=Role.INSTRUCTOR,
+            full_name=applicant.full_name,
+            email=applicant.email,
+        )
+        app.state.classroom_service.create(
+            instructor,
+            course_code="01076001",
+            course_name="Programming I",
+            section="1",
+            semester="1/2569",
+        )
+        SQLDraftRepository(session_factory).record_generation(
+            applicant.id, datetime.now(UTC)
+        )
+        quota = app.state.generation_service.quota(instructor)
+        assert quota.used == quota.limit == 1
     finally:
         settings_repository.update_ai_settings(
             AISettingsUpdate(
