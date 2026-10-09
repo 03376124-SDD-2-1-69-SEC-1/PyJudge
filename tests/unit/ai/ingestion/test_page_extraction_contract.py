@@ -4,12 +4,12 @@ from dataclasses import FrozenInstanceError, dataclass
 
 import pytest
 
-from greader.ai.ingestion.models import (
+from questly.ai.ingestion.models import (
     DocumentExtraction,
     ExtractedPage,
     PageExtractionOutcome,
 )
-from greader.ai.ingestion.ports import (
+from questly.ai.ingestion.ports import (
     CorruptDocumentError,
     EncryptedDocumentError,
     PageExtractionError,

@@ -305,6 +305,7 @@ def create_app(
             generation_client = OpenRouterGenerationClient(
                 api_key=use_settings().openrouter_api_key,
                 model=use_settings().generation_model,
+                code_runner=code_runner,
             )
         else:
             generation_client = StubGenerationClient()
