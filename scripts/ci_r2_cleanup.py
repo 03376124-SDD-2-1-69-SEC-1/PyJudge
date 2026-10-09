@@ -1,7 +1,7 @@
 """Delete every object under one CI run's R2 test prefix.
 
-รันโดย .github/workflows/ci.yml หลัง pytest จบ (ทั้ง pass และ fail) เป็นการ
-ล้าง object ที่เทสต์ r2 สร้างไว้ใต้ prefix ของ run นั้น ๆ lifecycle rule บน
+รันโดย scripts/run_integration_tests.py หลัง pytest จบ (ทั้ง pass และ fail)
+เป็นการล้าง object ที่เทสต์ r2 สร้างไว้ใต้ prefix ของ run นั้น ๆ lifecycle rule บน
 bucket `greader-ci` (ลบของเก่ากว่า 1 วัน) เป็นตาข่ายรับอีกชั้นเผื่อ step นี้
 ไม่ได้รัน (runner ถูก kill กลางคัน) — เหมือนกับที่ `--expires-at` รับ Neon branch
 

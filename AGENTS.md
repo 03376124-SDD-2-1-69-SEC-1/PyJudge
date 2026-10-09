@@ -266,8 +266,9 @@ provider. `tests/db/` and `tests/r2/` are the exceptions, and only through
 throwaway infrastructure:
 
 - `tests/db/` — mark tests `postgres`, read the DSN from the `postgres_url`
-  fixture, and never from `DATABASE_URL`. CI supplies `POSTGRES_TEST_URL` by
-  creating a Neon branch per run and deleting it afterwards.
+  fixture, and never from `DATABASE_URL`. `scripts/run_integration_tests.py`
+  supplies `POSTGRES_TEST_URL` by creating a Neon branch per run and deleting it
+  afterwards.
 - `tests/r2/` — mark tests `r2`, read the client and bucket from the
   `r2_test_bucket` fixture and a unique key from `r2_test_prefix`, and never
   from `R2_BUCKET_NAME`/`R2_ENDPOINT_URL`/etc. Reserve this marker for
@@ -276,15 +277,22 @@ throwaway infrastructure:
   everything else (upload-then-list) stays on the existing stub. `moto` is
   not a dev dependency today (not listed in `pyproject.toml`); adopting it
   would be a dependency change, so that's an OPS task, not something to add
-  ad hoc. CI supplies
+  ad hoc. The script reads
   `R2_TEST_ENDPOINT_URL`, `R2_TEST_ACCESS_KEY_ID`, `R2_TEST_SECRET_ACCESS_KEY`
-  (secrets) and `R2_TEST_BUCKET_NAME` (variable), pointing at a dedicated
-  `greader-ci` bucket, plus a per-run `R2_TEST_PREFIX` cleaned up by
-  `scripts/ci_r2_cleanup.py` after the run.
+  and `R2_TEST_BUCKET_NAME` from the environment, pointing at a dedicated
+  `greader-ci` bucket, sets a per-run `R2_TEST_PREFIX`, and cleans it up with
+  `scripts/ci_r2_cleanup.py` afterwards.
+
+**CI does not run `postgres` or `r2` tests.** They need real Neon and R2, and
+from a hosted runner they took ten minutes, so CI runs
+`pytest -m "not postgres and not r2"`. Run
+`uv run --env-file .env python -m scripts.run_integration_tests` yourself before
+a PR that touches `database/`, `alembic/`, `tests/db/` or `tests/r2/`, and quote
+its result in the PR description. CI does not apply migrations either, so a new
+migration is proven only by that script.
 
 With those variables unset the marked tests skip themselves, so
-`uv run pytest` stays green with no database or bucket — one command
-everywhere. See `tests/conftest.py`.
+`uv run pytest` stays green with no database or bucket. See `tests/conftest.py`.
 
 ## Seed corpus on R2
 
@@ -332,7 +340,8 @@ rules and known limits are in `docs/handoff/2026-09-28-OPS-17-pith-seed.md`.
   under `tests/` — a pre-existing suite staying green is not evidence the new
   code works, only that it wasn't exercised
 - the PR description quotes the CI result for the PR's own head commit, not a
-  number from a local run
+  number from a local run; a PR touching `database/`, `alembic/`, `tests/db/` or
+  `tests/r2/` also quotes the `scripts/run_integration_tests.py` result
 
 ## Git
 
