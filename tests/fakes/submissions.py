@@ -3,6 +3,7 @@
 import contextlib
 import math
 import os
+
 try:
     import resource
 except ImportError:
