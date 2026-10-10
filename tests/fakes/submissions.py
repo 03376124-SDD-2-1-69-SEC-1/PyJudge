@@ -3,7 +3,12 @@
 import contextlib
 import math
 import os
-import resource
+import warnings
+
+try:
+    import resource
+except ImportError:
+    resource = None
 import subprocess
 import sys
 import tempfile
@@ -81,7 +86,8 @@ class LocalUnsafeRunner:
     Opt-in: it refuses to exist unless ALLOW_UNSAFE_RUNNER=1, and always
     when ENV=production, so an unset ENV fails closed. Guards, none of which
     make it safe for untrusted code: each run gets a fresh temp dir as its working
-    directory, a wall-clock timeout, and CPU-time and memory rlimits (POSIX).
+    directory and a wall-clock timeout. CPU-time and memory rlimits are applied
+    on POSIX only; Windows has no resource limits in this runner.
     `scripts/demo.py` binds 127.0.0.1, so the only code it runs is what the
     person at the keyboard typed. Production needs a sandboxed CodeRunner
     (ADR-0007 open question 1).
@@ -99,6 +105,13 @@ class LocalUnsafeRunner:
                 "LocalUnsafeRunner runs code unsandboxed; set ALLOW_UNSAFE_RUNNER=1 "
                 "to use it in the local demo"
             )
+        if os.name != "posix" or resource is None:
+            warnings.warn(
+                "LocalUnsafeRunner does not enforce CPU or memory limits on this "
+                "platform; only the wall-clock timeout is applied.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
     def run(
         self, *, code: str, language: str, stdin: str, time_limit_seconds: float
@@ -106,17 +119,30 @@ class LocalUnsafeRunner:
         started = time.perf_counter()
         with tempfile.TemporaryDirectory(prefix="questly-run-") as workdir:
             try:
-                done = subprocess.run(
-                    [sys.executable, "-I", "-c", code],
-                    input=stdin,
-                    capture_output=True,
-                    text=True,
-                    timeout=time_limit_seconds,
-                    check=False,
-                    cwd=workdir,
-                    env={"PATH": os.environ.get("PATH", "")},
-                    preexec_fn=self._limits(time_limit_seconds),
-                )
+                command = [sys.executable, "-I", "-c", code]
+                if os.name == "posix" and resource is not None:
+                    done = subprocess.run(
+                        command,
+                        input=stdin,
+                        capture_output=True,
+                        text=True,
+                        timeout=time_limit_seconds,
+                        check=False,
+                        cwd=workdir,
+                        env={"PATH": os.environ.get("PATH", "")},
+                        preexec_fn=self._limits(time_limit_seconds),
+                    )
+                else:
+                    done = subprocess.run(
+                        command,
+                        input=stdin,
+                        capture_output=True,
+                        text=True,
+                        timeout=time_limit_seconds,
+                        check=False,
+                        cwd=workdir,
+                        env={"PATH": os.environ.get("PATH", "")},
+                    )
             except subprocess.TimeoutExpired:
                 return Execution(ExecutionStatus.TIME_LIMIT, "", "", time_limit_seconds)
         elapsed = time.perf_counter() - started
@@ -127,6 +153,8 @@ class LocalUnsafeRunner:
         return Execution(ExecutionStatus.OK, done.stdout, done.stderr, elapsed)
 
     def _limits(self, time_limit_seconds: float) -> Callable[[], None]:
+        if resource is None:
+            raise RuntimeError("POSIX resource limits are unavailable")
         cpu_seconds = math.ceil(time_limit_seconds) + 1
 
         def apply() -> None:

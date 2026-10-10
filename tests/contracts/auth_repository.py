@@ -77,6 +77,29 @@ class AuthRepositoryContract:
 
         assert repository.list_users() == [first, second]
 
+    def test_search_users_filters_and_paginates(
+        self, repository: AuthRepository
+    ) -> None:
+        repository.create_user(user("somchai@kmitl.ac.th", full_name="Somchai Jaidee"))
+        repository.create_user(
+            user("nattapong@kmitl.ac.th", full_name="Nattapong Suwan")
+        )
+        repository.create_user(
+            user(
+                "somchai2@kmitl.ac.th",
+                full_name="Somchai Prasert",
+                role=Role.INSTRUCTOR,
+            )
+        )
+
+        page, total = repository.search_users(q="SOMCHAI", page=1, page_size=1)
+        instructors, instructor_total = repository.search_users(role="instructor")
+
+        assert total == 2
+        assert [account.full_name for account in page] == ["Somchai Jaidee"]
+        assert instructor_total == 1
+        assert instructors[0].full_name == "Somchai Prasert"
+
     def test_update_user_replaces_stored_values(
         self, repository: AuthRepository
     ) -> None:
@@ -211,3 +234,52 @@ class AuthRepositoryContract:
 
         assert repository.find_pending_instructor_request(alice.id) == pending
         assert repository.find_pending_instructor_request(bob.id) is None
+
+    def test_review_instructor_request_approves_user_and_records_reviewer(
+        self, repository: AuthRepository
+    ) -> None:
+        applicant = repository.create_user(user("applicant@kmitl.ac.th"))
+        reviewer = repository.create_user(user("admin@kmitl.ac.th", role=Role.ADMIN))
+        request = repository.create_instructor_request(
+            InstructorRequest(applicant.id, "Engineering", NOW)
+        )
+
+        reviewed = repository.review_instructor_request(
+            request.id, reviewer.id, approve=True
+        )
+
+        assert reviewed.status is InstructorRequestStatus.APPROVED
+        assert reviewed.reviewed_by == reviewer.id
+        assert reviewed.reviewed_at is not None
+        assert repository.get_user(applicant.id).role is Role.INSTRUCTOR
+
+    def test_review_rejected_request_does_not_change_user_role(
+        self, repository: AuthRepository
+    ) -> None:
+        applicant = repository.create_user(user("applicant@kmitl.ac.th"))
+        reviewer = repository.create_user(user("admin@kmitl.ac.th", role=Role.ADMIN))
+        request = repository.create_instructor_request(
+            InstructorRequest(applicant.id, "Engineering", NOW)
+        )
+
+        reviewed = repository.review_instructor_request(
+            request.id, reviewer.id, approve=False
+        )
+
+        assert reviewed.status is InstructorRequestStatus.REJECTED
+        assert reviewed.reviewed_by == reviewer.id
+        assert reviewed.reviewed_at is not None
+        assert repository.get_user(applicant.id).role is Role.STUDENT
+
+    def test_review_instructor_request_is_one_time(
+        self, repository: AuthRepository
+    ) -> None:
+        applicant = repository.create_user(user("applicant@kmitl.ac.th"))
+        reviewer = repository.create_user(user("admin@kmitl.ac.th", role=Role.ADMIN))
+        request = repository.create_instructor_request(
+            InstructorRequest(applicant.id, "Engineering", NOW)
+        )
+        repository.review_instructor_request(request.id, reviewer.id, approve=False)
+
+        with pytest.raises(ValueError):
+            repository.review_instructor_request(request.id, reviewer.id, approve=True)

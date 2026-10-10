@@ -132,6 +132,8 @@ class InstructorRequest:
     requested_at: datetime
     status: InstructorRequestStatus = InstructorRequestStatus.PENDING
     id: int | None = None
+    reviewed_by: int | None = None
+    reviewed_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

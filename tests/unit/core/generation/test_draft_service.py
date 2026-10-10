@@ -65,7 +65,7 @@ class World:
             self.classrooms,
             assignments,
             self.clock,
-            daily_quota=quota,
+            daily_quota=lambda: quota,
         )
 
         def actor(email: str, role: Role) -> Actor:

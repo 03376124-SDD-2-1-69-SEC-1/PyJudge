@@ -58,13 +58,37 @@ class FakeAuthRepository:
     def list_users(self) -> list[User]:
         return [self._users[key] for key in sorted(self._users)]
 
+    def search_users(
+        self,
+        *,
+        q: str | None = None,
+        role: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> tuple[list[User], int]:
+        users = self.list_users()
+        if q:
+            q_lower = q.lower()
+            users = [
+                user
+                for user in users
+                if q_lower in user.email.lower() or q_lower in user.full_name.lower()
+            ]
+        if role:
+            users = [user for user in users if user.role.value == role]
+
+        total = len(users)
+        start = (page - 1) * page_size
+        end = start + page_size
+        return users[start:end], total
+
     def create_user(self, user: User) -> User:
         created = replace(user, id=self._new_id())
         self._users[created.id] = created
         return created
 
     def update_user(self, user: User) -> User:
-        self._users[user.id]  # KeyError for an unknown id, like the SQL adapter
+        self._users[user.id]  # KeyError for an unknown id
         self._users[user.id] = user
         return user
 
@@ -111,13 +135,46 @@ class FakeAuthRepository:
         return created
 
     def list_instructor_requests(
-        self, status: InstructorRequestStatus
+        self, status: str | InstructorRequestStatus | None = None
     ) -> list[InstructorRequest]:
-        return [
-            self._requests[key]
-            for key in sorted(self._requests)
-            if self._requests[key].status is status
-        ]
+        reqs = [self._requests[key] for key in sorted(self._requests)]
+        if status:
+            status_val = (
+                status.value if isinstance(status, InstructorRequestStatus) else status
+            )
+            reqs = [request for request in reqs if request.status.value == status_val]
+        return reqs
+
+    def review_instructor_request(
+        self, request_id: int, reviewer_id: int, approve: bool
+    ) -> InstructorRequest:
+        req = self._requests.get(request_id)
+        if req is None:
+            raise KeyError(f"Instructor request {request_id} not found")
+        if req.status is not InstructorRequestStatus.PENDING:
+            raise ValueError(
+                f"Instructor request {request_id} has already been reviewed"
+            )
+        if req.user_id not in self._users:
+            raise KeyError(f"User {req.user_id} not found")
+        new_status = (
+            InstructorRequestStatus.APPROVED
+            if approve
+            else InstructorRequestStatus.REJECTED
+        )
+        updated_req = replace(
+            req,
+            status=new_status,
+            reviewed_by=reviewer_id,
+            reviewed_at=datetime.now(UTC),
+        )
+        if approve:
+            self._users[req.user_id] = replace(
+                self._users[req.user_id], role=Role.INSTRUCTOR
+            )
+
+        self._requests[request_id] = updated_req
+        return updated_req
 
     def find_pending_instructor_request(self, user_id: int) -> InstructorRequest | None:
         for request in self._requests.values():
@@ -129,8 +186,6 @@ class FakeAuthRepository:
         return None
 
 
-# One hash reused by every seeded account: scrypt is slow on purpose, and tests
-# and the demo seed create dozens of users.
 DEFAULT_PASSWORD = "demo-pass-1234"
 _DEFAULT_HASH = hash_password(DEFAULT_PASSWORD)
 
