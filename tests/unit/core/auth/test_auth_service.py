@@ -30,8 +30,10 @@ from questly.core.auth.service import (
     hash_password,
     verify_password,
 )
+from questly.core.notifications.service import NotificationService
 from questly.integrations.email import StubEmailSender
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, FakeClock, seed_user
+from tests.fakes.notifications import FakeNotificationRepository
 
 PASSWORD = "correct horse"
 
@@ -55,7 +57,12 @@ def clock() -> FakeClock:
 def service(
     repository: FakeAuthRepository, mailer: StubEmailSender, clock: FakeClock
 ) -> AuthService:
-    return AuthService(repository, mailer, clock)
+    notification_service = NotificationService(
+        FakeNotificationRepository(),
+        mailer,
+        clock,
+    )
+    return AuthService(repository, notification_service, clock)
 
 
 def _sign_up(

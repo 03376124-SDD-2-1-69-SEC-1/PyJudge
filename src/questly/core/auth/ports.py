@@ -65,16 +65,6 @@ class AuthRepository(Protocol):
     ) -> InstructorRequest | None: ...
 
 
-class VerificationMailer(Protocol):
-    """Sends the email verification link."""
-
-    def send_verification(
-        self, *, email: str, full_name: str, verify_path: str
-    ) -> None:
-        """Deliver `verify_path` (e.g. `/verify?token=...`) to `email`."""
-        ...
-
-
 class Clock(Protocol):
     """The current time, timezone-aware UTC. Injected so expiry is testable."""
 
