@@ -13,6 +13,7 @@ from questly import config, main
 from questly.database import session
 from questly.database.rag import vector_repository as postgres_adapter
 from questly.database.storage import r2
+from tests.fakes.notifications import FakeNotificationRepository
 
 
 @pytest.fixture(autouse=True)
@@ -84,7 +85,7 @@ def test_production_composition_wires_the_postgres_vector_repository(
     monkeypatch.setattr(session, "create_engine", Mock(return_value=object()))
     monkeypatch.setattr(r2, "boto3", Mock())
 
-    application = main.create_app()
+    application = main.create_app(notification_repository=FakeNotificationRepository())
 
     assert application.state.vector_service._repository is repository
     adapter_factory.assert_called_once()

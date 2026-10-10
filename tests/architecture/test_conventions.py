@@ -17,7 +17,7 @@ LEGACY_ASSIGNMENTS_TEST_DIR = TESTS_ROOT / "unit" / "core" / "topics" / "assignm
 
 
 def _parse(path: Path) -> ast.Module:
-    return ast.parse(path.read_text(), filename=str(path))
+    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
 def _is_pytest_filename(path: Path) -> bool:
@@ -160,6 +160,9 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
 # `approved_at` on a draft, once Questly's approval flow needs it -- unlike
 # `created_at`/`updated_at`, that's a business fact, not row bookkeeping.
 ALLOWED_TIMESTAMP_FIELDS: set[str] = {
+    # notifications: list timestamps and determine whether a notification was read.
+    "created_at",
+    "read_at",
     # auth (ADR-0007 §1): verify_email refuses a link after 24 h and
     # resolve_session refuses an expired session.
     "expires_at",
@@ -352,7 +355,6 @@ ACTOR_SLICES = (
     "assignments",
     "generation",
     "submissions",
-    "notifications",
     "admin",
     "documents",
 )
@@ -541,7 +543,9 @@ def test_templates_build_controls_only_through_component_macros() -> None:
         relative = template.relative_to(TEMPLATE_ROOT)
         if relative.parts[0] == COMPONENTS_DIR:
             continue
-        for lineno, line in enumerate(template.read_text().splitlines(), start=1):
+        for lineno, line in enumerate(
+            template.read_text(encoding="utf-8").splitlines(), start=1
+        ):
             match = RAW_CONTROL.search(line)
             if match:
                 violations.append(f"{relative}:{lineno}: <{match.group(1)}>")
@@ -563,9 +567,12 @@ def test_every_post_form_carries_the_csrf_field() -> None:
     """core/auth/csrf.py rejects a form post without its page's token."""
     violations = []
     for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
-        for match in POST_FORM.finditer(template.read_text()):
+        for match in POST_FORM.finditer(template.read_text(encoding="utf-8")):
             if "csrf_field()" not in match.group(1):
-                line = template.read_text()[: match.start()].count("\n") + 1
+                line = (
+                    template.read_text(encoding="utf-8")[: match.start()].count("\n")
+                    + 1
+                )
                 violations.append(f"{template.relative_to(TEMPLATE_ROOT)}:{line}")
 
     assert not violations, (
@@ -578,7 +585,7 @@ def test_forms_macros_are_imported_with_context() -> None:
     """csrf_field() reads `request`, which a context-free import cannot see."""
     violations = []
     for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
-        for match in FORMS_IMPORT.finditer(template.read_text()):
+        for match in FORMS_IMPORT.finditer(template.read_text(encoding="utf-8")):
             if not match.group(1).rstrip().endswith("with context"):
                 violations.append(str(template.relative_to(TEMPLATE_ROOT)))
 
@@ -656,7 +663,7 @@ def test_old_project_name_is_gone() -> None:
             violations.append(f"{name} (path)")
             continue
         try:
-            text = path.read_text()
+            text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
         for lineno, line in enumerate(text.splitlines(), start=1):
