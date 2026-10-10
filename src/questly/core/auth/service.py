@@ -19,7 +19,8 @@ from questly.core.auth.models import (
     UserSummary,
     VerificationToken,
 )
-from questly.core.auth.ports import AuthRepository, Clock, VerificationMailer
+from questly.core.auth.ports import AuthRepository, Clock
+from questly.core.notifications.service import NotificationService
 
 KMITL_DOMAIN = "@kmitl.ac.th"
 MIN_PASSWORD_LENGTH = 8
@@ -82,11 +83,11 @@ class AuthService:
     def __init__(
         self,
         repository: AuthRepository,
-        mailer: VerificationMailer,
+        notification_service: NotificationService,
         clock: Clock,
     ) -> None:
         self._repository = repository
-        self._mailer = mailer
+        self._notification_service = notification_service
         self._clock = clock
 
     def sign_up(
@@ -232,6 +233,8 @@ class AuthService:
 
     def _send_verification(self, user: User) -> None:
         token = secrets.token_urlsafe(32)
+        verify_path = f"/verify?token={token}"
+
         self._repository.create_verification_token(
             VerificationToken(
                 token_hash=_digest(token),
@@ -239,10 +242,10 @@ class AuthService:
                 expires_at=self._clock.now() + VERIFICATION_TTL,
             )
         )
-        self._mailer.send_verification(
-            email=user.email,
-            full_name=user.full_name,
-            verify_path=f"/verify?token={token}",
+        self._notification_service.send_email(
+            to=user.email,
+            subject="Verify your email",
+            body=verify_path,
         )
 
     def _live_session(self, token: str) -> Session:

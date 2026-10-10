@@ -46,7 +46,7 @@ from questly.core.auth.models import (
 )
 from questly.core.auth.pages import DemoAccount
 from questly.core.auth.pages import router as auth_page_router
-from questly.core.auth.ports import AuthRepository, Clock, VerificationMailer
+from questly.core.auth.ports import AuthRepository, Clock
 from questly.core.auth.routes import router as auth_router
 from questly.core.auth.service import AuthService
 from questly.core.classrooms.pages import router as classroom_page_router
@@ -63,6 +63,9 @@ from questly.core.generation.ports import (
 from questly.core.generation.routes import classroom_router as draft_classroom_router
 from questly.core.generation.routes import router as draft_router
 from questly.core.generation.service import GenerationService
+from questly.core.notifications.ports import EmailSender, NotificationRepository
+from questly.core.notifications.routes import router as notification_router
+from questly.core.notifications.service import NotificationService
 from questly.core.submissions.pages import router as submission_page_router
 from questly.core.submissions.ports import CodeRunner, SubmissionRepository
 from questly.core.submissions.routes import (
@@ -113,7 +116,10 @@ DISPLAY_ZONE = ZoneInfo("Asia/Bangkok")
 
 def local_time(value: datetime, pattern: str = "%-d %b, %H:%M") -> str:
     """Render a stored UTC time in Bangkok time for templates (`|local`)."""
-    return value.astimezone(DISPLAY_ZONE).strftime(pattern)
+    local_value = value.astimezone(DISPLAY_ZONE)
+    return str(local_value.day).join(
+        local_value.strftime(part) for part in pattern.split("%-d")
+    )
 
 
 def asset_url(path: str) -> str:
@@ -143,7 +149,8 @@ def create_app(
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
-    verification_mailer: VerificationMailer | None = None,
+    email_sender: EmailSender | None = None,
+    notification_repository: NotificationRepository | None = None,
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
@@ -225,9 +232,23 @@ def create_app(
             clock,
         )
 
-    if verification_mailer is None:
-        verification_mailer = StubEmailSender()
-    auth_service = AuthService(auth_repository, verification_mailer, clock)
+    if email_sender is None:
+        email_sender = StubEmailSender()
+
+    if notification_repository is None:
+        raise RuntimeError(
+            "notification_repository must be provided "
+            "until the SQL adapter is available"
+        )
+
+    notification_service = NotificationService(
+        notification_repository,
+        email_sender,
+        clock,
+    )
+    application.state.notification_service = notification_service
+
+    auth_service = AuthService(auth_repository, notification_service, clock)
     application.state.auth_service = auth_service
 
     classroom_service = ClassroomService(
@@ -307,6 +328,7 @@ def create_app(
     application.include_router(generation_page_router)
     application.include_router(upload_router)
     application.include_router(vector_router)
+    application.include_router(notification_router)
     application.include_router(auth_router)
     application.include_router(auth_page_router)
     application.include_router(classroom_router)
