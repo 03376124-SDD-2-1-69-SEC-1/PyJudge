@@ -25,6 +25,7 @@ from questly.ai.app.repository import (
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
+from questly.ai.retrieval.models import RetrievalFilters
 from questly.database.rag.vector_repository import PostgresVectorRepository
 
 MODEL = "model-a"
@@ -284,6 +285,65 @@ def test_search_returns_empty_list() -> None:
     assert (
         _repository(session).search(_embedding(), embedding_model=MODEL, limit=5) == []
     )
+
+
+def test_filtered_search_joins_ready_sources_and_filters_before_limit() -> None:
+    session = MagicMock()
+    session.execute.return_value.mappings.return_value.all.return_value = [
+        {"chunk_id": 21, "source_id": 11, "page": 2, "text": "sample", "score": 0.8}
+    ]
+
+    results = _repository(session).search_filtered(
+        _embedding(),
+        embedding_model=MODEL,
+        limit=3,
+        filters=RetrievalFilters(topic="graphs", difficulty="hard"),
+    )
+
+    assert results == [ChunkSearchResult(21, 11, 2, "sample", 0.8)]
+    compiled = session.execute.call_args.args[0].compile(dialect=postgresql.dialect())
+    sql = str(compiled)
+    assert "JOIN rag.knowledge_sources" in sql
+    assert "knowledge_sources.status =" in sql
+    assert sql.count("knowledge_sources.metadata ->>") == 2
+    assert "ORDER BY score DESC, rag.knowledge_chunks.id ASC" in sql
+    assert all(
+        value in compiled.params.values()
+        for value in ("ready", "graphs", "hard", MODEL, 3)
+    )
+
+
+def test_filtered_search_without_difficulty_keeps_topic_condition() -> None:
+    session = MagicMock()
+    session.execute.return_value.mappings.return_value.all.return_value = []
+
+    _repository(session).search_filtered(
+        _embedding(),
+        embedding_model=MODEL,
+        limit=3,
+        filters=RetrievalFilters(topic="graphs"),
+    )
+
+    compiled = session.execute.call_args.args[0].compile(dialect=postgresql.dialect())
+    assert str(compiled).count("knowledge_sources.metadata ->>") == 1
+    assert "graphs" in compiled.params.values()
+
+
+def test_filtered_search_translates_database_failure() -> None:
+    session = MagicMock()
+    session.execute.side_effect = OperationalError("SELECT", {}, Exception("offline"))
+
+    with pytest.raises(
+        VectorRepositoryUnavailableError, match="search operation failed"
+    ):
+        _repository(session).search_filtered(
+            _embedding(),
+            embedding_model=MODEL,
+            limit=3,
+            filters=RetrievalFilters(topic="graphs"),
+        )
+
+    session.rollback.assert_called_once_with()
 
 
 def test_search_translates_database_failure() -> None:

@@ -33,6 +33,7 @@ from questly.ai.app.repository import (
     VectorRepositoryError,
     VectorRepositoryUnavailableError,
 )
+from questly.ai.retrieval.models import RetrievalFilters
 from questly.database.rag.tables import KnowledgeChunk as KnowledgeChunkTable
 from questly.database.rag.tables import KnowledgeSource as KnowledgeSourceTable
 
@@ -115,16 +116,32 @@ class PostgresVectorRepository:
             except SQLAlchemyError as exc:
                 session.rollback()
                 raise VectorRepositoryError("vector search operation failed") from exc
-        return [
-            ChunkSearchResult(
-                chunk_id=row["chunk_id"],
-                source_id=row["source_id"],
-                page=row["page"],
-                text=row["text"],
-                score=float(row["score"]),
-            )
-            for row in rows
-        ]
+        return [_search_result_from_row(row) for row in rows]
+
+    def search_filtered(
+        self,
+        embedding: Embedding,
+        *,
+        embedding_model: str,
+        limit: int,
+        filters: RetrievalFilters,
+    ) -> list[ChunkSearchResult]:
+        """Filter ready sources in SQL before ranking and limiting chunks."""
+        statement = _filtered_search_statement(
+            embedding, embedding_model=embedding_model, limit=limit, filters=filters
+        )
+        with self._session() as session:
+            try:
+                rows = session.execute(statement).mappings().all()
+            except OperationalError as exc:
+                session.rollback()
+                raise VectorRepositoryUnavailableError(
+                    "vector search operation failed"
+                ) from exc
+            except SQLAlchemyError as exc:
+                session.rollback()
+                raise VectorRepositoryError("vector search operation failed") from exc
+        return [_search_result_from_row(row) for row in rows]
 
     @contextmanager
     def _session(self) -> Iterator[Session]:
@@ -189,6 +206,51 @@ def _search_statement(embedding: Embedding, *, embedding_model: str, limit: int)
         )
         .order_by(score.desc(), CHUNK_TABLE.c.id.asc())
         .limit(limit)
+    )
+
+
+def _filtered_search_statement(
+    embedding: Embedding,
+    *,
+    embedding_model: str,
+    limit: int,
+    filters: RetrievalFilters,
+):
+    cosine_distance = CHUNK_TABLE.c.embedding.cosine_distance(list(embedding))
+    score = (literal(1.0) - cosine_distance).label("score")
+    statement = (
+        select(
+            CHUNK_TABLE.c.id.label("chunk_id"),
+            CHUNK_TABLE.c.source_id,
+            CHUNK_TABLE.c.page,
+            CHUNK_TABLE.c.text,
+            score,
+        )
+        .join(SOURCE_TABLE, CHUNK_TABLE.c.source_id == SOURCE_TABLE.c.id)
+        .where(
+            CHUNK_TABLE.c.embedding.is_not(None),
+            CHUNK_TABLE.c.embedding_model == embedding_model,
+            SOURCE_TABLE.c.status == "ready",
+        )
+    )
+    if filters.topic is not None:
+        statement = statement.where(
+            SOURCE_TABLE.c["metadata"]["topic"].astext == filters.topic
+        )
+    if filters.difficulty is not None:
+        statement = statement.where(
+            SOURCE_TABLE.c["metadata"]["difficulty"].astext == filters.difficulty
+        )
+    return statement.order_by(score.desc(), CHUNK_TABLE.c.id.asc()).limit(limit)
+
+
+def _search_result_from_row(row: RowMapping) -> ChunkSearchResult:
+    return ChunkSearchResult(
+        chunk_id=row["chunk_id"],
+        source_id=row["source_id"],
+        page=row["page"],
+        text=row["text"],
+        score=float(row["score"]),
     )
 
 
