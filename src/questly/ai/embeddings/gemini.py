@@ -4,8 +4,11 @@ Production composition creates ``google.genai.Client`` after credentials are
 configured. Importing this module never reads credentials or contacts Google.
 """
 
+import os
 from math import hypot, isfinite
 from typing import Protocol
+
+from dotenv import load_dotenv
 
 from questly.ai.app.models import EMBEDDING_DIMENSION, Embedding
 from questly.ai.embeddings.ports import EmbeddingError
@@ -85,3 +88,9 @@ def create_gemini_embedding_provider(api_key: str) -> GeminiEmbeddingProvider:
     except ImportError as exc:
         raise RuntimeError("google-genai dependency is required") from exc
     return GeminiEmbeddingProvider(genai.Client(api_key=api_key))
+
+
+def create_gemini_embedding_provider_from_env() -> GeminiEmbeddingProvider:
+    """Load local configuration only when the production adapter is requested."""
+    load_dotenv(override=False)
+    return create_gemini_embedding_provider(os.environ.get("GEMINI_API_KEY", ""))

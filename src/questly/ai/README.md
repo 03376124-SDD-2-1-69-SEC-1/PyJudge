@@ -14,8 +14,10 @@ Thai input heading. AI-04 connects those parts in `ingestion/pipeline.py`:
 
 Production embedding uses `GeminiEmbeddingProvider` with
 `gemini-embedding-001`, 768 output dimensions, and manual L2 normalization.
-Pass an SDK client explicitly, or call `create_gemini_embedding_provider` with
-an explicit API key. Imports and tests never load credentials or contact Google.
+Pass an SDK client explicitly, call `create_gemini_embedding_provider` with
+an explicit API key, or call `create_gemini_embedding_provider_from_env` to
+load `GEMINI_API_KEY` from the local environment at runtime. Imports and tests
+never load credentials or contact Google.
 The `google-genai` dependency must be added by the OPS owner to
 `pyproject.toml` and `uv.lock` before production composition can instantiate it.
 

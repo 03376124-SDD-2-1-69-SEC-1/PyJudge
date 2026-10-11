@@ -5,9 +5,11 @@ from math import isclose
 
 import pytest
 
+from questly.ai.embeddings import gemini
 from questly.ai.embeddings.gemini import (
     GeminiEmbeddingProvider,
     create_gemini_embedding_provider,
+    create_gemini_embedding_provider_from_env,
 )
 from questly.ai.embeddings.ports import EmbeddingError
 
@@ -86,3 +88,31 @@ def test_refuses_empty_text_without_provider_call() -> None:
 def test_factory_requires_explicit_key_before_importing_sdk() -> None:
     with pytest.raises(ValueError, match="API key"):
         create_gemini_embedding_provider(" ")
+
+
+def test_env_factory_requires_key_without_importing_sdk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gemini, "load_dotenv", lambda **_kwargs: None)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="API key"):
+        create_gemini_embedding_provider_from_env()
+
+
+def test_env_factory_passes_key_without_exposing_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: list[str] = []
+    sentinel = GeminiEmbeddingProvider(FakeClient(FakeResponse(None)))
+
+    def create(api_key: str) -> GeminiEmbeddingProvider:
+        observed.append(api_key)
+        return sentinel
+
+    monkeypatch.setattr(gemini, "load_dotenv", lambda **_kwargs: None)
+    monkeypatch.setattr(gemini, "create_gemini_embedding_provider", create)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-value")
+
+    assert create_gemini_embedding_provider_from_env() is sentinel
+    assert observed == ["test-only-value"]
