@@ -1,7 +1,8 @@
 """Guards for the only tests allowed to reach real external infrastructure.
 
-Tests marked `postgres` connect to a throwaway Neon branch created by CI and
-deleted when the run ends. They read `POSTGRES_TEST_URL` and nothing else:
+Tests marked `postgres` connect to a throwaway Neon branch created by
+`scripts/run_integration_tests.py` and deleted when the run ends. They read
+`POSTGRES_TEST_URL` and nothing else:
 `DATABASE_URL` points at the branch the whole team develops against, and these
 tests insert and delete rows.
 

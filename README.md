@@ -167,22 +167,56 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-Tests marked `postgres` or `r2` talk to real infrastructure and skip
-themselves locally unless the matching variables are exported. In CI they run
-against throwaway infrastructure created per run — see `AGENTS.md`. To run the
-`r2` tests locally against the dedicated `greader-ci` bucket, export:
+### Integration tests (Neon and R2)
+
+CI runs everything except tests marked `postgres` or `r2`. Those talk to real
+Neon and R2, and from a GitHub runner on another continent they took ten
+minutes. Run them yourself with one script before you open a PR that touches
+`database/`, `alembic/`, `tests/db/` or `tests/r2/`, and quote the result in the
+PR description.
 
 ```bash
-export R2_TEST_ENDPOINT_URL=...
-export R2_TEST_ACCESS_KEY_ID=...
-export R2_TEST_SECRET_ACCESS_KEY=...
-export R2_TEST_BUCKET_NAME=greader-ci
+uv run --env-file .env python -m scripts.run_integration_tests
 ```
 
-CI reads these same four names from repo secrets/variables
-(`R2_TEST_ENDPOINT_URL`, `R2_TEST_ACCESS_KEY_ID`, `R2_TEST_SECRET_ACCESS_KEY`
-as secrets; `R2_TEST_BUCKET_NAME` as a variable) — see
-`.github/workflows/ci.yml`.
+The script creates a throwaway Neon branch, applies the migrations to that
+branch only, runs the `postgres` and `r2` tests, then deletes the branch and the
+R2 objects it wrote. The branch also expires after two hours if the script is
+killed. The shared database is never the target.
+
+Options:
+
+```bash
+# only one group
+uv run --env-file .env python -m scripts.run_integration_tests --only postgres
+uv run --env-file .env python -m scripts.run_integration_tests --only r2
+
+# extra pytest arguments go after `--`
+uv run --env-file .env python -m scripts.run_integration_tests -- -k classroom
+
+# keep the branch to poke at it (it still expires)
+uv run --env-file .env python -m scripts.run_integration_tests --keep-branch
+```
+
+One-time setup:
+
+1. Install the Neon CLI: `npm i -g neonctl`, then `neonctl auth` (or export
+   `NEON_API_KEY`).
+2. Export the project, and for R2 the dedicated `greader-ci` bucket's
+   credentials. Ask พาย for the values:
+
+   ```bash
+   export NEON_PROJECT_ID=...
+   export NEON_PARENT_BRANCH=production   # optional, this is the default
+   export R2_TEST_ENDPOINT_URL=...
+   export R2_TEST_ACCESS_KEY_ID=...
+   export R2_TEST_SECRET_ACCESS_KEY=...
+   export R2_TEST_BUCKET_NAME=greader-ci
+   ```
+
+Plain `uv run pytest` still skips the marked tests, so it needs no database or
+bucket. Never point `POSTGRES_TEST_URL` at the shared database; `tests/conftest.py`
+refuses when it matches `DATABASE_URL`.
 
 ### Styles (Tailwind CSS v4, standalone CLI)
 

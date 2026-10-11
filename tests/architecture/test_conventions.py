@@ -6,6 +6,7 @@ When you add a rule to AGENTS.md, add its test here in the same PR.
 
 import ast
 import re
+import subprocess
 from pathlib import Path
 
 CORE_ROOT = Path("src/questly/core")
@@ -626,4 +627,45 @@ def test_every_post_page_handler_checks_csrf_first() -> None:
         "Every POST page handler takes `csrf_token` and calls "
         "require_csrf(request, csrf_token) as its first statement. "
         "Violations:\n" + "\n".join(violations)
+    )
+
+
+OLD_PROJECT_NAME = re.compile(r"greader(?!-ci)", re.IGNORECASE)
+OLD_NAME_EXEMPT_PREFIXES = ("docs/handoff/",)
+OLD_NAME_EXEMPT_FILES = {"tests/architecture/test_conventions.py"}
+
+
+def test_old_project_name_is_gone() -> None:
+    """A branch cut before the Questly rename re-adds the old project name.
+
+    `greader-ci` is the real name of the CI R2 bucket and is allowed. Dated
+    handoff docs are snapshots and are left alone.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files"], capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+
+    violations = []
+    for name in tracked:
+        if name in OLD_NAME_EXEMPT_FILES or name.startswith(OLD_NAME_EXEMPT_PREFIXES):
+            continue
+        path = Path(name)
+        if not path.is_file():
+            continue
+        if OLD_PROJECT_NAME.search(name):
+            violations.append(f"{name} (path)")
+            continue
+        try:
+            text = path.read_text()
+        except UnicodeDecodeError:
+            continue
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            if OLD_PROJECT_NAME.search(line):
+                violations.append(f"{name}:{lineno}")
+
+    assert not violations, (
+        "The project was renamed to Questly (src/questly, `questly.*` imports). "
+        "Your branch predates the rename: `git pull origin dev`, move your code "
+        "under src/questly/, fix the imports, and delete src/<old name>/. "
+        "Found in:\n  " + "\n  ".join(violations)
     )
