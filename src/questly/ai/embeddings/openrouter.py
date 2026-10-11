@@ -1,7 +1,7 @@
-"""Gemini text embedding adapter; the SDK client is supplied by the caller.
+"""OpenRouter text embedding adapter for the existing 768-dimensional RAG schema.
 
-Production composition creates ``google.genai.Client`` after credentials are
-configured. Importing this module never reads credentials or contacts Google.
+The client is injected for tests. Constructing a production client happens only
+when the factory is called, so imports remain credential- and network-free.
 """
 
 import os
@@ -13,31 +13,37 @@ from dotenv import load_dotenv
 from questly.ai.app.models import EMBEDDING_DIMENSION, Embedding
 from questly.ai.embeddings.ports import EmbeddingError
 
-MODEL = "gemini-embedding-001"
+MODEL = "google/gemini-embedding-001"
+BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class _Embedding(Protocol):
-    values: list[float] | None
+    embedding: list[float]
 
 
 class _Response(Protocol):
-    embeddings: list[_Embedding] | None
+    data: list[_Embedding]
 
 
-class _Models(Protocol):
-    def embed_content(
-        self, *, model: str, contents: str, config: dict[str, object]
+class _Embeddings(Protocol):
+    def create(
+        self,
+        *,
+        model: str,
+        input: str,
+        dimensions: int,
+        encoding_format: str,
     ) -> _Response: ...
 
 
-class GeminiClient(Protocol):
-    models: _Models
+class OpenRouterClient(Protocol):
+    embeddings: _Embeddings
 
 
-class GeminiEmbeddingProvider:
-    """Request 768 dimensions and L2-normalize the truncated 001 output."""
+class OpenRouterEmbeddingProvider:
+    """Request 768 dimensions and L2-normalize the returned vector."""
 
-    def __init__(self, client: GeminiClient) -> None:
+    def __init__(self, client: OpenRouterClient) -> None:
         self._client = client
 
     @property
@@ -47,18 +53,16 @@ class GeminiEmbeddingProvider:
     def embed(self, text: str) -> Embedding:
         if not text.strip():
             raise EmbeddingError("cannot embed empty text")
-        response = self._client.models.embed_content(
+        response = self._client.embeddings.create(
             model=MODEL,
-            contents=text,
-            config={
-                "output_dimensionality": EMBEDDING_DIMENSION,
-                "task_type": "RETRIEVAL_DOCUMENT",
-            },
+            input=text,
+            dimensions=EMBEDDING_DIMENSION,
+            encoding_format="float",
         )
-        embeddings = response.embeddings
-        if embeddings is None or len(embeddings) != 1:
+        data = response.data
+        if data is None or len(data) != 1:
             raise EmbeddingError("provider must return one embedding")
-        values = embeddings[0].values
+        values = data[0].embedding
         if values is None or len(values) != EMBEDDING_DIMENSION:
             raise EmbeddingError("provider returned the wrong embedding dimension")
         for value in values:
@@ -79,18 +83,22 @@ class GeminiEmbeddingProvider:
         return tuple(value / magnitude for value in values)
 
 
-def create_gemini_embedding_provider(api_key: str) -> GeminiEmbeddingProvider:
+def create_openrouter_embedding_provider(api_key: str) -> OpenRouterEmbeddingProvider:
     """Construct the production adapter only when explicitly configured."""
     if not api_key.strip():
-        raise ValueError("Gemini API key is required")
-    try:
-        from google import genai
-    except ImportError as exc:
-        raise RuntimeError("google-genai dependency is required") from exc
-    return GeminiEmbeddingProvider(genai.Client(api_key=api_key))
+        raise ValueError("OpenRouter API key is required")
+    return OpenRouterEmbeddingProvider(_new_client(api_key))
 
 
-def create_gemini_embedding_provider_from_env() -> GeminiEmbeddingProvider:
+def _new_client(api_key: str) -> OpenRouterClient:
+    from openai import OpenAI
+
+    return OpenAI(base_url=BASE_URL, api_key=api_key, timeout=60.0)
+
+
+def create_openrouter_embedding_provider_from_env() -> OpenRouterEmbeddingProvider:
     """Load local configuration only when the production adapter is requested."""
     load_dotenv(override=False)
-    return create_gemini_embedding_provider(os.environ.get("GEMINI_API_KEY", ""))
+    return create_openrouter_embedding_provider(
+        os.environ.get("OPENROUTER_API_KEY", "")
+    )

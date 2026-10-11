@@ -12,14 +12,20 @@ Thai input heading. AI-04 connects those parts in `ingestion/pipeline.py`:
 4. Each chunk stores its starting page in `page` and its inclusive ending page
    in metadata `page_end`; source metadata such as topic/difficulty is retained.
 
-Production embedding uses `GeminiEmbeddingProvider` with
-`gemini-embedding-001`, 768 output dimensions, and manual L2 normalization.
-Pass an SDK client explicitly, call `create_gemini_embedding_provider` with
-an explicit API key, or call `create_gemini_embedding_provider_from_env` to
-load `GEMINI_API_KEY` from the local environment at runtime. Imports and tests
-never load credentials or contact Google.
-The `google-genai` dependency must be added by the OPS owner to
-`pyproject.toml` and `uv.lock` before production composition can instantiate it.
+Production embedding uses `OpenRouterEmbeddingProvider` with
+`google/gemini-embedding-001` through OpenRouter's OpenAI-compatible embedding
+endpoint, requesting 768 output dimensions and applying L2 normalization.
+Pass an OpenAI-compatible client explicitly, call
+`create_openrouter_embedding_provider` with an explicit key, or call
+`create_openrouter_embedding_provider_from_env` to load `OPENROUTER_API_KEY`
+at runtime. The existing `openai` dependency is sufficient. Imports and tests
+never load credentials or contact an AI provider.
+
+AI-04 scope note for PR review: `docs/task-scope.md` still names the direct
+`google-genai` SDK (or `sentence-transformers`) and asks the OPS owner to add
+it. Pai approved OpenRouter instead; this implementation reuses the existing
+`openai` dependency and OpenRouter key, without touching locked dependency or
+scope files. The scope row should be updated by its owner when convenient.
 
 This module does not fetch objects from R2, perform OCR, or ingest the seed
 corpus. Those are later tasks. No tests may call shared Neon, real R2, or a
