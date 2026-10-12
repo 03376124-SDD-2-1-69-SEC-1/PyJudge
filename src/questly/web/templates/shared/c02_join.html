@@ -1,25 +1,28 @@
 {# C-02 join modal (popover); C-02a is the same modal rendered open with the error. #}
 {% from "_components/forms.html" import csrf_field, field, button, link_button with context %}
 {% from "_components/ui.html" import modal %}
+{% from "_components/icons.html" import icon %}
 {% if join_error %}
-  {% call modal("join-classroom-error", "Join a classroom", static=true, state="C-02a") %}
-  <form method="post" action="/classes/join" class="flex flex-col gap-3.5">
+  {% call modal("join-classroom-error", "เข้าร่วมห้องเรียน", static=true, state="C-02a", centered=true) %}
+  <form method="post" action="/classes/join" class="flex flex-col gap-4">
     {{ csrf_field() }}
-    {{ field("join_code", "Join code", id="join-code-retry", value=join_code, input_class="input-code", error="No classroom with this code.", maxlength=6, minlength=6, autocomplete="off", required=true) }}
+    <span class="icon-well icon-well-lg mx-auto">{{ icon("users", 30) }}</span>
+    {{ field("join_code", "รหัสเข้าร่วมห้องเรียน", id="join-code-retry", value=join_code, input_class="input-code", error="No classroom with this code.", maxlength=6, minlength=6, autocomplete="off", required=true) }}
     <div class="flex justify-between">
-      {{ link_button("/classes", "Cancel") }}
-      {{ button("Join", variant="primary") }}
+      {{ link_button("/classes", "ยกเลิก") }}
+      {{ button("เข้าร่วมห้องเรียน", variant="primary") }}
     </div>
   </form>
   {% endcall %}
 {% endif %}
-{% call modal("join-classroom", "Join a classroom", page="C-02") %}
-<form method="post" action="/classes/join" class="flex flex-col gap-3.5">
+{% call modal("join-classroom", "เข้าร่วมห้องเรียน", page="C-02", centered=true) %}
+<form method="post" action="/classes/join" class="flex flex-col gap-4">
   {{ csrf_field() }}
-  {{ field("join_code", "Join code", input_class="input-code", hint="6 characters, from your instructor.", maxlength=6, minlength=6, autocomplete="off", required=true, placeholder="X7K29B") }}
+  <span class="icon-well icon-well-lg mx-auto">{{ icon("users", 30) }}</span>
+  {{ field("join_code", "รหัสเข้าร่วมห้องเรียน", input_class="input-code", hint="6 characters, from your instructor.", maxlength=6, minlength=6, autocomplete="off", required=true, placeholder="X7K29B") }}
   <div class="flex justify-between">
-    {{ button("Cancel", type="button", popovertarget="join-classroom", popovertargetaction="hide") }}
-    {{ button("Join", variant="primary") }}
+    {{ button("ยกเลิก", type="button", popovertarget="join-classroom", popovertargetaction="hide") }}
+    {{ button("เข้าร่วมห้องเรียน", variant="primary") }}
   </div>
 </form>
 {% endcall %}

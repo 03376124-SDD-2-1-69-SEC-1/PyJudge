@@ -1,34 +1,39 @@
 {% extends "base.html" %}
 {% from "_components/forms.html" import button with context %}
-{% from "_components/ui.html" import page_header, seg, empty_state %}
+{% from "_components/ui.html" import page_header, seg, empty_state, badge, progress %}
+{% from "_components/icons.html" import icon %}
 {% block title %}My classrooms · Questly{% endblock %}
 {% block content %}
 <section data-page="C-01" data-variant="instructor">
-  {% call page_header("My classrooms") %}
+  {% call page_header("ห้องเรียนของฉัน", "จัดการห้องเรียนและติดตามความก้าวหน้าของนักเรียน", eyebrow="INSTRUCTOR SPACE") %}
     {{ seg([("all", "All", "/classes?filter=all"), ("active", "Active", "/classes?filter=active"), ("archived", "Archived", "/classes?filter=archived")], filter) }}
+    {{ button("สร้างห้องเรียน", variant="primary", icon="plus", type="button", popovertarget="create-classroom") }}
   {% endcall %}
 
   {% if not picker.cards and filter == "all" %}
     {% call empty_state("No classrooms yet", "Create one and share its join code with your students.", state="C-01a") %}
-      {{ button("+ Create classroom", variant="primary", type="button", popovertarget="create-classroom") }}
+      {{ button("สร้างห้องเรียน", variant="primary", icon="plus", type="button", popovertarget="create-classroom") }}
     {% endcall %}
   {% else %}
-  <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+  <ul class="class-grid">
     {% for card in picker.cards %}
+    {% set pass_pct = (card.stats.avg_pass_rate * 100) | round | int if card.stats.avg_pass_rate is not none else none %}
     <li>
-      <a class="card h-full no-underline hover:border-mid" href="/classes/{{ card.classroom.id }}">
-        <p class="eyebrow">{{ card.classroom.label }}{% if card.classroom.archived %} · archived{% endif %}</p>
-        <h2 class="h2">{{ card.classroom.course_name }}</h2>
-        <hr class="hr">
-        <div class="flex justify-between text-xs">
-          <span>{{ card.student_count }} students</span>
-          <span>Avg pass rate <strong>{% if card.stats.avg_pass_rate is not none %}{{ (card.stats.avg_pass_rate * 100) | round | int }}%{% else %}—{% endif %}</strong></span>
+      <a class="class-card h-full" href="/classes/{{ card.classroom.id }}">
+        <div class="class-cover cover-{{ ['pink', 'violet', 'blue'][loop.index0 % 3] }}">
+          <span>{{ icon("code") }}</span>
+          <small>{{ card.classroom.label }}{% if card.classroom.archived %} · archived{% endif %}</small>
         </div>
-        <p class="text-xs text-mid">{{ card.stats.problem_count }} problems{% if card.stats.draft_count %} · {{ card.stats.draft_count }} draft{% if card.stats.draft_count > 1 %}s{% endif %}{% endif %}</p>
+        <div class="class-body">
+          <h2>{{ card.classroom.course_name }}{% if card.classroom.archived %} {{ badge("archived") }}{% endif %}</h2>
+          <p>{{ card.classroom.semester }}</p>
+          <div class="progress-row"><span>{{ card.student_count }} students</span><span>Avg pass rate <strong>{% if pass_pct is not none %}{{ pass_pct }}%{% else %}—{% endif %}</strong></span></div>
+          {% if pass_pct is not none %}{{ progress(pass_pct) }}{% endif %}
+          <div class="card-footer"><span>{{ card.stats.problem_count }} problems{% if card.stats.draft_count %} · {{ card.stats.draft_count }} draft{% if card.stats.draft_count > 1 %}s{% endif %}{% endif %}</span>{{ icon("chevron") }}</div>
+        </div>
       </a>
     </li>
     {% endfor %}
-    <li>{{ button("+ Create classroom", variant="tile", type="button", popovertarget="create-classroom") }}</li>
   </ul>
   {% endif %}
   {% include "shared/c03_create.html" %}
