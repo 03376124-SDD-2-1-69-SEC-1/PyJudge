@@ -730,6 +730,79 @@
     background: var(--color-warn-bg);
     color: var(--color-warn-ink);
   }
+  /* Pass/fail toast, top right of the viewport. CSS only: it fades out by itself. */
+  .toast-stack {
+    position: fixed;
+    top: 72px;
+    right: 20px;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(360px, calc(100vw - 40px));
+    pointer-events: none;
+  }
+  .toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--color-ok-line);
+    border-left-width: 4px;
+    border-radius: var(--radius-icon);
+    background: var(--color-ok-bg);
+    box-shadow: 0 12px 32px rgb(15 23 42 / 0.14);
+    color: var(--color-ok);
+    font-size: var(--text-xs);
+  }
+  .toast strong {
+    display: block;
+    font-size: var(--text-body);
+  }
+  .toast p {
+    margin: 2px 0 0;
+    color: var(--color-ink);
+  }
+  .toast-danger {
+    border-color: var(--color-danger-line);
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+  }
+  .toast-icon {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .toast-icon svg {
+    color: #fff;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .toast {
+      animation:
+        toast-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
+        toast-out 0.5s ease-in 6s forwards;
+    }
+    .toast-icon {
+      animation: landing-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.4) 0.2s both;
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateX(120%);
+    }
+  }
+  @keyframes toast-out {
+    to {
+      opacity: 0;
+      transform: translateY(-12px);
+      visibility: hidden;
+    }
+  }
   .alert-ok {
     border-color: var(--color-ok-line);
     background: var(--color-ok-bg);
@@ -2392,6 +2465,17 @@
     text-align: center;
     align-items: center;
   }
+  .error-code {
+    margin: 0;
+    font-size: clamp(72px, 14vw, 120px);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -4px;
+    background: linear-gradient(145deg, #be185d, #ec4899 64%, #f472b6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 
   /* ---- G-00 landing motion (CSS only, off under prefers-reduced-motion) ---------- */
   .landing-footer-note a {
@@ -2554,6 +2638,71 @@
   @keyframes landing-shift {
     50% {
       background-position: 100% 50%;
+    }
+  }
+
+  /* ---- Auth brand panel motion (CSS only, off under prefers-reduced-motion) ----- */
+  @media (prefers-reduced-motion: no-preference) {
+    .auth-brand {
+      background-size: 180% 180%;
+      animation: landing-shift 14s ease-in-out infinite;
+    }
+    .auth-brand::after {
+      animation: landing-breathe 9s ease-in-out infinite;
+    }
+    .auth-brand::before {
+      content: "";
+      position: absolute;
+      top: -90px;
+      left: -110px;
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgb(255 255 255 / 0.18), transparent 70%);
+      animation: auth-drift 18s ease-in-out infinite;
+    }
+    .auth-brand > * {
+      position: relative;
+      animation: landing-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+    .auth-brand > :nth-child(2) {
+      animation-delay: 0.12s;
+    }
+    .auth-brand > :nth-child(3) {
+      animation:
+        landing-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.24s both,
+        landing-float 6s ease-in-out 1s infinite;
+    }
+    .code-art span {
+      animation: auth-type 0.5s ease-out both;
+    }
+    .code-art span:nth-child(1) {
+      animation-delay: 0.7s;
+    }
+    .code-art span:nth-child(2) {
+      animation-delay: 1.1s;
+    }
+    .code-art span:nth-child(3) {
+      animation-delay: 1.5s;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .verify-card .error-code {
+      background-size: 200% 200%;
+      animation:
+        landing-pop 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+        landing-shift 8s ease-in-out 0.6s infinite;
+    }
+  }
+  @keyframes auth-drift {
+    50% {
+      transform: translate(180px, 120px) scale(1.25);
+    }
+  }
+  @keyframes auth-type {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
     }
   }
 
