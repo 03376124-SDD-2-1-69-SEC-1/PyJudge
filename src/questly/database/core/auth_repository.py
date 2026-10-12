@@ -10,6 +10,8 @@ from sqlmodel import select
 
 from questly.core.auth.models import (
     InstructorRequest,
+    InstructorRequestAlreadyReviewedError,
+    InstructorRequestNotFoundError,
     InstructorRequestStatus,
     Role,
     Session,
@@ -314,17 +316,12 @@ class SQLAuthRepository:
                 .with_for_update()
             ).first()
             if row is None:
-                raise KeyError(f"Instructor request {request_id} not found")
+                raise InstructorRequestNotFoundError(request_id)
             if row.status != InstructorRequestStatus.PENDING.value:
-                raise ValueError(
-                    f"Instructor request {request_id} has already been reviewed"
-                )
+                raise InstructorRequestAlreadyReviewedError(request_id)
 
             if approve:
-                applicant = db.get(UserRow, row.user_id)
-                if applicant is None:
-                    raise KeyError(f"User {row.user_id} not found")
-                applicant.role = Role.INSTRUCTOR.value
+                db.get_one(UserRow, row.user_id).role = Role.INSTRUCTOR.value
 
             row.status = (
                 InstructorRequestStatus.APPROVED.value

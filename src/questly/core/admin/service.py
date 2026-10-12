@@ -1,12 +1,15 @@
+"""Admin use cases (ADR-0007 §8). Every public method takes the Actor first."""
+
 from dataclasses import replace
 
-from fastapi import HTTPException, status
-
-from questly.core.admin.domain import (
+from questly.core.admin.models import (
     AISettings,
-    AISettingsUpdate,
-    SystemStatusResponse,
-    UserRole,
+    AISettingsChange,
+    AISettingsWithUsage,
+    ModelNotAllowedError,
+    SelfModificationError,
+    SystemStatus,
+    UserNotFoundError,
 )
 from questly.core.admin.ports import AdminRepository, SystemHealthChecker
 from questly.core.auth.models import (
@@ -23,11 +26,11 @@ from questly.core.auth.ports import AuthRepository
 class AdminService:
     def __init__(
         self,
-        admin_repo: AdminRepository | None,
+        admin_repo: AdminRepository,
         auth_repo: AuthRepository,
-        health_checker: SystemHealthChecker | None = None,
-        allowed_models: tuple[str, ...] = (),
-    ):
+        health_checker: SystemHealthChecker,
+        allowed_models: tuple[str, ...],
+    ) -> None:
         self.admin_repo = admin_repo
         self.auth_repo = auth_repo
         self.health_checker = health_checker
@@ -49,18 +52,20 @@ class AdminService:
     def approve_instructor_request(
         self, actor: Actor, request_id: int
     ) -> tuple[InstructorRequest, User]:
+        """Raises InstructorRequestNotFoundError or ...AlreadyReviewedError."""
         self._require_admin(actor)
-        request = self._review_instructor_request(
-            request_id, actor.user_id, approve=True
+        request = self.auth_repo.review_instructor_request(
+            request_id=request_id, reviewer_id=actor.user_id, approve=True
         )
         return self._request_and_user(request)
 
     def reject_instructor_request(
         self, actor: Actor, request_id: int
     ) -> tuple[InstructorRequest, User]:
+        """Raises InstructorRequestNotFoundError or ...AlreadyReviewedError."""
         self._require_admin(actor)
-        request = self._review_instructor_request(
-            request_id, actor.user_id, approve=False
+        request = self.auth_repo.review_instructor_request(
+            request_id=request_id, reviewer_id=actor.user_id, approve=False
         )
         return self._request_and_user(request)
 
@@ -69,76 +74,59 @@ class AdminService:
         self,
         actor: Actor,
         q: str | None = None,
-        role: UserRole | None = None,
+        role: Role | None = None,
         page: int = 1,
         page_size: int = 25,
     ) -> tuple[list[User], int]:
         self._require_admin(actor)
-        if page < 1:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Page number must be at least 1",
-            )
-        role_val = role.value if role else None
+        role_value = None
+        if role is not None:
+            role_value = role.value
         return self.auth_repo.search_users(
-            q=q, role=role_val, page=page, page_size=page_size
+            q=q, role=role_value, page=page, page_size=page_size
         )
 
-    def update_user_role(self, actor: Actor, user_id: int, new_role: UserRole) -> User:
+    def update_user_role(self, actor: Actor, user_id: int, new_role: Role) -> User:
         self._require_admin(actor)
-        if user_id == actor.user_id and new_role != UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot demote your own admin role",
-            )
+        if user_id == actor.user_id and new_role is not Role.ADMIN:
+            raise SelfModificationError("Cannot demote your own admin role")
         user = self._get_user(user_id)
-        return self.auth_repo.update_user(replace(user, role=Role(new_role.value)))
+        return self.auth_repo.update_user(replace(user, role=new_role))
 
     def deactivate_user(self, actor: Actor, user_id: int) -> User:
         self._require_admin(actor)
         if user_id == actor.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot deactivate your own admin account",
-            )
+            raise SelfModificationError("Cannot deactivate your own admin account")
         user = self._get_user(user_id)
         deactivated = self.auth_repo.update_user(replace(user, is_active=False))
         self.auth_repo.revoke_sessions_of(user_id)
         return deactivated
 
     # --- AI Settings ---
-    def get_ai_settings(self, actor: Actor) -> AISettings:
+    def get_ai_settings(self, actor: Actor) -> AISettingsWithUsage:
         self._require_admin(actor)
-        admin_repo = self._require_admin_repository()
-        settings = admin_repo.get_ai_settings()
-        return settings.model_copy(
-            update={"usage_this_month": admin_repo.get_usage_this_month()}
-        )
+        return self._with_usage(self.admin_repo.get_ai_settings())
 
     def update_ai_settings(
-        self, actor: Actor, settings: AISettingsUpdate
-    ) -> AISettings:
+        self, actor: Actor, change: AISettingsChange
+    ) -> AISettingsWithUsage:
         self._require_admin(actor)
-        if settings.model is not None and settings.model not in self.allowed_models:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail="Model is not in the configured allowlist",
-            )
-        admin_repo = self._require_admin_repository()
-        saved = admin_repo.update_ai_settings(settings)
-        return saved.model_copy(
-            update={"usage_this_month": admin_repo.get_usage_this_month()}
-        )
+        if change.model is not None and change.model not in self.allowed_models:
+            raise ModelNotAllowedError(change.model)
+        current = self.admin_repo.get_ai_settings()
+        saved = self.admin_repo.update_ai_settings(_merge(current, change))
+        return self._with_usage(saved)
 
     # --- System Status ---
-    def get_system_status(self, actor: Actor) -> SystemStatusResponse:
+    def get_system_status(self, actor: Actor) -> SystemStatus:
         self._require_admin(actor)
-        if not self.health_checker:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Health checker unavailable",
-            )
         return self.health_checker.check_services_health()
+
+    def _with_usage(self, settings: AISettings) -> AISettingsWithUsage:
+        return AISettingsWithUsage(
+            settings=settings,
+            usage_this_month=self.admin_repo.get_usage_this_month(),
+        )
 
     def _require_admin(self, actor: Actor) -> None:
         if actor.role is not Role.ADMIN:
@@ -147,36 +135,8 @@ class AdminService:
     def _get_user(self, user_id: int) -> User:
         user = self.auth_repo.get_user(user_id)
         if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
+            raise UserNotFoundError(user_id)
         return user
-
-    def _require_admin_repository(self) -> AdminRepository:
-        if self.admin_repo is None:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Admin settings repository is not wired",
-            )
-        return self.admin_repo
-
-    def _review_instructor_request(
-        self, request_id: int, reviewer_id: int, *, approve: bool
-    ) -> InstructorRequest:
-        try:
-            return self.auth_repo.review_instructor_request(
-                request_id=request_id, reviewer_id=reviewer_id, approve=approve
-            )
-        except KeyError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Instructor request not found",
-            ) from exc
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Instructor request has already been reviewed",
-            ) from exc
 
     def _request_and_user(
         self, instructor_request: InstructorRequest
@@ -187,3 +147,17 @@ class AdminService:
                 f"Instructor request {instructor_request.id} has no user"
             )
         return instructor_request, user
+
+
+def _merge(current: AISettings, change: AISettingsChange) -> AISettings:
+    """Apply the fields an Admin changed on top of the stored settings."""
+    merged = current
+    if change.model is not None:
+        merged = replace(merged, model=change.model)
+    if change.daily_quota is not None:
+        merged = replace(merged, daily_quota=change.daily_quota)
+    if change.max_pages is not None:
+        merged = replace(merged, max_pages=change.max_pages)
+    if change.require_citations is not None:
+        merged = replace(merged, require_citations=change.require_citations)
+    return merged

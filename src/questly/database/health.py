@@ -8,10 +8,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session
 
-from questly.core.admin.domain import (
+from questly.core.admin.models import (
     ServiceHealthStatus,
     ServiceStatus,
-    SystemStatusResponse,
+    SystemStatus,
 )
 from questly.core.admin.ports import SystemHealthChecker
 from questly.database.session import SessionFactory
@@ -53,7 +53,7 @@ class SQLSystemHealthChecker(SystemHealthChecker):
         self._sandbox_available = sandbox_available
         self._email_available = email_available
 
-    def check_services_health(self) -> SystemStatusResponse:
+    def check_services_health(self) -> SystemStatus:
         try:
             with self._session_factory() as session:
                 database = check_db(session)
@@ -61,7 +61,7 @@ class SQLSystemHealthChecker(SystemHealthChecker):
         except SQLAlchemyError:
             database_ready = False
 
-        return SystemStatusResponse(
+        return SystemStatus(
             services=[
                 self._status("web application", True),
                 self._status(

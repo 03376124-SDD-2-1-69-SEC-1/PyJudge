@@ -121,7 +121,9 @@ async def test_admin_can_approve_or_reject_instructor_requests() -> None:
     )
     missing = await client.post("/api/v1/admin/instructor-requests/99999/approve")
     assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["code"] == "instructor_request_already_reviewed"
     assert missing.status_code == 404
+    assert missing.json()["detail"]["code"] == "instructor_request_not_found"
     await client.aclose()
 
 
@@ -153,8 +155,10 @@ async def test_admin_endpoints_validate_missing_and_invalid_inputs() -> None:
     assert invalid_role_filter.status_code == 422
     assert invalid_page.status_code == 422
     assert missing_role_target.status_code == 404
+    assert missing_role_target.json()["detail"]["code"] == "user_not_found"
     assert invalid_role.status_code == 422
     assert missing_deactivation_target.status_code == 404
+    assert missing_deactivation_target.json()["detail"]["code"] == "user_not_found"
     assert invalid_quota.status_code == 422
     assert null_quota.status_code == 422
     await client.aclose()
@@ -189,7 +193,11 @@ async def test_admin_can_search_change_role_and_deactivate_users() -> None:
     assert deactivation.status_code == 200
     assert deactivation.json()["is_active"] is False
     assert own_role_change.status_code == 400
+    assert own_role_change.json()["detail"]["code"] == "self_modification"
     assert own_deactivation.status_code == 400
+    assert own_deactivation.json()["detail"]["code"] == "self_modification"
+    assert api.auth.get_user(api.admin.id).role is Role.ADMIN
+    assert api.auth.get_user(api.admin.id).is_active is True
     assert inactive_session.status_code == 401
     await client.aclose()
     await student_client.aclose()
@@ -228,6 +236,7 @@ async def test_ai_settings_update_changes_generation_quota() -> None:
     assert changed.json()["require_citations"] is False
     assert changed.json()["usage_this_month"] == 5
     assert model_rejected.status_code == 422
+    assert model_rejected.json()["detail"]["code"] == "model_not_allowed"
     assert current.json()["daily_quota"] == 7
     assert quota.limit == 7
     await client.aclose()

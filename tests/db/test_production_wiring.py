@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy import text
 
-from questly.core.admin.domain import AISettingsUpdate
+from questly.core.admin.models import AISettingsChange
 from questly.core.auth.models import Actor, InstructorRequest, Role, User
 from questly.core.auth.service import hash_password
 from questly.database.core.admin_repository import SQLAdminRepository
@@ -111,14 +111,14 @@ def test_admin_services_persist_settings_and_generation_reads_quota(
             admin_actor, request.id
         )
         changed_settings = app.state.admin_service.update_ai_settings(
-            admin_actor, AISettingsUpdate(daily_quota=1)
+            admin_actor, AISettingsChange(daily_quota=1)
         )
         read_settings = app.state.admin_service.get_ai_settings(admin_actor)
 
         assert approved.reviewed_by == admin.id
         assert approved.reviewed_at is not None
-        assert changed_settings.daily_quota == 1
-        assert read_settings.daily_quota == 1
+        assert changed_settings.settings.daily_quota == 1
+        assert read_settings.settings.daily_quota == 1
         assert auth_repository.get_user(applicant.id).role is Role.INSTRUCTOR
 
         instructor = Actor(
@@ -140,11 +140,4 @@ def test_admin_services_persist_settings_and_generation_reads_quota(
         quota = app.state.generation_service.quota(instructor)
         assert quota.used == quota.limit == 1
     finally:
-        settings_repository.update_ai_settings(
-            AISettingsUpdate(
-                model=original_settings.model,
-                daily_quota=original_settings.daily_quota,
-                max_pages=original_settings.max_pages,
-                require_citations=original_settings.require_citations,
-            )
-        )
+        settings_repository.update_ai_settings(original_settings)

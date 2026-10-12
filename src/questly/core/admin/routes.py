@@ -1,15 +1,23 @@
 """Admin API routes (ADR-0007 §8)."""
 
-from fastapi import APIRouter, Query, Request
+from typing import NoReturn
 
-from questly.core.admin.domain import (
-    AISettings,
-    AISettingsUpdate,
-    SystemStatusResponse,
-    UserRole,
+from fastapi import APIRouter, HTTPException, Query, Request, status
+
+from questly.core.admin.models import (
+    AISettingsChange,
+    AISettingsWithUsage,
+    ModelNotAllowedError,
+    SelfModificationError,
+    SystemStatus,
+    UserNotFoundError,
 )
 from questly.core.admin.schemas import (
+    AISettingsResponse,
+    AISettingsUpdate,
     InstructorRequestResponse,
+    ServiceStatusResponse,
+    SystemStatusResponse,
     UserAdminResponse,
     UserPaginatedResponse,
     UserRoleUpdate,
@@ -18,7 +26,10 @@ from questly.core.admin.service import AdminService
 from questly.core.auth.current import current_actor
 from questly.core.auth.models import (
     InstructorRequest,
+    InstructorRequestAlreadyReviewedError,
+    InstructorRequestNotFoundError,
     InstructorRequestStatus,
+    Role,
     User,
 )
 
@@ -27,6 +38,36 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 def _service(request: Request) -> AdminService:
     return request.app.state.admin_service
+
+
+def _raise(status_code: int, code: str, message: str) -> NoReturn:
+    raise HTTPException(
+        status_code=status_code, detail={"code": code, "message": message}
+    )
+
+
+def _raise_request_not_found() -> NoReturn:
+    _raise(
+        status.HTTP_404_NOT_FOUND,
+        "instructor_request_not_found",
+        "Instructor request not found",
+    )
+
+
+def _raise_request_already_reviewed() -> NoReturn:
+    _raise(
+        status.HTTP_409_CONFLICT,
+        "instructor_request_already_reviewed",
+        "Instructor request has already been reviewed",
+    )
+
+
+def _raise_user_not_found() -> NoReturn:
+    _raise(status.HTTP_404_NOT_FOUND, "user_not_found", "User not found")
+
+
+def _raise_self_modification(error: SelfModificationError) -> NoReturn:
+    _raise(status.HTTP_400_BAD_REQUEST, "self_modification", str(error))
 
 
 def _request_response(
@@ -42,6 +83,37 @@ def _request_response(
         reviewed_by=instructor_request.reviewed_by,
         reviewed_at=instructor_request.reviewed_at,
         requested_at=instructor_request.requested_at,
+    )
+
+
+def _user_response(user: User) -> UserAdminResponse:
+    return UserAdminResponse(
+        id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        role=user.role.value,
+        is_active=user.is_active,
+    )
+
+
+def _ai_settings_response(current: AISettingsWithUsage) -> AISettingsResponse:
+    return AISettingsResponse(
+        model=current.settings.model,
+        daily_quota=current.settings.daily_quota,
+        max_pages=current.settings.max_pages,
+        require_citations=current.settings.require_citations,
+        usage_this_month=current.usage_this_month,
+    )
+
+
+def _status_response(system_status: SystemStatus) -> SystemStatusResponse:
+    return SystemStatusResponse(
+        services=[
+            ServiceStatusResponse(
+                name=service.name, status=service.status, details=service.details
+            )
+            for service in system_status.services
+        ]
     )
 
 
@@ -69,9 +141,14 @@ def approve_instructor_request(
     request: Request, request_id: int
 ) -> InstructorRequestResponse:
     actor = current_actor(request)
-    instructor_request, user = _service(request).approve_instructor_request(
-        actor, request_id=request_id
-    )
+    try:
+        instructor_request, user = _service(request).approve_instructor_request(
+            actor, request_id=request_id
+        )
+    except InstructorRequestNotFoundError:
+        _raise_request_not_found()
+    except InstructorRequestAlreadyReviewedError:
+        _raise_request_already_reviewed()
     return _request_response(instructor_request, user)
 
 
@@ -83,9 +160,14 @@ def reject_instructor_request(
     request: Request, request_id: int
 ) -> InstructorRequestResponse:
     actor = current_actor(request)
-    instructor_request, user = _service(request).reject_instructor_request(
-        actor, request_id=request_id
-    )
+    try:
+        instructor_request, user = _service(request).reject_instructor_request(
+            actor, request_id=request_id
+        )
+    except InstructorRequestNotFoundError:
+        _raise_request_not_found()
+    except InstructorRequestAlreadyReviewedError:
+        _raise_request_already_reviewed()
     return _request_response(instructor_request, user)
 
 
@@ -93,7 +175,7 @@ def reject_instructor_request(
 def list_users(
     request: Request,
     q: str | None = Query(None, max_length=100),
-    role: UserRole | None = None,
+    role: Role | None = None,
     page: int = Query(1, ge=1),
 ) -> UserPaginatedResponse:
     actor = current_actor(request)
@@ -101,16 +183,7 @@ def list_users(
         actor, q=q, role=role, page=page, page_size=25
     )
     return UserPaginatedResponse(
-        items=[
-            UserAdminResponse(
-                id=user.id,
-                full_name=user.full_name,
-                email=user.email,
-                role=user.role.value,
-                is_active=user.is_active,
-            )
-            for user in items
-        ],
+        items=[_user_response(user) for user in items],
         total=total,
         page=page,
         page_size=25,
@@ -122,44 +195,56 @@ def update_user_role(
     request: Request, user_id: int, body: UserRoleUpdate
 ) -> UserAdminResponse:
     actor = current_actor(request)
-    user = _service(request).update_user_role(
-        actor, user_id=user_id, new_role=body.role
-    )
-    return UserAdminResponse(
-        id=user.id,
-        full_name=user.full_name,
-        email=user.email,
-        role=user.role.value,
-        is_active=user.is_active,
-    )
+    try:
+        user = _service(request).update_user_role(
+            actor, user_id=user_id, new_role=body.role
+        )
+    except UserNotFoundError:
+        _raise_user_not_found()
+    except SelfModificationError as error:
+        _raise_self_modification(error)
+    return _user_response(user)
 
 
 @router.post("/users/{user_id}/deactivate", response_model=UserAdminResponse)
 def deactivate_user(request: Request, user_id: int) -> UserAdminResponse:
     actor = current_actor(request)
-    user = _service(request).deactivate_user(actor, user_id=user_id)
-    return UserAdminResponse(
-        id=user.id,
-        full_name=user.full_name,
-        email=user.email,
-        role=user.role.value,
-        is_active=user.is_active,
+    try:
+        user = _service(request).deactivate_user(actor, user_id=user_id)
+    except UserNotFoundError:
+        _raise_user_not_found()
+    except SelfModificationError as error:
+        _raise_self_modification(error)
+    return _user_response(user)
+
+
+@router.get("/ai-settings", response_model=AISettingsResponse)
+def get_ai_settings(request: Request) -> AISettingsResponse:
+    actor = current_actor(request)
+    return _ai_settings_response(_service(request).get_ai_settings(actor))
+
+
+@router.put("/ai-settings", response_model=AISettingsResponse)
+def update_ai_settings(request: Request, body: AISettingsUpdate) -> AISettingsResponse:
+    actor = current_actor(request)
+    change = AISettingsChange(
+        model=body.model,
+        daily_quota=body.daily_quota,
+        max_pages=body.max_pages,
+        require_citations=body.require_citations,
     )
-
-
-@router.get("/ai-settings", response_model=AISettings)
-def get_ai_settings(request: Request) -> AISettings:
-    actor = current_actor(request)
-    return _service(request).get_ai_settings(actor)
-
-
-@router.put("/ai-settings", response_model=AISettings)
-def update_ai_settings(request: Request, body: AISettingsUpdate) -> AISettings:
-    actor = current_actor(request)
-    return _service(request).update_ai_settings(actor, body)
+    try:
+        updated = _service(request).update_ai_settings(actor, change)
+    except ModelNotAllowedError:
+        _raise(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "model_not_allowed",
+            "Model is not in the configured allowlist",
+        )
+    return _ai_settings_response(updated)
 
 
 @router.get("/status", response_model=SystemStatusResponse)
 def get_system_status(request: Request) -> SystemStatusResponse:
     actor = current_actor(request)
-    return _service(request).get_system_status(actor)
+    return _status_response(_service(request).get_system_status(actor))

@@ -1,10 +1,6 @@
 from typing import Protocol
 
-from questly.core.admin.domain import (
-    AISettings,
-    AISettingsUpdate,
-    SystemStatusResponse,
-)
+from questly.core.admin.models import AISettings, SystemStatus
 
 
 class AdminRepository(Protocol):
@@ -12,8 +8,8 @@ class AdminRepository(Protocol):
         """อ่านค่า AI settings ปัจจุบัน."""
         ...
 
-    def update_ai_settings(self, settings: AISettingsUpdate) -> AISettings:
-        """อัปเดต AI settings."""
+    def update_ai_settings(self, settings: AISettings) -> AISettings:
+        """แทนที่ AI settings ทั้งแถวด้วยค่าที่ส่งมา แล้วคืนค่าที่บันทึก."""
         ...
 
     def get_usage_this_month(self) -> int:
@@ -22,6 +18,6 @@ class AdminRepository(Protocol):
 
 
 class SystemHealthChecker(Protocol):
-    def check_services_health(self) -> SystemStatusResponse:
+    def check_services_health(self) -> SystemStatus:
         """ตรวจสอบสถานะบริการทั้ง 6 ตัว."""
         ...

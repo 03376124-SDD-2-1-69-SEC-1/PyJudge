@@ -1,28 +1,28 @@
-import pytest
-from pydantic import ValidationError
+from dataclasses import replace
 
-from questly.core.admin.domain import AISettingsUpdate
 from questly.core.admin.ports import AdminRepository
 
 
 class AdminRepositoryContractTests:
     """Contract tests for AdminRepository implementations (Fake & SQL)."""
 
-    def test_get_and_update_ai_settings(self, repo: AdminRepository) -> None:
-        settings = repo.get_ai_settings()
-        assert settings.daily_quota > 0
-        assert settings.model is not None
+    def test_update_replaces_every_field_and_get_reads_it_back(
+        self, repo: AdminRepository
+    ) -> None:
+        current = repo.get_ai_settings()
+        changed = replace(
+            current,
+            model=f"{current.model}-changed",
+            daily_quota=current.daily_quota + 1,
+            max_pages=current.max_pages + 1,
+            require_citations=not current.require_citations,
+        )
 
-        updated = repo.update_ai_settings(AISettingsUpdate(daily_quota=50))
-        assert updated.daily_quota == 50
-        assert updated.model == settings.model
-        assert updated.max_pages == settings.max_pages
-        assert updated.require_citations == settings.require_citations
+        saved = repo.update_ai_settings(changed)
+
+        assert saved == changed
+        assert repo.get_ai_settings() == changed
 
     def test_get_usage_this_month(self, repo: AdminRepository) -> None:
         usage = repo.get_usage_this_month()
         assert usage >= 0
-
-    def test_settings_updates_reject_explicit_nulls(self) -> None:
-        with pytest.raises(ValidationError):
-            AISettingsUpdate(model=None)

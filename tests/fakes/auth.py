@@ -7,6 +7,8 @@ from datetime import UTC, datetime, timedelta
 
 from questly.core.auth.models import (
     InstructorRequest,
+    InstructorRequestAlreadyReviewedError,
+    InstructorRequestNotFoundError,
     InstructorRequestStatus,
     Role,
     Session,
@@ -150,13 +152,9 @@ class FakeAuthRepository:
     ) -> InstructorRequest:
         req = self._requests.get(request_id)
         if req is None:
-            raise KeyError(f"Instructor request {request_id} not found")
+            raise InstructorRequestNotFoundError(request_id)
         if req.status is not InstructorRequestStatus.PENDING:
-            raise ValueError(
-                f"Instructor request {request_id} has already been reviewed"
-            )
-        if req.user_id not in self._users:
-            raise KeyError(f"User {req.user_id} not found")
+            raise InstructorRequestAlreadyReviewedError(request_id)
         new_status = (
             InstructorRequestStatus.APPROVED
             if approve

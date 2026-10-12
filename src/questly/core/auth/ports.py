@@ -71,7 +71,13 @@ class AuthRepository(Protocol):
 
     def review_instructor_request(
         self, request_id: int, reviewer_id: int, approve: bool
-    ) -> InstructorRequest: ...
+    ) -> InstructorRequest:
+        """Approve (promoting the applicant) or reject a pending request.
+
+        Raises InstructorRequestNotFoundError for an unknown id and
+        InstructorRequestAlreadyReviewedError when it is no longer pending.
+        """
+        ...
 
     def find_pending_instructor_request(
         self, user_id: int

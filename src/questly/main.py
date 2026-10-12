@@ -269,8 +269,6 @@ def create_app(
     application.state.admin_service = admin_service
 
     def get_daily_quota() -> int:
-        if admin_repository is None:
-            raise RuntimeError("AdminRepository is not wired; see paired OPS-22")
         return admin_repository.get_ai_settings().daily_quota
 
     classroom_service = ClassroomService(

@@ -13,6 +13,8 @@ import pytest
 
 from questly.core.auth.models import (
     InstructorRequest,
+    InstructorRequestAlreadyReviewedError,
+    InstructorRequestNotFoundError,
     InstructorRequestStatus,
     Role,
     Session,
@@ -281,5 +283,14 @@ class AuthRepositoryContract:
         )
         repository.review_instructor_request(request.id, reviewer.id, approve=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(InstructorRequestAlreadyReviewedError):
             repository.review_instructor_request(request.id, reviewer.id, approve=True)
+        assert repository.get_user(applicant.id).role is Role.STUDENT
+
+    def test_review_unknown_instructor_request_raises_not_found(
+        self, repository: AuthRepository
+    ) -> None:
+        reviewer = repository.create_user(user("admin@kmitl.ac.th", role=Role.ADMIN))
+
+        with pytest.raises(InstructorRequestNotFoundError):
+            repository.review_instructor_request(999_999, reviewer.id, approve=True)

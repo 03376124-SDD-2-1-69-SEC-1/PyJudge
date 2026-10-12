@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
-from questly.core.admin.domain import UserRole
-from questly.core.auth.models import InstructorRequestStatus
+from questly.core.admin.models import ServiceHealthStatus
+from questly.core.auth.models import InstructorRequestStatus, Role
 
 
 class InstructorRequestResponse(BaseModel):
@@ -34,4 +34,38 @@ class UserPaginatedResponse(BaseModel):
 
 
 class UserRoleUpdate(BaseModel):
-    role: UserRole = Field(..., description="Role ใหม่ที่จะตั้งให้ผู้ใช้")
+    role: Role = Field(..., description="Role ใหม่ที่จะตั้งให้ผู้ใช้")
+
+
+class AISettingsUpdate(BaseModel):
+    """PUT body: send only the fields to change; null is rejected."""
+
+    model: str | None = Field(default=None, min_length=1)
+    daily_quota: int | None = Field(default=None, gt=0)
+    max_pages: int | None = Field(default=None, gt=0)
+    require_citations: bool | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_null_values(cls, value: object) -> object:
+        if isinstance(value, dict) and any(item is None for item in value.values()):
+            raise ValueError("Omit unchanged AI settings instead of sending null")
+        return value
+
+
+class AISettingsResponse(BaseModel):
+    model: str
+    daily_quota: int
+    max_pages: int
+    require_citations: bool
+    usage_this_month: int = Field(ge=0)
+
+
+class ServiceStatusResponse(BaseModel):
+    name: str
+    status: ServiceHealthStatus
+    details: str | None = None
+
+
+class SystemStatusResponse(BaseModel):
+    services: list[ServiceStatusResponse]

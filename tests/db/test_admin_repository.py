@@ -5,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from questly.core.admin.domain import AISettingsUpdate
 from questly.core.admin.ports import AdminRepository
 from questly.core.auth.models import User
 from questly.database.core.admin_repository import SQLAdminRepository
@@ -27,14 +26,7 @@ class TestSQLAdminRepository(AdminRepositoryContractTests):
         repository = SQLAdminRepository(session_factory)
         original = repository.get_ai_settings()
         yield repository
-        repository.update_ai_settings(
-            AISettingsUpdate(
-                model=original.model,
-                daily_quota=original.daily_quota,
-                max_pages=original.max_pages,
-                require_citations=original.require_citations,
-            )
-        )
+        repository.update_ai_settings(original)
 
     def test_monthly_usage_counts_only_current_month(
         self, session_factory: SessionFactory

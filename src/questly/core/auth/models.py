@@ -43,6 +43,14 @@ class CsrfTokenError(Exception):
     """A form post without the token its page was rendered with: 403."""
 
 
+class InstructorRequestNotFoundError(Exception):
+    """No Instructor request has this id: 404."""
+
+
+class InstructorRequestAlreadyReviewedError(Exception):
+    """The Instructor request was approved or rejected already: 409."""
+
+
 @dataclass(frozen=True, slots=True)
 class User:
     """An account. `id` is `None` only before the repository persisted it."""
