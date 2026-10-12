@@ -1,0 +1,60 @@
+{#
+  Questly icon set — the 21 stroke icons from the Figma Make design (App.tsx `paths`).
+  Pure inline SVG: no script elements, no event handlers, safe under
+  tests/architecture/test_no_browser_javascript.py.
+
+    {% from "_components/icons.html" import icon %}
+    {{ icon("sparkles") }}            (18px default)
+    {{ icon("check", 14) }}
+    {{ icon("book", 22, class="text-acc") }}
+
+  Names: book bell chevron plus users chart code clock check x play send
+         settings sparkles file upload arrow copy more search shield
+#}
+{% macro icon(name, size=18, class="") -%}
+<svg class="shrink-0{% if class %} {{ class }}{% endif %}" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+{%- if name == "book" -%}
+<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v15h4.5a2.5 2.5 0 0 1 2.5 2.5z"/>
+{%- elif name == "bell" -%}
+<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>
+{%- elif name == "chevron" -%}
+<path d="m9 18 6-6-6-6"/>
+{%- elif name == "plus" -%}
+<path d="M12 5v14M5 12h14"/>
+{%- elif name == "users" -%}
+<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+{%- elif name == "chart" -%}
+<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>
+{%- elif name == "code" -%}
+<path d="m8 9-4 3 4 3m8-6 4 3-4 3m-2-9-4 12"/>
+{%- elif name == "clock" -%}
+<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+{%- elif name == "check" -%}
+<path d="m5 12 4 4L19 6"/>
+{%- elif name == "x" -%}
+<path d="m6 6 12 12M18 6 6 18"/>
+{%- elif name == "play" -%}
+<path d="m8 5 11 7-11 7z"/>
+{%- elif name == "send" -%}
+<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>
+{%- elif name == "settings" -%}
+<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15z"/>
+{%- elif name == "sparkles" -%}
+<path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2zM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8zM19 13l.6 1.4L21 15l-1.4.6L19 17l-.6-1.4L17 15l1.4-.6z"/>
+{%- elif name == "file" -%}
+<path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h5M9 13h6M9 17h5"/>
+{%- elif name == "upload" -%}
+<path d="M12 16V4m-4 4 4-4 4 4"/><path d="M5 15v5h14v-5"/>
+{%- elif name == "arrow" -%}
+<path d="m15 18-6-6 6-6"/>
+{%- elif name == "copy" -%}
+<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
+{%- elif name == "more" -%}
+<circle cx="5" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/>
+{%- elif name == "search" -%}
+<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
+{%- elif name == "shield" -%}
+<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}

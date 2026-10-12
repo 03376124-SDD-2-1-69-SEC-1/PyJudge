@@ -207,8 +207,29 @@
   .static {
     position: static;
   }
+  .sticky {
+    position: sticky;
+  }
   .z-30 {
     z-index: 30;
+  }
+  .container {
+    width: 100%;
+    @media (width >= 40rem) {
+      max-width: 40rem;
+    }
+    @media (width >= 48rem) {
+      max-width: 48rem;
+    }
+    @media (width >= 64rem) {
+      max-width: 64rem;
+    }
+    @media (width >= 80rem) {
+      max-width: 80rem;
+    }
+    @media (width >= 96rem) {
+      max-width: 96rem;
+    }
   }
   .mx-auto {
     margin-inline: auto;
@@ -426,6 +447,9 @@
   .rounded {
     border-radius: 0.25rem;
   }
+  .rounded-ui {
+    border-radius: var(--radius-ui);
+  }
   .border {
     border-style: var(--tw-border-style);
     border-width: 1px;
@@ -439,6 +463,9 @@
   }
   .border-line {
     border-color: var(--color-line);
+  }
+  .bg-fill {
+    background-color: var(--color-fill);
   }
   .bg-pap {
     background-color: var(--color-pap);
@@ -487,8 +514,15 @@
     --tw-font-weight: var(--font-weight-semibold);
     font-weight: var(--font-weight-semibold);
   }
+  .tracking-\[\.06em\] {
+    --tw-tracking: .06em;
+    letter-spacing: .06em;
+  }
   .whitespace-pre-line {
     white-space: pre-line;
+  }
+  .text-acc {
+    color: var(--color-acc);
   }
   .text-ink {
     color: var(--color-ink);
@@ -501,6 +535,9 @@
   }
   .capitalize {
     text-transform: capitalize;
+  }
+  .uppercase {
+    text-transform: uppercase;
   }
   .ordinal {
     --tw-ordinal: ordinal;
@@ -1327,6 +1364,10 @@
   syntax: "*";
   inherits: false;
 }
+@property --tw-tracking {
+  syntax: "*";
+  inherits: false;
+}
 @property --tw-ordinal {
   syntax: "*";
   inherits: false;
@@ -1469,10 +1510,6 @@
   syntax: "*";
   inherits: false;
 }
-@property --tw-tracking {
-  syntax: "*";
-  inherits: false;
-}
 @layer properties {
   @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
     *, ::before, ::after, ::backdrop {
@@ -1483,6 +1520,7 @@
       --tw-skew-y: initial;
       --tw-border-style: solid;
       --tw-font-weight: initial;
+      --tw-tracking: initial;
       --tw-ordinal: initial;
       --tw-slashed-zero: initial;
       --tw-numeric-figure: initial;
@@ -1516,7 +1554,6 @@
       --tw-drop-shadow-alpha: 100%;
       --tw-drop-shadow-size: initial;
       --tw-leading: initial;
-      --tw-tracking: initial;
     }
   }
 }
