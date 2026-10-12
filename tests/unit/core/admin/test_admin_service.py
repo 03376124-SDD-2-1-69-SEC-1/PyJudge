@@ -1,5 +1,7 @@
 """AdminService rules, on the in-memory adapters."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from questly.core.admin.models import (
@@ -23,7 +25,8 @@ from tests.fakes.admin import (
     FakeAdminRepository,
     FakeSystemHealthChecker,
 )
-from tests.fakes.auth import DEFAULT_NOW, FakeAuthRepository, seed_user
+from tests.fakes.auth import DEFAULT_NOW, FakeAuthRepository, FakeClock, seed_user
+from tests.fakes.generation import FakeDraftRepository
 
 
 def _actor(user: User) -> Actor:
@@ -33,13 +36,16 @@ def _actor(user: User) -> Actor:
 
 
 class Admin:
-    def __init__(self) -> None:
+    def __init__(self, now: datetime = DEFAULT_NOW) -> None:
         self.auth = FakeAuthRepository()
         self.settings = FakeAdminRepository()
+        self.drafts = FakeDraftRepository()
         self.service = AdminService(
             self.settings,
             self.auth,
             FakeSystemHealthChecker(),
+            generation_usage=self.drafts,
+            clock=FakeClock(now),
             allowed_models=(DEFAULT_AI_SETTINGS.model, "other/model"),
         )
         self.admin = _actor(
@@ -122,3 +128,17 @@ def test_only_an_admin_may_change_ai_settings() -> None:
         )
 
     assert admin.settings.settings == DEFAULT_AI_SETTINGS
+
+
+def test_usage_this_month_starts_at_midnight_on_the_first_in_bangkok() -> None:
+    bangkok_month_start = datetime(2026, 9, 30, 17, 0, tzinfo=UTC)  # 1 Oct 00:00
+    admin = Admin(now=bangkok_month_start + timedelta(hours=1))
+    admin.drafts.record_generation(
+        admin.student.id, bangkok_month_start - timedelta(seconds=1)
+    )
+    admin.drafts.record_generation(admin.student.id, bangkok_month_start)
+    admin.drafts.record_generation(admin.admin.user_id, bangkok_month_start)
+
+    current = admin.service.get_ai_settings(admin.admin)
+
+    assert current.usage_this_month == 2

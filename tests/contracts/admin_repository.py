@@ -22,7 +22,3 @@ class AdminRepositoryContractTests:
 
         assert saved == changed
         assert repo.get_ai_settings() == changed
-
-    def test_get_usage_this_month(self, repo: AdminRepository) -> None:
-        usage = repo.get_usage_this_month()
-        assert usage >= 0

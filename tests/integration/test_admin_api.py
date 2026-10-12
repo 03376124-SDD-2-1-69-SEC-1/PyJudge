@@ -1,5 +1,7 @@
 """HTTP tests for the Admin API and its authorization boundary."""
 
+from datetime import timedelta
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -12,7 +14,11 @@ from tests.fakes.auth import (
     FakeAuthRepository,
     seed_user,
 )
-from tests.fakes.generation import FakeGenerationClient, binary_search_response
+from tests.fakes.generation import (
+    FakeDraftRepository,
+    FakeGenerationClient,
+    binary_search_response,
+)
 
 ADMIN = "admin@kmitl.ac.th"
 INSTRUCTOR = "instructor@kmitl.ac.th"
@@ -32,8 +38,10 @@ class AdminApi:
         self.settings = FakeAdminRepository()
         self.health = FakeSystemHealthChecker()
         self.generation_client = FakeGenerationClient(binary_search_response())
+        self.drafts = FakeDraftRepository()
         self.app = build_app(
             auth_repository=self.auth,
+            draft_repository=self.drafts,
             admin_repository=self.settings,
             system_health_checker=self.health,
             generation_client=self.generation_client,
@@ -206,6 +214,8 @@ async def test_admin_can_search_change_role_and_deactivate_users() -> None:
 @pytest.mark.anyio
 async def test_ai_settings_update_changes_generation_quota() -> None:
     api = AdminApi()
+    api.drafts.record_generation(api.instructor.id, DEFAULT_NOW)
+    api.drafts.record_generation(api.instructor.id, DEFAULT_NOW - timedelta(days=60))
     client = await api.client_for(ADMIN)
 
     changed = await client.put(
@@ -234,7 +244,7 @@ async def test_ai_settings_update_changes_generation_quota() -> None:
     assert changed.json()["daily_quota"] == 7
     assert changed.json()["max_pages"] == 12
     assert changed.json()["require_citations"] is False
-    assert changed.json()["usage_this_month"] == 5
+    assert changed.json()["usage_this_month"] == 1
     assert model_rejected.status_code == 422
     assert model_rejected.json()["detail"]["code"] == "model_not_allowed"
     assert current.json()["daily_quota"] == 7

@@ -1,15 +1,15 @@
-"""SQLAdminRepository against the shared contract, on real Postgres."""
+"""SQLAdminRepository against the shared contract, on real Postgres.
+
+Usage this month is counted by SQLDraftRepository.count_all_generations,
+whose contract runs in tests/db/test_draft_repository.py.
+"""
 
 from collections.abc import Generator
-from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from questly.core.admin.ports import AdminRepository
-from questly.core.auth.models import User
 from questly.database.core.admin_repository import SQLAdminRepository
-from questly.database.core.auth_repository import SQLAuthRepository
-from questly.database.core.tables import GenerationEvent
 from questly.database.session import SessionFactory
 from tests.contracts.admin_repository import AdminRepositoryContractTests
 
@@ -27,26 +27,3 @@ class TestSQLAdminRepository(AdminRepositoryContractTests):
         original = repository.get_ai_settings()
         yield repository
         repository.update_ai_settings(original)
-
-    def test_monthly_usage_counts_only_current_month(
-        self, session_factory: SessionFactory
-    ) -> None:
-        now = datetime.now(UTC)
-        previous_month = now.replace(day=1) - timedelta(days=1)
-        owner = SQLAuthRepository(session_factory).create_user(
-            User(
-                email="usage@kmitl.ac.th",
-                full_name="Usage",
-                password_hash="scrypt$x",
-            )
-        )
-        with session_factory() as session:
-            session.add_all(
-                [
-                    GenerationEvent(user_id=owner.id, occurred_at=now),
-                    GenerationEvent(user_id=owner.id, occurred_at=previous_month),
-                ]
-            )
-            session.commit()
-
-        assert SQLAdminRepository(session_factory).get_usage_this_month() == 1

@@ -145,3 +145,15 @@ class DraftRepositoryContract(NeedsAssignments, NeedsTopics):
         assert repository.count_generations(alice, midnight) == 2
         assert repository.count_generations(bob, midnight) == 1
         assert repository.count_generations(alice, NOW + timedelta(seconds=1)) == 0
+
+    def test_all_generations_are_counted_across_users_from_since_inclusive(
+        self, repository: DraftRepository, new_user: IdFactory
+    ) -> None:
+        alice, bob = new_user(), new_user()
+        month_start = NOW.replace(day=1, hour=0)
+        repository.record_generation(alice, month_start - timedelta(seconds=1))
+        repository.record_generation(alice, month_start)
+        repository.record_generation(bob, NOW)
+
+        assert repository.count_all_generations(month_start) == 2
+        assert repository.count_all_generations(NOW + timedelta(seconds=1)) == 0

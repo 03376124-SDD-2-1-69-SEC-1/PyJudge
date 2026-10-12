@@ -264,6 +264,8 @@ def create_app(
         admin_repository,
         auth_repository,
         system_health_checker,
+        generation_usage=draft_repository,
+        clock=clock,
         allowed_models=(use_settings().generation_model,),
     )
     application.state.admin_service = admin_service

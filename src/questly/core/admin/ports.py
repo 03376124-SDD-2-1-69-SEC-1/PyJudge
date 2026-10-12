@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Protocol
 
 from questly.core.admin.models import AISettings, SystemStatus
@@ -12,8 +13,12 @@ class AdminRepository(Protocol):
         """แทนที่ AI settings ทั้งแถวด้วยค่าที่ส่งมา แล้วคืนค่าที่บันทึก."""
         ...
 
-    def get_usage_this_month(self) -> int:
-        """นับการใช้งานเดือนปัจจุบันจาก generation events."""
+
+class GenerationUsage(Protocol):
+    """What the A-01 AI tab needs from the generation slice's DraftRepository."""
+
+    def count_all_generations(self, since: datetime) -> int:
+        """Every user's generations at or after `since`."""
         ...
 
 

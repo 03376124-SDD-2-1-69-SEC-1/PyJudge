@@ -197,3 +197,12 @@ class SQLDraftRepository:
                     GenerationEvent.occurred_at >= since,
                 )
             ).one()
+
+    def count_all_generations(self, since: datetime) -> int:
+        """Count every user's generations at or after `since`."""
+        with self._session_factory() as db:
+            return db.exec(
+                select(func.count())
+                .select_from(GenerationEvent)
+                .where(GenerationEvent.occurred_at >= since)
+            ).one()

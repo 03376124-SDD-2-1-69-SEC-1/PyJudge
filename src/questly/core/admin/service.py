@@ -1,6 +1,8 @@
 """Admin use cases (ADR-0007 §8). Every public method takes the Actor first."""
 
 from dataclasses import replace
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from questly.core.admin.models import (
     AISettings,
@@ -11,7 +13,11 @@ from questly.core.admin.models import (
     SystemStatus,
     UserNotFoundError,
 )
-from questly.core.admin.ports import AdminRepository, SystemHealthChecker
+from questly.core.admin.ports import (
+    AdminRepository,
+    GenerationUsage,
+    SystemHealthChecker,
+)
 from questly.core.auth.models import (
     Actor,
     InstructorRequest,
@@ -20,7 +26,9 @@ from questly.core.auth.models import (
     Role,
     User,
 )
-from questly.core.auth.ports import AuthRepository
+from questly.core.auth.ports import AuthRepository, Clock
+
+USAGE_ZONE = ZoneInfo("Asia/Bangkok")
 
 
 class AdminService:
@@ -29,11 +37,15 @@ class AdminService:
         admin_repo: AdminRepository,
         auth_repo: AuthRepository,
         health_checker: SystemHealthChecker,
+        generation_usage: GenerationUsage,
+        clock: Clock,
         allowed_models: tuple[str, ...],
     ) -> None:
         self.admin_repo = admin_repo
         self.auth_repo = auth_repo
         self.health_checker = health_checker
+        self.generation_usage = generation_usage
+        self.clock = clock
         self.allowed_models = allowed_models
 
     # --- Instructor Requests ---
@@ -125,8 +137,17 @@ class AdminService:
     def _with_usage(self, settings: AISettings) -> AISettingsWithUsage:
         return AISettingsWithUsage(
             settings=settings,
-            usage_this_month=self.admin_repo.get_usage_this_month(),
+            usage_this_month=self.generation_usage.count_all_generations(
+                self._month_start()
+            ),
         )
+
+    def _month_start(self) -> datetime:
+        """The first instant of the current month in Bangkok, as UTC."""
+        local = self.clock.now().astimezone(USAGE_ZONE)
+        return local.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        ).astimezone(UTC)
 
     def _require_admin(self, actor: Actor) -> None:
         if actor.role is not Role.ADMIN:

@@ -15,11 +15,8 @@ DEFAULT_AI_SETTINGS = AISettings(
 
 
 class FakeAdminRepository:
-    def __init__(
-        self, settings: AISettings = DEFAULT_AI_SETTINGS, usage_this_month: int = 5
-    ) -> None:
+    def __init__(self, settings: AISettings = DEFAULT_AI_SETTINGS) -> None:
         self.settings = settings
-        self.usage_this_month = usage_this_month
 
     def get_ai_settings(self) -> AISettings:
         return self.settings
@@ -27,9 +24,6 @@ class FakeAdminRepository:
     def update_ai_settings(self, settings: AISettings) -> AISettings:
         self.settings = settings
         return self.settings
-
-    def get_usage_this_month(self) -> int:
-        return self.usage_this_month
 
 
 class FakeSystemHealthChecker:
