@@ -3155,6 +3155,12 @@
       width: calc(100% - 28px);
       padding-top: 32px;
     }
+    .table-wrap, .card .table-wrap, .box .table-wrap {
+      background: linear-gradient(to right, #fff 30%, rgb(255 255 255 / 0)) left center / 40px 100% no-repeat local, linear-gradient(to left, #fff 30%, rgb(255 255 255 / 0)) right center / 40px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, rgb(131 24 67 / 0.22), transparent) left center / 14px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, rgb(131 24 67 / 0.22), transparent) right center / 14px 100% no-repeat scroll, #fff;
+    }
+    .table th:first-child, .table td:first-child {
+      min-width: 150px;
+    }
     .app-header, .site-header {
       padding-inline: 15px;
     }
