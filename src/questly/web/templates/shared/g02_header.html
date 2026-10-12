@@ -1,19 +1,23 @@
 {# G-02 header; 02a notifications dropdown (<details>); 02b mobile menu. No JS. #}
 {% from "_components/forms.html" import action_form, button, csrf_field, hidden, toggle with context %}
-{% from "_components/ui.html" import badge, short_name %}
+{% from "_components/ui.html" import avatar, badge, short_name %}
+{% from "_components/icons.html" import icon %}
 {% set menu = header_notifications(request) %}
-<header class="site-header" data-page="G-02">
-  <a class="logo" href="/classes">Questly</a>
-  {% if breadcrumb is defined %}<span class="crumb">/ {{ breadcrumb }}</span>{% endif %}
-  <div class="ml-auto flex items-center gap-5">
+{% set role_labels = {"student": "Student", "instructor": "Instructor", "admin": "Admin"} %}
+<header class="app-header" data-page="G-02">
+  <div class="flex min-w-0 items-center gap-3">
+    <a class="logo" href="/classes"><span class="logo-mark">{{ icon("book", 22) }}</span>Questly</a>
+    {% if breadcrumb is defined %}<span class="crumb">{{ icon("chevron", 14) }}{{ breadcrumb }}</span>{% endif %}
+  </div>
+  <div class="header-actions">
     {#- "My documents" (T-06) returns with the documents slice; /documents is 404 until then. -#}
     <details class="relative" data-page="G-02a">
-      <summary class="bell" aria-label="Notifications">
-        <span class="icon-dot"></span>
-        {% if menu.unread_count %}{{ badge(menu.unread_count, tone="accent") }}{% endif %}
+      <summary class="icon-btn" aria-label="Notifications">
+        {{ icon("bell", 20) }}
+        {% if menu.unread_count %}<span class="absolute -top-1 -right-1">{{ badge(menu.unread_count, tone="accent") }}</span>{% endif %}
       </summary>
       <div class="dropdown z-30" id="notifications">
-        <div class="flex items-center justify-between border-b border-hair px-3.5 py-3">
+        <div class="flex items-center justify-between border-b border-hair px-2.5 pt-1.5 pb-3">
           <strong>Notifications</strong>
           {% if menu.unread_count %}
           <form method="post" action="/notifications/read-all" class="inline">
@@ -48,18 +52,21 @@
         {% endif %}
       </div>
     </details>
-    {% call toggle("account-menu", class="hidden items-center gap-2 sm:flex") %}
-      <span class="icon-dot"></span><span>{{ short_name(actor.full_name) }} ▾</span>
+    {% call toggle("account-menu", class="user-button max-sm:hidden") %}
+      {{ avatar(actor.full_name) }}
+      <span class="user-button-text"><strong>{{ short_name(actor.full_name) }}</strong><small>{{ role_labels[actor.role.value] }}</small></span>
+      {{ icon("chevron", 14, class="rotate-90 text-soft") }}
     {% endcall %}
-    {% call toggle("mobile-menu", aria_label="Menu", class="sm:hidden") %}
-      <span class="inline-block h-[18px] w-[18px] border border-line bg-pap"></span>
+    {% call toggle("mobile-menu", aria_label="Menu", class="user-button sm:hidden") %}
+      {{ avatar(actor.full_name) }}
     {% endcall %}
   </div>
 </header>
 
-<div id="account-menu" popover class="dropdown w-64">
-  <div class="dropdown-item"><strong>{{ actor.full_name }}</strong><br><span class="sub">{{ actor.email }}</span></div>
-  {{ action_form("/logout", "Log out", variant="plain", class="dropdown-item cursor-pointer text-mid") }}
+<div id="account-menu" popover class="dropdown w-56">
+  <div class="px-2.5 py-2"><strong>{{ actor.full_name }}</strong><br><span class="sub">{{ actor.email }}</span></div>
+  <hr class="hr my-1">
+  {{ action_form("/logout", "Log out", variant="plain", class="dropdown-item cursor-pointer") }}
 </div>
 
 <div id="mobile-menu" popover class="mobile-menu" data-page="G-02b">
@@ -68,6 +75,6 @@
     {% if breadcrumb is defined %}<span class="dropdown-item">{{ breadcrumb }}</span>{% endif %}
     {#- "My documents" returns with the documents slice. -#}
     <span class="dropdown-item">{{ short_name(actor.full_name) }}</span>
-    {{ action_form("/logout", "Log out", variant="plain", class="dropdown-item cursor-pointer text-soft") }}
+    {{ action_form("/logout", "Log out", variant="plain", class="dropdown-item cursor-pointer") }}
   </nav>
 </div>

@@ -180,6 +180,7 @@ def classroom_page(
             actor, classroom_id, filter
         )
         context["filter"] = filter.value
+        context["summary"] = _assignments(request).summary(actor, classroom_id)
         if isinstance(view, InstructorClassroomView):
             generation = request.app.state.generation_service
             context["drafts"] = generation.drafts(actor, classroom_id)

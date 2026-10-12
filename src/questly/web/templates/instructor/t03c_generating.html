@@ -15,8 +15,8 @@
       "running_solution": "Running the reference solution for expected outputs",
       "saving": "Saving the draft",
     } %}
-    {{ page_header("Generating…") }}
-    <div class="card mx-auto mt-4 max-w-xl">
+    {{ page_header("กำลังสร้างโจทย์…", "รอสักครู่ หน้านี้จะรีเฟรชเอง", eyebrow="AI PROBLEM CREATOR") }}
+    <div class="card narrow mt-4 gap-4">
       <progress class="progress" value="{{ progress.done_count }}" max="{{ progress.steps|length }}">{{ progress.done_count }} of {{ progress.steps|length }} steps done</progress>
       <ul class="flex flex-col gap-1 text-xxs" aria-live="polite">
         {% for row in progress.steps %}

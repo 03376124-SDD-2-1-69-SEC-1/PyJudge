@@ -15,11 +15,11 @@
         {% for sub in view.submissions | reverse %}
         <tr>
           <td>{{ sub.attempt }}</td>
-          <td>{{ sub.submitted_at | local }}{% if sub.is_late %} {{ badge("Late") }}{% endif %}</td>
+          <td>{{ sub.submitted_at | local }}{% if sub.is_late %} {{ badge("Late", tone="danger") }}{% endif %}</td>
           <td>{{ sub.passed_count }}/{{ sub.results | length }}</td>
           <td>{{ sub.score }}/{{ sub.max_score }}</td>
-          <td>{% if sub.version_number < problem.assignment.current_version %}on an older version{% elif loop.first %}counted{% else %}—{% endif %}</td>
-          <td class="text-right"><a class="link" href="{{ url }}?tab=history&attempt={{ sub.attempt }}">View code</a></td>
+          <td>{% if sub.version_number < problem.assignment.current_version %}{{ badge("on an older version", tone="warn") }}{% elif loop.first %}{{ badge("counted", tone="ok") }}{% else %}—{% endif %}</td>
+          <td class="text-right"><a class="link whitespace-nowrap" href="{{ url }}?tab=history&attempt={{ sub.attempt }}">View code</a></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -31,7 +31,7 @@
   {% if shown %}
   <section class="card mt-4 gap-3" data-attempt="{{ shown.attempt }}" aria-labelledby="shown-title">
     <h2 class="h2" id="shown-title">Attempt {{ shown.attempt }} · score {{ shown.score }}/{{ shown.max_score }}</h2>
-    <pre class="code-cell box">{{ shown.code }}</pre>
+    <pre class="code-preview">{{ shown.code }}</pre>
     {{ results_table(shown.results, problem.assignment.settings.show_hidden_names) }}
   </section>
   {% endif %}

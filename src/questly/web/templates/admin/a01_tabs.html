@@ -1,7 +1,14 @@
-{% from "_components/ui.html" import page_header, tabs %}
-{{ page_header("Settings") }}
-{{ tabs([
-  ("users", "Users", "/admin/settings"),
-  ("ai", "AI", "/admin/settings/ai"),
-  ("status", "System status", "/admin/settings/status"),
-], tab, label="Admin tabs") }}
+{#- A-01 shell: Figma Admin layout, a left nav of real links and the page in the slot. -#}
+{% from "_components/ui.html" import page_header %}
+{% from "_components/icons.html" import icon %}
+{% macro admin_shell(tab) -%}
+{{ page_header("Settings", "Users, AI and system status", eyebrow="ADMIN CONSOLE") }}
+<div class="admin-layout">
+  <nav class="admin-nav" aria-label="Admin tabs">
+    {% for key, label, href, icon_name in [("users", "Users", "/admin/settings", "users"), ("ai", "AI", "/admin/settings/ai", "sparkles"), ("status", "System status", "/admin/settings/status", "shield")] %}
+    <a href="{{ href }}"{% if key == tab %} aria-current="page"{% endif %}>{{ icon(icon_name, 16) }}{{ label }}</a>
+    {% endfor %}
+  </nav>
+  <div class="admin-content">{{ caller() }}</div>
+</div>
+{%- endmacro %}

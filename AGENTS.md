@@ -43,6 +43,14 @@ never lists one.
 
 Do not implement another area's placeholder unless the task says to.
 
+**UI source of truth:** the Figma Make file "Questly Classroom Web App (Copy)"
+(fileKey `ft2Fe3c5xrv3NO2zCq21wi`), through the local copy in
+`docs/ui-redesign/` (PLAN.md, tokens, reference/figma-make/). Agents read that
+folder and do not call the Figma MCP (the Starter plan quota is used up). A page
+without a mock follows `docs/wireframes/Questly wireframes - Prototype.html`.
+`docs/ui-audit.md` records which template matches which screen and every
+deviation from the design.
+
 ## Stack
 
 Python 3.12+ · FastAPI · Jinja2 · uv · Pytest · Ruff · Tailwind (standalone CLI)

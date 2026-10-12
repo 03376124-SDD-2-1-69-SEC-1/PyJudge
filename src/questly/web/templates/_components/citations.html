@@ -1,0 +1,43 @@
+{#
+  Citations are what an Instructor checks before trusting a draft: which
+  document, which page, which passage the AI used. Never hide them.
+
+    {% from "_components/citations.html" import citation_panel, citation_chips %}
+    {{ citation_panel(draft.citations, sources) }}
+    {{ citation_chips(draft.citations, sources) }}
+
+  sources maps source_id to the document's file name.
+#}
+{% from "_components/icons.html" import icon %}
+
+{% macro citation_panel(citations, sources) -%}
+<section class="citation-panel" aria-label="แหล่งอ้างอิงจากเอกสาร" data-citations="{{ citations | length }}">
+  <header class="citation-head">
+    <span>{{ icon("file", 18) }}</span>
+    <h3>แหล่งอ้างอิงจากเอกสาร</h3>
+    <span class="badge badge-accent ml-auto">{{ citations | length }}</span>
+  </header>
+  {% for citation in citations %}
+  <article class="citation-item">
+    <p class="text-xs"><strong>{{ sources.get(citation.source_id, "source " ~ citation.source_id) }}</strong>{% if citation.page %} · <span class="badge badge-accent">p. {{ citation.page }}</span>{% endif %}</p>
+    {% if citation.text_snapshot %}
+    <details class="citation-quote">
+      <summary><blockquote class="whitespace-pre-line">{{ citation.text_snapshot }}</blockquote></summary>
+    </details>
+    {% endif %}
+  </article>
+  {% else %}
+  <p class="muted text-xs">No citations for this draft.</p>
+  {% endfor %}
+</section>
+{%- endmacro %}
+
+{% macro citation_chips(citations, sources) -%}
+<span class="inline-flex flex-wrap gap-1.5" data-citations="{{ citations | length }}">
+  {% for citation in citations %}
+  <span class="citation-chip">{{ icon("file", 14) }}{{ sources.get(citation.source_id, "source " ~ citation.source_id) }}{% if citation.page %} · p. {{ citation.page }}{% endif %}</span>
+  {% else %}
+  <span class="muted text-xs">No citations.</span>
+  {% endfor %}
+</span>
+{%- endmacro %}

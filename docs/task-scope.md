@@ -105,6 +105,7 @@ Rows that were closed and no longer apply are in `docs/task-archive.md`.
 | OPS-24 | พาย | open | `config.py`, `.env.example`, `core/auth/`, `core/notifications/`, `main.py`, `tests/` | ลิงก์ verify ในอีเมลเป็น URL เต็ม: เพิ่ม setting `BASE_URL` (env `BASE_URL`) แล้วลิงก์เป็น `{BASE_URL}/verify?token=...`. ห้ามสร้าง URL จาก Host header ของ request เพราะปลอมได้. ทำพร้อมตอนต่อ email provider จริง (ตอนนี้ลิงก์เป็น path `/verify?token=...` และ stub log ทั้ง body) |
 | OPS-25 | พาย | open | `ai/client.py`, `tests/unit/ai/test_client.py` | เปิด `response_format` แบบ `json_schema` ใน `OpenRouterGenerationClient` ให้โมเดลคืน JSON ตาม schema ของ draft. ทำหลัง OPS-26 เลือกโมเดลแล้ว เพราะแต่ละโมเดลรองรับ structured output ไม่เท่ากัน; มีเทสต์ว่า request ส่ง `response_format` ตาม schema และ reply ที่ไม่ตรง schema ยังถูกจัดเป็น `GenerationFailedError` |
 | OPS-26 | พาย | open | `scripts/`, `docs/`, `config.py`, `.env.example` | เลือกโมเดล generation: เทียบหลายโมเดลบน OpenRouter กับโจทย์ seed ภาษาไทย 3 ข้อจาก `scripts/seed/pith-100-manifest.csv` บันทึกผลเทียบใน `docs/` แล้วตั้ง allowlist (`GENERATION_MODEL_ALLOWLIST`) สำหรับ A-01 และ default ใน `config.py`. ไม่ต้องมี migration เพราะเปลี่ยนโมเดลตอนรันผ่าน A-01 |
+| UI-02 | พาย | in-progress | `web/templates/`, `web/static/css/`, `core/*/pages.py`, `tests/integration/`, `docs/ui-redesign/`, `docs/ui-audit.md`, `AGENTS.md` | ทุกหน้า re-skin ตาม Figma Make `ft2Fe3c5xrv3NO2zCq21wi`; รายการ deviation อยู่ใน `docs/ui-audit.md`; quality gate ผ่าน (PR #61) |
 
 ## The composition root
 

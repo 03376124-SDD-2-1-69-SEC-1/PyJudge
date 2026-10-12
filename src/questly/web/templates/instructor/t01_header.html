@@ -1,6 +1,10 @@
 {% from "_components/forms.html" import link_button with context %}
 {% from "_components/ui.html" import page_header %}
-{% call page_header(view.classroom.course_name ~ " · Sec " ~ view.classroom.section,
-                    view.student_count ~ " students · semester " ~ view.classroom.semester ~ (" · archived" if view.classroom.archived else "")) %}
-  {{ link_button("/classes/" ~ view.classroom.id ~ "/generate", "+ Create problem with AI", variant="primary") }}
+{% from "_components/icons.html" import icon %}
+<nav class="crumb" aria-label="Breadcrumb"><a href="/classes">ห้องเรียนของฉัน</a>{{ icon("chevron", 14) }}<span>{{ view.classroom.course_name }}</span></nav>
+{% call page_header(view.classroom.course_name,
+                    view.student_count ~ " students · semester " ~ view.classroom.semester ~ (" · archived" if view.classroom.archived else ""),
+                    eyebrow=view.classroom.label | upper) %}
+  {{ link_button("/classes/" ~ view.classroom.id ~ "?tab=settings", "ตั้งค่า", icon="settings") }}
+  {{ link_button("/classes/" ~ view.classroom.id ~ "/generate", "สร้างโจทย์ด้วย AI", variant="primary", icon="sparkles") }}
 {% endcall %}

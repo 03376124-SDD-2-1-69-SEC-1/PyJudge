@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_components/ui.html" import badge %}
 {% from "instructor/t02_parts.html" import t02_header with context %}
 {% set problem = view.problem %}
 {% set url = "/classes/" ~ problem.posting.classroom_id ~ "/assignments/" ~ problem.assignment.id %}
@@ -11,7 +12,7 @@
       <thead><tr><th>Version</th><th>Changed</th><th>Reason</th></tr></thead>
       <tbody>
         {% for version in view.versions %}
-        <tr><td>v{{ version.number }}{% if loop.first %} · current{% endif %}</td><td>{{ version.changed_at | local }}</td><td>{{ version.reason }}</td></tr>
+        <tr><td>{% if loop.first %}{{ badge("v" ~ version.number ~ " · current", tone="accent") }}{% else %}<strong class="text-ink">v{{ version.number }}</strong>{% endif %}</td><td>{{ version.changed_at | local }}</td><td>{{ version.reason }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -3,15 +3,30 @@
 
     {% from "_components/ui.html" import page_header, tabs, badge, empty_state, modal %}
 #}
+{% from "_components/icons.html" import icon %}
 
-{% macro page_header(title, subtitle="") -%}
-<header class="page-header">
-  <div>
+{#- Figma PageTop. Actions go in a {% call %} body; the old (title, subtitle) form still works. -#}
+{% macro page_header(title, subtitle="", eyebrow="", back_href="", back_label="กลับ") -%}
+<header class="page-top">
+  {% if back_href %}<a class="back-link" href="{{ back_href }}">{{ icon("arrow") }} {{ back_label }}</a>{% endif %}
+  <div class="page-top-main">
+    {% if eyebrow %}<span class="eyebrow">{{ eyebrow }}</span>{% endif %}
     <h1 class="h1">{{ title }}</h1>
-    {% if subtitle %}<p class="sub">{{ subtitle }}</p>{% endif %}
+    {% if subtitle %}<p class="page-desc">{{ subtitle }}</p>{% endif %}
   </div>
-  {% if caller is defined %}<div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">{{ caller() }}</div>{% endif %}
+  {% if caller is defined %}<div class="page-actions">{{ caller() }}</div>{% endif %}
 </header>
+{%- endmacro %}
+
+{#- A section title with an optional actions slot ({% call section_head(...) %}). -#}
+{% macro section_head(title, subtitle="") -%}
+<div class="section-head">
+  <div>
+    <h2>{{ title }}</h2>
+    {% if subtitle %}<p>{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if caller is defined %}<div class="page-actions">{{ caller() }}</div>{% endif %}
+</div>
 {%- endmacro %}
 
 {#- items: list of (key, label, href); current: the active key. -#}
@@ -31,16 +46,24 @@
 </nav>
 {%- endmacro %}
 
-{#- tone: "" (neutral) | accent | danger | ok -#}
+{#- tone: "" (neutral) | accent | ok | warn | danger | info -#}
 {% macro badge(text, tone="") -%}
 <span class="badge{% if tone %} badge-{{ tone }}{% endif %}">{{ text }}</span>
 {%- endmacro %}
 
-{% macro empty_state(title, body="", art="empty", state="") -%}
+{#- Easy / medium / hard as a coloured pill; value is the Difficulty enum value. -#}
+{% macro difficulty_badge(value) -%}
+{%- set tones = {"easy": "ok", "medium": "warn", "hard": "danger"} -%}
+{{ badge(value | string | capitalize, tone=tones.get(value | string | lower, "")) }}
+{%- endmacro %}
+
+{#- art names the old placeholder text; it picks the icon now. -#}
+{% macro empty_state(title, body="", art="empty", state="", icon_name="") -%}
+{%- set art_icons = {"people": "users", "chart": "chart", "PDF": "file"} -%}
 <div class="empty"{% if state %} data-state="{{ state }}"{% endif %}>
-  <div class="placeholder h-12 w-16">{{ art }}</div>
+  <span class="empty-icon">{{ icon(icon_name or art_icons.get(art, "book"), 34) }}</span>
   <h2 class="h2">{{ title }}</h2>
-  {% if body %}<p class="muted">{{ body }}</p>{% endif %}
+  {% if body %}<p>{{ body }}</p>{% endif %}
   {% if caller is defined %}<div class="flex flex-wrap justify-center gap-2.5">{{ caller() }}</div>{% endif %}
 </div>
 {%- endmacro %}
@@ -58,6 +81,7 @@
 {% if static %}</div>{% endif %}
 {%- endmacro %}
 
+{#- tone: "" (pink) | danger | warn | ok -#}
 {% macro alert(tone="", state="") -%}
 <div class="alert{% if tone %} alert-{{ tone }}{% endif %}" role="alert"{% if state %} data-state="{{ state }}"{% endif %}>{{ caller() }}</div>
 {%- endmacro %}
@@ -66,6 +90,17 @@
 {% macro short_name(full_name) -%}
 {%- set parts = full_name.split() -%}
 {{ parts[0] }}{% if parts | length > 1 %} {{ parts[-1][0] }}.{% endif %}
+{%- endmacro %}
+
+{#- Two-letter initials in a pink square. -#}
+{% macro avatar(name, size="") -%}
+{%- set parts = name.split() -%}
+<span class="avatar{% if size %} avatar-{{ size }}{% endif %}" aria-hidden="true">{% if parts | length > 1 %}{{ parts[0][0] }}{{ parts[-1][0] }}{% else %}{{ name[:2] }}{% endif %}</span>
+{%- endmacro %}
+
+{#- pct is 0-100. tone: "" (pink) | ok -#}
+{% macro progress(pct, tone="") -%}
+<div class="progress" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ pct }}%{% if tone == 'ok' %}; background: var(--color-pass){% endif %}"></i></div>
 {%- endmacro %}
 
 {#- S-01b status badges; "Resubmit needed" is the only accented one. -#}
@@ -78,10 +113,28 @@
   "late": "Late",
   "closed": "Closed",
 } -%}
-{{ badge(labels[state], tone="accent" if state == "resubmit_needed" else "") }}
+{%- set tones = {
+  "passed": "ok",
+  "partial": "warn",
+  "resubmit_needed": "accent",
+  "late": "danger",
+} -%}
+{{ badge(labels[state], tone=tones.get(state, "")) }}
 {%- endmacro %}
 
 {#- A labelled number, as on T-01/S-01 Summary. -#}
 {% macro stat_box(label, value) -%}
 <div class="box"><p class="eyebrow">{{ label }}</p><p class="stat">{{ value }}</p></div>
+{%- endmacro %}
+
+{#- The 4-up strip: {% call stats_strip() %}{{ stat_cell(...) }}...{% endcall %}. -#}
+{% macro stats_strip(cols=4) -%}
+<div class="stats-strip" style="--cols: {{ cols }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{% macro stat_cell(label, value, icon_name="chart") -%}
+<div class="stat-cell">
+  <span class="icon-well">{{ icon(icon_name) }}</span>
+  <div><small>{{ label }}</small><strong>{{ value }}</strong></div>
+</div>
 {%- endmacro %}

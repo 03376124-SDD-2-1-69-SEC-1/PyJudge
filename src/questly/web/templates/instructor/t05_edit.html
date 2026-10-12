@@ -4,7 +4,7 @@
 {% block title %}Edit {{ assignment.title }} · Questly{% endblock %}
 {% block content %}
 <section data-page="T-05">
-  {% call page_header("Edit problem " ~ number ~ " · " ~ assignment.title, "Now version v" ~ assignment.current_version ~ ". Saving creates v" ~ next_version ~ ".") %}
+  {% call page_header("Edit problem " ~ number ~ " · " ~ assignment.title, "Now version v" ~ assignment.current_version ~ ". Saving creates v" ~ next_version ~ ".", eyebrow="EDIT PROBLEM") %}
     {{ link_button(t02_url, "Cancel") }}
   {% endcall %}
   {% if submitted_total %}
@@ -18,7 +18,7 @@
   <form method="post" action="{{ t02_url }}/edit" class="flex flex-col gap-6">
     {{ csrf_field() }}
     <div class="grid gap-6 lg:grid-cols-[3fr_2fr]">
-      <div class="flex flex-col gap-4">
+      <div class="card gap-4">
         {{ field("title", "Title", value=form.title, required=true) }}
         {{ textarea_field("problem_statement", "Description", value=form.problem_statement, rows=8, required=true) }}
         <div class="grid grid-cols-2 gap-4">
@@ -27,7 +27,7 @@
         </div>
         {{ textarea_field("reason", "Reason for change · required", value=form.reason, rows=3, required=true, hint="Students see this reason in their notification.", error="A reason for the change is required." if error and not form.reason.strip() else "") }}
       </div>
-      <aside class="box self-start" aria-label="What changes for students">
+      <aside class="box self-start bg-brand-50" aria-label="What changes for students">
         <p class="text-xs font-semibold">What changes for students</p>
         <ul class="flex flex-col gap-1 text-xs text-mid">
           {% if submitted_total %}<li>· {{ submitted_total }} {{ "submission" if submitted_total == 1 else "submissions" }} marked “Resubmit needed”</li>{% endif %}
@@ -65,8 +65,8 @@
     </section>
     {% endfor %}
 
-    <section>
-      <p class="eyebrow mb-2">Judging settings</p>
+    <section class="card">
+      <p class="eyebrow">Judging settings</p>
       <div class="grid max-w-3xl gap-4 sm:grid-cols-2">
         {{ field("time_limit_s", "Time limit per test (s)", type="number", value=form.time_limit_s, min="0.1", step="0.1") }}
         {{ value_select("language", "Language", [("python3", "Python 3")], selected=form.language) }}
