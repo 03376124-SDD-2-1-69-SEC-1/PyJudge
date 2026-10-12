@@ -266,7 +266,7 @@ def create_app(
         system_health_checker,
         generation_usage=draft_repository,
         clock=clock,
-        allowed_models=(use_settings().generation_model,),
+        allowed_models=use_settings().generation_model_allowlist,
     )
     application.state.admin_service = admin_service
 
@@ -304,7 +304,7 @@ def create_app(
         if use_settings().openrouter_api_key:
             generation_client = OpenRouterGenerationClient(
                 api_key=use_settings().openrouter_api_key,
-                model=use_settings().generation_model,
+                model=lambda: admin_repository.get_ai_settings().model,
                 code_runner=code_runner,
             )
         else:
