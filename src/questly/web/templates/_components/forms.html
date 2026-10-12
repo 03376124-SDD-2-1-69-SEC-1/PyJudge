@@ -11,6 +11,8 @@
   `required`, maxlength=6 renders `maxlength="6"`, false/none are dropped.
 #}
 
+{% from "_components/icons.html" import icon as svg_icon %}
+
 {% macro attrs(extra) -%}
   {%- for key, value in extra.items() -%}
     {%- if value is sameas true %} {{ key }}{% elif value is not sameas false and value is not none %} {{ key }}="{{ value }}"{% endif -%}
@@ -23,7 +25,7 @@
   <label class="label" for="{{ field_id }}">{{ label }}</label>
   <input class="input{% if error %} input-error{% endif %} {{ input_class }}" id="{{ field_id }}" name="{{ name }}" type="{{ type }}"{% if type != "password" %} value="{{ value }}"{% endif %}{% if error %} aria-invalid="true" aria-describedby="{{ field_id }}-error"{% endif %}{{ attrs(kwargs) }}>
   {% if hint %}<small class="hint">{{ hint }}</small>{% endif %}
-  {% if error %}<p class="error-text" id="{{ field_id }}-error">{{ error }}</p>{% endif %}
+  {% if error %}<p class="error-text" id="{{ field_id }}-error">{{ svg_icon("x", 14) }}{{ error }}</p>{% endif %}
 </div>
 {%- endmacro %}
 
@@ -33,7 +35,7 @@
   <label class="label" for="{{ field_id }}">{{ label }}</label>
   <textarea class="input{% if error %} input-error{% endif %} {{ input_class }}" id="{{ field_id }}" name="{{ name }}"{{ attrs(kwargs) }}>{{ value }}</textarea>
   {% if hint %}<small class="hint">{{ hint }}</small>{% endif %}
-  {% if error %}<p class="error-text">{{ error }}</p>{% endif %}
+  {% if error %}<p class="error-text">{{ svg_icon("x", 14) }}{{ error }}</p>{% endif %}
 </div>
 {%- endmacro %}
 
@@ -46,7 +48,7 @@
     {% for option in options %}<option{% if option == selected %} selected{% endif %}>{{ option }}</option>{% endfor %}
   </select>
   {% if hint %}<small class="hint">{{ hint }}</small>{% endif %}
-  {% if error %}<p class="error-text">{{ error }}</p>{% endif %}
+  {% if error %}<p class="error-text">{{ svg_icon("x", 14) }}{{ error }}</p>{% endif %}
 </div>
 {%- endmacro %}
 
@@ -66,26 +68,27 @@
 <input type="hidden" name="{{ name }}" value="{{ value }}">
 {%- endmacro %}
 
-{#- variant: primary | secondary | danger | ghost | tile | plain (no btn styling) -#}
+{#- variant: primary | secondary | soft | danger | ghost | tile | plain (no btn styling) -#}
 {% macro button_class(variant, size, block, class) -%}
 {%- if variant == "plain" -%}{{ class }}{%- else -%}
 btn{% if variant != "secondary" %} btn-{{ variant }}{% endif %}{% if size %} btn-{{ size }}{% endif %}{% if block %} btn-block{% endif %} {{ class }}
 {%- endif -%}
 {%- endmacro %}
 
-{% macro button(label, variant="secondary", type="submit", size="", block=false, class="") -%}
-<button type="{{ type }}" class="{{ button_class(variant, size, block, class) }}"{{ attrs(kwargs) }}>{{ label }}</button>
+{#- icon: an _components/icons.html name drawn before the label. -#}
+{% macro button(label, variant="secondary", type="submit", size="", block=false, class="", icon="") -%}
+<button type="{{ type }}" class="{{ button_class(variant, size, block, class) }}"{{ attrs(kwargs) }}>{% if icon %}{{ svg_icon(icon, 16) }}{% endif %}{{ label }}</button>
 {%- endmacro %}
 
-{% macro link_button(href, label, variant="secondary", size="", block=false, class="") -%}
-<a href="{{ href }}" class="{{ button_class(variant, size, block, class) }}"{{ attrs(kwargs) }}>{{ label }}</a>
+{% macro link_button(href, label, variant="secondary", size="", block=false, class="", icon="") -%}
+<a href="{{ href }}" class="{{ button_class(variant, size, block, class) }}"{{ attrs(kwargs) }}>{% if icon %}{{ svg_icon(icon, 16) }}{% endif %}{{ label }}</a>
 {%- endmacro %}
 
 {#- A POST form with one button, e.g. "Archive classroom". -#}
-{% macro action_form(action, label, variant="secondary", size="", class="") -%}
+{% macro action_form(action, label, variant="secondary", size="", class="", icon="") -%}
 <form method="post" action="{{ action }}" class="inline">
   {{ csrf_field() }}
-  {{ button(label, variant=variant, size=size, class=class) }}
+  {{ button(label, variant=variant, size=size, class=class, icon=icon) }}
 </form>
 {%- endmacro %}
 
@@ -120,11 +123,11 @@ btn{% if variant != "secondary" %} btn-{{ variant }}{% endif %}{% if size %} btn
 
 {#- One bare cell control for editable tables (T-04 step 2): no label row. -#}
 {% macro cell_input(name, value, label, class="") -%}
-<input class="input h-8 {{ class }}" name="{{ name }}" value="{{ value }}" aria-label="{{ label }}"{{ attrs(kwargs) }}>
+<input class="input h-8 px-2 py-0 text-xs {{ class }}" name="{{ name }}" value="{{ value }}" aria-label="{{ label }}"{{ attrs(kwargs) }}>
 {%- endmacro %}
 
 {% macro cell_select(name, options, selected, label) -%}
-<select class="input h-8" name="{{ name }}" aria-label="{{ label }}">
+<select class="input h-8 px-2 py-0 text-xs" name="{{ name }}" aria-label="{{ label }}">
   {% for value in options %}<option{% if value == selected %} selected{% endif %}>{{ value }}</option>{% endfor %}
 </select>
 {%- endmacro %}
@@ -136,6 +139,6 @@ btn{% if variant != "secondary" %} btn-{{ variant }}{% endif %}{% if size %} btn
 {#- Multi-line cell (test input/output keeps its newlines). The newline after
     the tag is eaten by the browser, so a value that starts with one survives. -#}
 {% macro cell_textarea(name, value, label, class="") -%}
-<textarea class="input h-auto min-h-16 py-1.5 {{ class }}" name="{{ name }}" rows="{{ [value.count("\n") + 1, 2] | max }}" aria-label="{{ label }}"{{ attrs(kwargs) }}>
+<textarea class="input h-auto min-h-16 px-2 py-1.5 text-xs {{ class }}" name="{{ name }}" rows="{{ [value.count("\n") + 1, 2] | max }}" aria-label="{{ label }}"{{ attrs(kwargs) }}>
 {{ value }}</textarea>
 {%- endmacro %}
