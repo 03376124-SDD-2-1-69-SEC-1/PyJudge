@@ -118,8 +118,9 @@ one executable reference; prose in this file does not override it.
 
 - Do not run `alembic upgrade`, `downgrade`, or `--autogenerate` against the
   shared database. It is shared across the team; a downgrade destroys other
-  people's work. The one exception is CI, which runs `alembic upgrade head`
-  against a Neon branch it creates and deletes within the same run.
+  people's work. The one exception is `scripts/run_integration_tests.py`, which
+  runs `alembic upgrade head` against a Neon branch it creates and deletes
+  within the same run. CI does not run it.
 - Do not create or edit migration files.
 - Do not edit `.env`, `.env.example`, or anything holding credentials.
 - Do not add `<script>`, `javascript:` URLs, or inline handlers (`onclick`,
@@ -348,7 +349,9 @@ rules and known limits are in `docs/handoff/2026-09-28-OPS-17-pith-seed.md`.
 Branch from `dev`, named `<type>/<TASK-ID>-<slug>` where type is `feat`, `fix`,
 `chore`, `docs`, or `refactor`. Pull requests target `dev`, not `main` — `main`
 is only this repo's default branch, so GitHub pre-fills it as the PR base;
-change the base to `dev` before opening, every time. PRs need one approval.
+change the base to `dev` before opening, every time. Pai reviews every PR by
+hand first, then with AI. Pai reviews and merges his own PRs, and the
+description quotes the integration-test results.
 Never commit directly to `main` or `dev`.
 
 ## Typing rules
