@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% from "_components/forms.html" import link_button with context %}
-{% from "_components/ui.html" import badge, empty_state, modal, stat_box %}
+{% from "_components/forms.html" import action_form, button, cell_input, hidden, link_button with context %}
+{% from "_components/ui.html" import alert, badge, empty_state, modal, stat_box %}
 {% from "instructor/t02_parts.html" import t02_header, test_name with context %}
 {% set problem = view.problem %}
 {% set url = "/classes/" ~ problem.posting.classroom_id ~ "/assignments/" ~ problem.assignment.id %}
@@ -8,8 +8,13 @@
 {% block content %}
 <section data-page="T-02" data-tab="results">
   {{ t02_header(view, "results", url) }}
+  {% if notified %}
+    {% call alert(state="T-02-notified") %}Students were notified about this problem.{% endcall %}
+  {% endif %}
   {% if not view.submitted %}
-    {% call empty_state("No submissions yet", "Published " ~ (problem.posting.published_at | local) ~ " · deadline " ~ (problem.posting.schedule.deadline | local) ~ " · " ~ view.rows | length ~ " students", state="T-02c") %}{% endcall %}
+    {% call empty_state("No submissions yet", "Published " ~ (problem.posting.published_at | local) ~ " · deadline " ~ (problem.posting.schedule.deadline | local) ~ " · " ~ view.rows | length ~ " students", state="T-02c") %}
+      {{ action_form(url ~ "/notify", "Notify students") }}
+    {% endcall %}
   {% else %}
   <div class="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
     {{ stat_box("Submitted", view.submitted | length ~ " / " ~ view.rows | length) }}
@@ -33,14 +38,27 @@
       </div>
     </section>
     <section class="card gap-3" aria-labelledby="students-title">
-      <h2 class="h2" id="students-title">Students</h2>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="h2" id="students-title">Students</h2>
+        <form method="get" action="{{ url }}" class="flex items-center gap-2" role="search">
+          {{ hidden("tab", "results") }}
+          {{ cell_input("q", view.query, "Search students by name or ID", type="search", placeholder="Search name or ID") }}
+          {{ button("Search", size="sm") }}
+        </form>
+      </div>
+      {% set listed = view.shown | selectattr("counted") | list %}
+      {% if not listed %}
+      {% call empty_state("No students match “" ~ view.query ~ "”" if view.query else "No submissions to show", "Search by part of a name or a student ID.", state="T-02-search") %}
+        {{ link_button(url, "Clear search") }}
+      {% endcall %}
+      {% else %}
       <div class="table-wrap">
         <table class="table">
           <thead><tr><th>Student</th><th>Submitted</th><th>Tests</th><th class="text-right">Score</th><th></th></tr></thead>
           <tbody>
-            {% for row in view.rows if row.counted %}
+            {% for row in listed %}
             <tr>
-              <td>{{ row.name }}</td>
+              <td>{{ row.name }}{% if row.student_number %} <span class="text-xxs text-soft">{{ row.student_number }}</span>{% endif %}</td>
               <td>{{ row.counted.submitted_at | local }}{% if row.counted.is_late %} {{ badge("Late") }}{% endif %}{% if row.counted.version_number < problem.assignment.current_version %} {{ badge("Resubmit needed", tone="accent") }}{% endif %}</td>
               <td>{{ row.counted.passed_count }}/{{ row.counted.results | length }}</td>
               <td class="text-right">{{ row.counted.score }}</td>
@@ -50,8 +68,9 @@
           </tbody>
         </table>
       </div>
-      {% set missing = view.rows | length - view.submitted | length %}
-      {% if missing %}<p class="text-xxs text-soft">{{ missing }} not submitted: {{ view.rows | rejectattr("counted") | map(attribute="name") | join(", ") }}</p>{% endif %}
+      {% endif %}
+      {% set missing = view.shown | rejectattr("counted") | list %}
+      {% if missing %}<p class="text-xxs text-soft">{{ missing | length }} not submitted: {{ missing | map(attribute="name") | join(", ") }}</p>{% endif %}
     </section>
   </div>
   {% endif %}
