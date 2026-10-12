@@ -170,6 +170,8 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "last_active_at",
     # auth: A-01 pending Instructor requests, "Requested" column.
     "requested_at",
+    # auth (ADR-0007 §8): A-01 records when an Instructor request was reviewed.
+    "reviewed_at",
     # classrooms: T-01 Members "Joined" column and its ordering.
     "joined_at",
     # assignments: Posting.is_closed reads closed_at; published_at orders the
@@ -567,12 +569,10 @@ def test_every_post_form_carries_the_csrf_field() -> None:
     """core/auth/csrf.py rejects a form post without its page's token."""
     violations = []
     for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
-        for match in POST_FORM.finditer(template.read_text(encoding="utf-8")):
+        template_text = template.read_text(encoding="utf-8")
+        for match in POST_FORM.finditer(template_text):
             if "csrf_field()" not in match.group(1):
-                line = (
-                    template.read_text(encoding="utf-8")[: match.start()].count("\n")
-                    + 1
-                )
+                line = template_text[: match.start()].count("\n") + 1
                 violations.append(f"{template.relative_to(TEMPLATE_ROOT)}:{line}")
 
     assert not violations, (

@@ -26,6 +26,9 @@ from questly.ai.app.schemas import ApplicationErrorResponse
 from questly.ai.app.service import VectorService
 from questly.ai.client import OpenRouterGenerationClient, StubGenerationClient
 from questly.config import Settings, get_settings
+from questly.core.admin.ports import AdminRepository, SystemHealthChecker
+from questly.core.admin.routes import router as admin_router
+from questly.core.admin.service import AdminService
 from questly.core.assignments.ports import (
     AssignmentRepository,
     PostingRepository,
@@ -80,6 +83,7 @@ from questly.core.topics.service import TopicService
 from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from questly.core.uploads.routes import router as upload_router
 from questly.core.uploads.service import UploadService
+from questly.database.core.admin_repository import SQLAdminRepository
 from questly.database.core.assignment_repository import SQLAssignmentRepository
 from questly.database.core.auth_repository import SQLAuthRepository
 from questly.database.core.classroom_repository import SQLClassroomRepository
@@ -95,7 +99,7 @@ from questly.database.core.posting_repository import SQLPostingRepository
 from questly.database.core.submission_repository import SQLSubmissionRepository
 from questly.database.core.topic_repository import SQLTopicRepository
 from questly.database.core.version_repository import SQLVersionRepository
-from questly.database.health import check_db
+from questly.database.health import SQLSystemHealthChecker, check_db
 from questly.database.rag.vector_repository import PostgresVectorRepository
 from questly.database.session import (
     SessionFactory,
@@ -120,8 +124,10 @@ DISPLAY_ZONE = ZoneInfo("Asia/Bangkok")
 def local_time(value: datetime, pattern: str = "%-d %b, %H:%M") -> str:
     """Render a stored UTC time in Bangkok time for templates (`|local`)."""
     local_value = value.astimezone(DISPLAY_ZONE)
-    return str(local_value.day).join(
-        local_value.strftime(part) for part in pattern.split("%-d")
+    day_placeholder = "\x00LOCAL_TIME_DAY\x00"
+    portable_pattern = pattern.replace("%-d", day_placeholder)
+    return local_value.strftime(portable_pattern).replace(
+        day_placeholder, str(local_value.day)
     )
 
 
@@ -154,6 +160,8 @@ def create_app(
     auth_repository: AuthRepository | None = None,
     email_sender: EmailSender | None = None,
     notification_repository: NotificationRepository | None = None,
+    admin_repository: AdminRepository | None = None,
+    system_health_checker: SystemHealthChecker | None = None,
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
@@ -250,8 +258,37 @@ def create_app(
     )
     application.state.notification_service = notification_service
 
+    if admin_repository is None:
+        admin_repository = SQLAdminRepository(use_session_factory())
+    if system_health_checker is None:
+        system_health_checker = SQLSystemHealthChecker(
+            use_session_factory(),
+            generation_available=(
+                bool(use_settings().openrouter_api_key)
+                or (
+                    generation_client is not None
+                    and not isinstance(generation_client, StubGenerationClient)
+                )
+            ),
+            sandbox_available=(
+                code_runner is not None and not isinstance(code_runner, StubCodeRunner)
+            ),
+            email_available=(not isinstance(email_sender, StubEmailSender)),
+        )
     auth_service = AuthService(auth_repository, notification_service, clock)
     application.state.auth_service = auth_service
+    admin_service = AdminService(
+        admin_repository,
+        auth_repository,
+        system_health_checker,
+        generation_usage=draft_repository,
+        clock=clock,
+        allowed_models=use_settings().generation_model_allowlist,
+    )
+    application.state.admin_service = admin_service
+
+    def get_daily_quota() -> int:
+        return admin_repository.get_ai_settings().daily_quota
 
     classroom_service = ClassroomService(
         classroom_repository, auth_service, classroom_stats, clock
@@ -288,7 +325,7 @@ def create_app(
         if use_settings().openrouter_api_key:
             generation_client = OpenRouterGenerationClient(
                 api_key=use_settings().openrouter_api_key,
-                model=use_settings().generation_model,
+                model=lambda: admin_repository.get_ai_settings().model,
                 code_runner=code_runner,
             )
         else:
@@ -300,6 +337,7 @@ def create_app(
         classroom_service,
         assignment_service,
         clock,
+        daily_quota=get_daily_quota,
     )
 
     if topic_repository is None:
@@ -337,6 +375,7 @@ def create_app(
     application.include_router(notification_router)
     application.include_router(auth_router)
     application.include_router(auth_page_router)
+    application.include_router(admin_router)
     application.include_router(classroom_router)
     application.include_router(classroom_page_router)
     application.include_router(submission_router)

@@ -10,8 +10,10 @@ import json
 import logging
 from unittest.mock import MagicMock, patch
 
+import httpx
+import openrouter.utils.retries
 import pytest
-from openai import OpenAIError
+from openrouter.errors import NoResponseError, OpenRouterError
 
 from questly.ai.client import (
     OpenRouterGenerationClient,
@@ -148,17 +150,17 @@ def _make_client(
     if code_runner is None:
         code_runner = FakeCodeRunner([_ok("5"), _ok("42")])
     return OpenRouterGenerationClient(
-        api_key="dummy-key", model=model, code_runner=code_runner
+        api_key="dummy-key", model=lambda: model, code_runner=code_runner
     )
 
 
-def _mock_completion(content: str) -> MagicMock:
-    """Return a mock that looks like openai.types.chat.ChatCompletion."""
+def _mock_result(content: str) -> MagicMock:
+    """Return a mock that looks like openrouter.components.ChatResult."""
     choice = MagicMock()
     choice.message.content = content
-    completion = MagicMock()
-    completion.choices = [choice]
-    return completion
+    result = MagicMock()
+    result.choices = [choice]
+    return result
 
 
 _SOLUTION = "n = int(input())\nprint(max(map(int, input().split())))"
@@ -184,20 +186,44 @@ _NO_SOLUTION_LLM_RESPONSE = """{
 
 def _generate(client: OpenRouterGenerationClient, llm_reply: str) -> GenerationResponse:
     with patch.object(
-        client._client.chat.completions,
-        "create",
-        return_value=_mock_completion(llm_reply),
+        client._client.chat,
+        "send",
+        return_value=_mock_result(llm_reply),
     ):
         return client.generate(GenerationRequest(prompt="find max"))
+
+
+def test_openrouter_client_reads_the_model_on_every_call() -> None:
+    """An Admin's A-01 model change reaches the next generation."""
+    chosen = ["first/model"]
+    client = OpenRouterGenerationClient(
+        api_key="dummy-key",
+        model=lambda: chosen[0],
+        code_runner=FakeCodeRunner([_ok("5"), _ok("42"), _ok("5"), _ok("42")]),
+    )
+
+    with patch.object(
+        client._client.chat,
+        "send",
+        return_value=_mock_result(_VALID_LLM_RESPONSE),
+    ) as create:
+        client.generate(GenerationRequest(prompt="find max"))
+        chosen[0] = "second/model"
+        client.generate(GenerationRequest(prompt="find max"))
+
+    assert [call.kwargs["model"] for call in create.call_args_list] == [
+        "first/model",
+        "second/model",
+    ]
 
 
 def test_openrouter_client_returns_draft(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _make_client()
 
     with patch.object(
-        client._client.chat.completions,
-        "create",
-        return_value=_mock_completion(_VALID_LLM_RESPONSE),
+        client._client.chat,
+        "send",
+        return_value=_mock_result(_VALID_LLM_RESPONSE),
     ):
         response = client.generate(GenerationRequest(prompt="find max in array"))
 
@@ -265,35 +291,82 @@ def test_openrouter_client_citations_are_empty(monkeypatch: pytest.MonkeyPatch) 
     client = _make_client()
 
     with patch.object(
-        client._client.chat.completions,
-        "create",
-        return_value=_mock_completion(_VALID_LLM_RESPONSE),
+        client._client.chat,
+        "send",
+        return_value=_mock_result(_VALID_LLM_RESPONSE),
     ):
         response = client.generate(GenerationRequest(prompt="find max"))
 
     assert response.citations == []
 
 
-def test_openrouter_client_retries_transient_errors() -> None:
-    client = _make_client()
+def _chat_result_json(content: str) -> dict[str, object]:
+    return {
+        "id": "gen-1",
+        "object": "chat.completion",
+        "created": 1,
+        "model": "test/model",
+        "system_fingerprint": None,
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": "stop",
+                "message": {"role": "assistant", "content": content},
+            }
+        ],
+    }
 
-    assert client._client.max_retries == 4
+
+def test_openrouter_client_retries_a_rate_limit_then_parses_the_reply(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Free models return transient 429s; the SDK alone retries only 5XX."""
+    monkeypatch.setattr(openrouter.utils.retries.time, "sleep", lambda _s: None)
+    requests: list[httpx.Request] = []
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if len(requests) == 1:
+            return httpx.Response(429, json={"error": {"code": 429, "message": "x"}})
+        return httpx.Response(200, json=_chat_result_json(_VALID_LLM_RESPONSE))
+
+    client = _make_client(model="some/model:free")
+    client._client.sdk_configuration.client = httpx.Client(
+        transport=httpx.MockTransport(reply)
+    )
+
+    response = client.generate(GenerationRequest(prompt="find max"))
+
+    assert response.draft.title == "Find Maximum"
+    assert len(requests) == 2
+    assert requests[-1].url == "https://openrouter.ai/api/v1/chat/completions"
+    body = json.loads(requests[-1].content)
+    assert body["model"] == "some/model:free"
+    assert [message["role"] for message in body["messages"]] == ["system", "user"]
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        OpenRouterError(
+            "429 rate limited",
+            httpx.Response(429, request=httpx.Request("POST", "https://x")),
+        ),
+        NoResponseError("429 rate limited"),
+        httpx.ReadTimeout("429 rate limited"),
+    ],
+    ids=["openrouter-error", "no-response", "timeout"],
+)
 def test_openrouter_client_logs_and_reraises_api_failure(
-    caplog: pytest.LogCaptureFixture,
+    error: Exception, caplog: pytest.LogCaptureFixture
 ) -> None:
     """The service hides the cause, so the client must log it."""
     client = _make_client(model="some/model:free")
 
     with (
-        patch.object(
-            client._client.chat.completions,
-            "create",
-            side_effect=OpenAIError("429 rate limited"),
-        ),
+        patch.object(client._client.chat, "send", side_effect=error),
         caplog.at_level(logging.ERROR, logger="questly.ai.client"),
-        pytest.raises(OpenAIError),
+        pytest.raises(type(error)),
     ):
         client.generate(GenerationRequest(prompt="anything"))
 
@@ -307,9 +380,9 @@ def test_openrouter_client_bad_json_raises(monkeypatch: pytest.MonkeyPatch) -> N
 
     with (
         patch.object(
-            client._client.chat.completions,
-            "create",
-            return_value=_mock_completion("oops not json"),
+            client._client.chat,
+            "send",
+            return_value=_mock_result("oops not json"),
         ),
         pytest.raises(ValueError),
     ):
