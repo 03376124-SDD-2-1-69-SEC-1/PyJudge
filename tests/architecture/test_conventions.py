@@ -160,6 +160,9 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
 # `approved_at` on a draft, once Questly's approval flow needs it -- unlike
 # `created_at`/`updated_at`, that's a business fact, not row bookkeeping.
 ALLOWED_TIMESTAMP_FIELDS: set[str] = {
+    # notifications: list timestamps and determine whether a notification was read.
+    "created_at",
+    "read_at",
     # auth (ADR-0007 §1): verify_email refuses a link after 24 h and
     # resolve_session refuses an expired session.
     "expires_at",
@@ -354,7 +357,6 @@ ACTOR_SLICES = (
     "assignments",
     "generation",
     "submissions",
-    "notifications",
     "admin",
     "documents",
 )
@@ -661,7 +663,7 @@ def test_old_project_name_is_gone() -> None:
             violations.append(f"{name} (path)")
             continue
         try:
-            text = path.read_text()
+            text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
         for lineno, line in enumerate(text.splitlines(), start=1):

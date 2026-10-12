@@ -9,6 +9,7 @@ from tests.fakes.app import build_app, fake_settings
 from tests.fakes.assignments import FakeAssignmentRepository
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
+from tests.fakes.notifications import FakeNotificationRepository
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
@@ -117,6 +118,7 @@ async def test_cookies_are_secure_unless_turned_off() -> None:
         object_storage=FakeObjectStorage(),
         vector_repository=FakeVectorRepository(),
         auth_repository=_users(),
+        notification_repository=FakeNotificationRepository(),
         classroom_repository=FakeClassroomRepository(),
         classroom_stats=FakeClassroomStats(),
     )

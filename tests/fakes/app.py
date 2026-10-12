@@ -40,6 +40,7 @@ from tests.fakes.assignments import (
 from tests.fakes.auth import FakeAuthRepository, FakeClock
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
 from tests.fakes.generation import FakeDocumentCatalog, FakeDraftRepository
+from tests.fakes.notifications import FakeNotificationRepository
 from tests.fakes.submissions import FakeSubmissionRepository, ScriptedCodeRunner
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
@@ -78,6 +79,7 @@ def build_app(
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
+    notification_repository: FakeNotificationRepository | None = None,
     admin_repository: AdminRepository | None = None,
     system_health_checker: SystemHealthChecker | None = None,
     verification_mailer: StubEmailSender | None = None,
@@ -122,6 +124,8 @@ def build_app(
         verification_mailer = StubEmailSender()
     if clock is None:
         clock = FakeClock()
+    if notification_repository is None:
+        notification_repository = FakeNotificationRepository()
     if classroom_repository is None:
         classroom_repository = FakeClassroomRepository()
     if classroom_stats is None:
@@ -141,9 +145,10 @@ def build_app(
         document_catalog=document_catalog,
         vector_repository=vector_repository,
         auth_repository=auth_repository,
+        email_sender=verification_mailer,
+        notification_repository=notification_repository,
         admin_repository=admin_repository,
         system_health_checker=system_health_checker,
-        verification_mailer=verification_mailer,
         clock=clock,
         classroom_repository=classroom_repository,
         classroom_stats=classroom_stats,

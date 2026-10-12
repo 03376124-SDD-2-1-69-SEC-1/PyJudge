@@ -1,5 +1,6 @@
 """scripts/demo.py builds a clickable app from fakes and a seed."""
 
+import logging
 from datetime import UTC, datetime
 
 import pytest
@@ -7,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 from scripts.demo import DemoSeed, build_demo_app
 
 from questly.core.auth.models import Actor
+from questly.core.notifications.models import NotificationKind
 from tests.fakes.auth import DEFAULT_NOW, FakeClock
 from tests.integration.forms import post_form
 
@@ -90,3 +92,21 @@ def test_seeded_deadlines_follow_the_clock(now: datetime) -> None:
         "Matrix transpose": False,
         "Stack with min()": False,
     }
+
+
+def test_seeded_students_have_notifications_and_verify_links_still_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    seed = DemoSeed()
+    app = build_demo_app(seed)
+    nattapong = seed.students[0]
+
+    kinds = {n.kind for n in seed.notifications.list_for_user(nattapong.id)}
+    with caplog.at_level(logging.WARNING, logger="questly.email"):
+        app.state.auth_service.resend_verification("new.student@kmitl.ac.th")
+
+    assert kinds == {
+        NotificationKind.ASSIGNMENT_PUBLISHED,
+        NotificationKind.ASSIGNMENT_UPDATED,
+    }
+    assert "/verify?token=" in caplog.text

@@ -291,6 +291,21 @@ def unpost(request: Request, classroom_id: int, assignment_id: int) -> Response:
 
 
 @classroom_router.post(
+    "/{classroom_id}/assignments/{assignment_id}/notify",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def notify_students(
+    request: Request, classroom_id: int, assignment_id: int
+) -> Response:
+    """T-02c "Notify students": notify every Member of this Classroom."""
+    with domain_errors():
+        assignment_service(request).notify_students(
+            current_actor(request), classroom_id, assignment_id
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@classroom_router.post(
     "/{classroom_id}/assignments/{assignment_id}/close",
     response_model=PostingResponse,
 )

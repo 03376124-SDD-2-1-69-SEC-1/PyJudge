@@ -49,6 +49,7 @@ from tests.fakes.assignments import (
 )
 from tests.fakes.auth import FakeAuthRepository, FakeClock, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
+from tests.fakes.notifications import RecordingMemberNotifier
 from tests.fakes.submissions import FakeSubmissionRepository, ScriptedCodeRunner
 
 NOW = datetime(2026, 9, 24, 3, 0, tzinfo=UTC)
@@ -81,6 +82,7 @@ class World:
             self.classrooms,
             SubmissionPostingStats(self.submissions, assignments),
             self.clock,
+            RecordingMemberNotifier(),
         )
         self.runner = ScriptedCodeRunner(CORRECT)
         self.service = SubmissionService(

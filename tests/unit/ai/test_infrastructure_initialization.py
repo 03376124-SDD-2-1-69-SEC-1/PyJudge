@@ -11,6 +11,7 @@ import pytest
 
 from questly import config, main
 from questly.database import session
+from questly.database.core.notification_repository import SQLNotificationRepository
 from questly.database.rag import vector_repository as postgres_adapter
 from questly.database.storage import r2
 
@@ -113,6 +114,10 @@ def test_production_composition_wires_the_postgres_vector_repository(
 
     assert application.state.vector_service._repository is repository
     adapter_factory.assert_called_once()
+    assert isinstance(
+        application.state.notification_service._repository,
+        SQLNotificationRepository,
+    )
 
 
 def test_postgres_repository_rejects_non_psycopg_urls() -> None:

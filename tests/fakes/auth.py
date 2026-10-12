@@ -1,7 +1,8 @@
-"""In-memory AuthRepository, a settable clock, and a seeding helper."""
+"""In-memory AuthRepository, a settable clock, and seeding and email helpers."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -16,6 +17,7 @@ from questly.core.auth.models import (
     VerificationToken,
 )
 from questly.core.auth.service import hash_password
+from questly.integrations.email import StubEmailSender
 
 DEFAULT_NOW = datetime(2026, 9, 28, 9, 0, tzinfo=UTC)
 
@@ -206,3 +208,13 @@ def seed_user(
             email_verified=verified,
         )
     )
+
+
+VERIFY_PATH = re.compile(r"/verify\?token=[\w-]+")
+
+
+def verification_path(mailer: StubEmailSender) -> str:
+    """The `/verify?token=...` link in the newest email `mailer` recorded."""
+    match = VERIFY_PATH.search(mailer.messages[-1].body)
+    assert match is not None, mailer.messages[-1].body
+    return match.group(0)

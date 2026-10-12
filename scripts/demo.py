@@ -55,6 +55,7 @@ from tests.fakes.generation import (
     FakeGenerationClient,
     binary_search_response,
 )
+from tests.fakes.notifications import FakeNotificationRepository
 from tests.fakes.submissions import FakeSubmissionRepository, LocalUnsafeRunner
 
 BANGKOK = ZoneInfo("Asia/Bangkok")
@@ -217,6 +218,8 @@ class DemoSeed:
         self.code_runner: CodeRunner = StubCodeRunner()
         self.drafts = FakeDraftRepository()
         self.documents = FakeDocumentCatalog()
+        # Filled as the seed publishes: one row per Member of each Classroom.
+        self.notifications = FakeNotificationRepository()
         # Every T-03 "Generate" answers with the prototype's binary-search draft.
         self.generation_client = FakeGenerationClient(binary_search_response())
         self.accounts: list[DemoAccount] = []
@@ -527,7 +530,15 @@ def build_demo_app(seed: DemoSeed | None = None) -> FastAPI:
     if seed is None:
         seed = DemoSeed()
     app = _build(seed)
-    _seed_coursework(app, seed)
+    # Publishing emails every Member; the stub would log ~80 of those before
+    # the server starts and bury the startup output.
+    email_log = logging.getLogger("questly.email")
+    level = email_log.level
+    email_log.setLevel(logging.ERROR)
+    try:
+        _seed_coursework(app, seed)
+    finally:
+        email_log.setLevel(level)
     _seed_generation(app, seed)
     return app
 
@@ -545,6 +556,7 @@ def _build(seed: DemoSeed) -> FastAPI:
         draft_repository=seed.drafts,
         document_catalog=seed.documents,
         generation_client=seed.generation_client,
+        notification_repository=seed.notifications,
         demo_accounts=tuple(seed.accounts),
     )
 
