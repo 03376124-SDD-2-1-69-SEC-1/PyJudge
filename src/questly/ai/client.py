@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import httpx
@@ -127,7 +128,11 @@ class OpenRouterGenerationClient:
       catches as GenerationFailedError (T-03d).
     """
 
-    def __init__(self, api_key: str, model: str, code_runner: CodeRunner) -> None:
+    def __init__(
+        self, api_key: str, model: Callable[[], str], code_runner: CodeRunner
+    ) -> None:
+        # Read on every generate(), so the model an Admin picks on A-01 is
+        # used from the next call on.
         self._model = model
         self._code_runner = code_runner
         self._client = OpenRouter(
@@ -136,15 +141,16 @@ class OpenRouterGenerationClient:
 
     def generate(self, request: GenerationRequest) -> GenerationResponse:
         """Call the LLM and parse a structured GenerationResponse."""
+        model = self._model()
         user_content = request.prompt
         if request.filters and request.filters.difficulty:
             user_content += f"\n\nDifficulty level: {request.filters.difficulty}"
 
-        logger.debug("OpenRouterGenerationClient.generate model=%s", self._model)
+        logger.debug("OpenRouterGenerationClient.generate model=%s", model)
 
         try:
             result = self._client.chat.send(
-                model=self._model,
+                model=model,
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
                     {"role": "user", "content": user_content},
@@ -153,20 +159,22 @@ class OpenRouterGenerationClient:
         except _SDK_ERRORS:
             # GenerationService turns every client failure into one generic
             # GenerationFailedError, so this is the only place the cause is seen.
-            logger.exception("OpenRouter call failed model=%s", self._model)
+            logger.exception("OpenRouter call failed model=%s", model)
             raise
 
         content = result.choices[0].message.content
         raw = content if isinstance(content, str) else ""
-        return self._with_expected_outputs(_parse_response(raw))
+        return self._with_expected_outputs(_parse_response(raw), model)
 
-    def _with_expected_outputs(self, parsed: _ParsedReply) -> GenerationResponse:
+    def _with_expected_outputs(
+        self, parsed: _ParsedReply, model: str
+    ) -> GenerationResponse:
         draft = parsed.response.draft
         if not parsed.reference_solution:
             logger.warning(
                 "LLM reply has no reference_solution model=%s; "
                 "expected outputs left blank",
-                self._model,
+                model,
             )
             return parsed.response
 
@@ -184,7 +192,7 @@ class OpenRouterGenerationClient:
                 logger.warning(
                     "reference solution failed model=%s test_case=%d status=%s; "
                     "expected output left blank",
-                    self._model,
+                    model,
                     index,
                     execution.status.value,
                 )

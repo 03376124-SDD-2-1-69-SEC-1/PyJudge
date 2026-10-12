@@ -18,7 +18,7 @@
           <td>{{ member.full_name }}</td>
           <td>{{ member.student_number or "—" }}</td>
           <td>{{ member.email }}</td>
-          <td>{{ member.joined_at.strftime("%-d %b") }}</td>
+          <td>{{ member.joined_at | local("%-d %b") }}</td>
           <td class="text-right">{{ action_form("/classes/" ~ view.classroom.id ~ "/members/" ~ member.user_id ~ "/remove", "Remove", variant="ghost", size="sm") }}</td>
         </tr>
         {% endfor %}

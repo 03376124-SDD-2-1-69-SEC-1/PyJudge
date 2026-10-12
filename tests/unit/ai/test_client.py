@@ -150,7 +150,7 @@ def _make_client(
     if code_runner is None:
         code_runner = FakeCodeRunner([_ok("5"), _ok("42")])
     return OpenRouterGenerationClient(
-        api_key="dummy-key", model=model, code_runner=code_runner
+        api_key="dummy-key", model=lambda: model, code_runner=code_runner
     )
 
 
@@ -191,6 +191,30 @@ def _generate(client: OpenRouterGenerationClient, llm_reply: str) -> GenerationR
         return_value=_mock_result(llm_reply),
     ):
         return client.generate(GenerationRequest(prompt="find max"))
+
+
+def test_openrouter_client_reads_the_model_on_every_call() -> None:
+    """An Admin's A-01 model change reaches the next generation."""
+    chosen = ["first/model"]
+    client = OpenRouterGenerationClient(
+        api_key="dummy-key",
+        model=lambda: chosen[0],
+        code_runner=FakeCodeRunner([_ok("5"), _ok("42"), _ok("5"), _ok("42")]),
+    )
+
+    with patch.object(
+        client._client.chat,
+        "send",
+        return_value=_mock_result(_VALID_LLM_RESPONSE),
+    ) as create:
+        client.generate(GenerationRequest(prompt="find max"))
+        chosen[0] = "second/model"
+        client.generate(GenerationRequest(prompt="find max"))
+
+    assert [call.kwargs["model"] for call in create.call_args_list] == [
+        "first/model",
+        "second/model",
+    ]
 
 
 def test_openrouter_client_returns_draft(monkeypatch: pytest.MonkeyPatch) -> None:

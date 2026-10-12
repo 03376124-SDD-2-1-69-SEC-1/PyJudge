@@ -94,6 +94,10 @@ class DraftRepository(Protocol):
 
     def count_generations(self, user_id: int, since: datetime) -> int: ...
 
+    def count_all_generations(self, since: datetime) -> int:
+        """Every user's generations at or after `since` (A-01 usage)."""
+        ...
+
 
 class DocumentCatalog(Protocol):
     """The Instructor's Document library, owned by the documents slice."""

@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from questly.ai.app.repository import VectorRepository
 from questly.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
+from questly.core.admin.ports import AdminRepository, SystemHealthChecker
 from questly.core.assignments.ports import (
     AssignmentRepository,
     PostingRepository,
@@ -30,6 +31,7 @@ from questly.core.topics.ports import TopicRepository
 from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from questly.integrations.email import StubEmailSender
 from questly.main import create_app
+from tests.fakes.admin import FakeAdminRepository, FakeSystemHealthChecker
 from tests.fakes.assignments import (
     FakeAssignmentRepository,
     FakePostingRepository,
@@ -76,6 +78,8 @@ def build_app(
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
+    admin_repository: AdminRepository | None = None,
+    system_health_checker: SystemHealthChecker | None = None,
     verification_mailer: StubEmailSender | None = None,
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
@@ -110,6 +114,10 @@ def build_app(
         vector_repository = FakeVectorRepository()
     if auth_repository is None:
         auth_repository = FakeAuthRepository()
+    if admin_repository is None:
+        admin_repository = FakeAdminRepository()
+    if system_health_checker is None:
+        system_health_checker = FakeSystemHealthChecker()
     if verification_mailer is None:
         verification_mailer = StubEmailSender()
     if clock is None:
@@ -133,6 +141,8 @@ def build_app(
         document_catalog=document_catalog,
         vector_repository=vector_repository,
         auth_repository=auth_repository,
+        admin_repository=admin_repository,
+        system_health_checker=system_health_checker,
         verification_mailer=verification_mailer,
         clock=clock,
         classroom_repository=classroom_repository,
