@@ -30,7 +30,16 @@ from questly.core.generation.models import (
     DraftPart,
     DraftSettings,
     DraftStatus,
+    GenerationAbandonedError,
+    GenerationForm,
+    GenerationJob,
+    GenerationStep,
+    JobError,
+    JobProgress,
+    JobStatus,
+    ProviderQuotaSnapshot,
     QuotaStatus,
+    StartedJob,
 )
 from questly.core.generation.ports import (
     AssignmentPublisher,
@@ -39,6 +48,8 @@ from questly.core.generation.ports import (
     DocumentCatalog,
     DraftRepository,
     GenerationClient,
+    GenerationJobStore,
+    ProviderQuota,
 )
 from questly.core.generation.schemas import AssignmentDraft as DraftSchema
 from questly.core.generation.schemas import Citation as CitationSchema
@@ -58,6 +69,18 @@ class GenerationFailedError(Exception):
 
 class QuotaExceededError(Exception):
     """No generations left today."""
+
+
+class ProviderQuotaExceededError(Exception):
+    """The provider's own free quota is spent until `resets_at`."""
+
+    def __init__(self, resets_at: datetime) -> None:
+        super().__init__(f"provider quota spent until {resets_at.isoformat()}")
+        self.resets_at = resets_at
+
+
+class GenerationJobGoneError(Exception):
+    """No such job: it never existed here, or the server restarted since."""
 
 
 class DraftNotFoundError(Exception):
@@ -87,6 +110,10 @@ class _Unset:
 UNSET = _Unset()
 
 
+def _ignore_step(step: GenerationStep) -> None:
+    """The `on_step` of a caller that shows no progress (the JSON API)."""
+
+
 class GenerationService:
     def __init__(
         self,
@@ -97,6 +124,8 @@ class GenerationService:
         publisher: AssignmentPublisher,
         clock: Clock,
         daily_quota: Callable[[], int],
+        jobs: GenerationJobStore,
+        provider_quota: ProviderQuota,
     ) -> None:
         self._drafts = drafts
         self._client = client
@@ -105,6 +134,8 @@ class GenerationService:
         self._publisher = publisher
         self._clock = clock
         self._daily_quota = daily_quota
+        self._jobs = jobs
+        self._provider_quota = provider_quota
 
     # ---- T-03 ----------------------------------------------------------------
 
@@ -129,28 +160,24 @@ class GenerationService:
         difficulty: Difficulty,
         topic_id: int | None = None,
         document_ids: list[int] | None = None,
+        on_step: Callable[[GenerationStep], None] = _ignore_step,
     ) -> Draft:
-        """Ask the model for a draft; charge the quota only when it answers."""
-        self._require_owner(actor, classroom_id)
-        prompt = prompt.strip()
-        if not prompt:
-            raise ValueError("describe the problem you want")
-        if document_ids is None:
-            document_ids = []
-        allowed = {
-            document.id for document in self._documents.documents_of(actor.user_id)
-        }
-        if not set(document_ids) <= allowed:
-            raise DocumentNotAllowedError
-        self._require_quota(actor)
+        """Ask the model for a draft; charge the quota only when it answers.
+
+        `on_step` hears each stage (T-03c); it may raise to abandon the run
+        before anything is saved or charged.
+        """
+        prompt, document_ids = self._prepare(actor, classroom_id, prompt, document_ids)
 
         response = self._call(
             GenerationRequest(
                 prompt=prompt,
                 filters=GenerationFilters(difficulty=difficulty.value),
                 document_ids=document_ids,
-            )
+            ),
+            on_step,
         )
+        on_step(GenerationStep.SAVING)
         now = self._clock.now()
         draft = self._drafts.create(
             Draft(
@@ -176,7 +203,8 @@ class GenerationService:
                 prompt=draft.prompt,
                 filters=GenerationFilters(difficulty=draft.content.difficulty.value),
                 document_ids=draft.document_ids,
-            )
+            ),
+            _ignore_step,
         )
         if part is DraftPart.TITLE:
             content = replace(draft.content, title=response.draft.title)
@@ -185,6 +213,94 @@ class GenerationService:
         updated = self._drafts.update(replace(draft, content=content))
         self._drafts.record_generation(actor.user_id, self._clock.now())
         return updated
+
+    # ---- T-03c: Generate as a background job (ADR-0010) --------------------------
+
+    def provider_quota(self, actor: Actor) -> ProviderQuotaSnapshot:
+        """T-03's second quota line: what the provider says is left today."""
+        self._require_instructor(actor)
+        return self._provider_quota.snapshot()
+
+    def start_job(
+        self,
+        actor: Actor,
+        classroom_id: int,
+        *,
+        prompt: str,
+        difficulty: Difficulty,
+        topic_id: int | None = None,
+        document_ids: list[int] | None = None,
+    ) -> StartedJob:
+        """Validate the form, check both quotas and register a running job.
+
+        A second Generate while one is still running returns that job, so the
+        caller must run the work only when `created`.
+        """
+        self._require_owner(actor, classroom_id)
+        running = self._jobs.running_for(actor.user_id, classroom_id)
+        if running is not None:
+            running = self._expire_if_stale(running)
+            if running.status is JobStatus.RUNNING:
+                return StartedJob(running, created=False)
+        prompt, document_ids = self._prepare(actor, classroom_id, prompt, document_ids)
+        snapshot = self._provider_quota.snapshot()
+        if snapshot.is_spent:
+            raise ProviderQuotaExceededError(snapshot.resets_at)
+        return self._jobs.create_unless_running(
+            GenerationJob(
+                actor=actor,
+                classroom_id=classroom_id,
+                form=GenerationForm(prompt, difficulty, topic_id, document_ids),
+                started_at=self._clock.now(),
+            )
+        )
+
+    def run_job(self, actor: Actor, classroom_id: int, job_id: int) -> None:
+        """Do the work of a job (the background task).
+
+        A failed run does not raise: its outcome is the job's status.
+        """
+        job = self._own_job(actor, classroom_id, job_id)
+        if job.status is not JobStatus.RUNNING:
+            return
+
+        def on_step(step: GenerationStep) -> None:
+            self._jobs.update(job_id, lambda j: j.advance(step, self._clock.now()))
+
+        try:
+            draft = self.generate(
+                job.actor,
+                job.classroom_id,
+                prompt=job.form.prompt,
+                difficulty=job.form.difficulty,
+                topic_id=job.form.topic_id,
+                document_ids=job.form.document_ids,
+                on_step=on_step,
+            )
+        except GenerationAbandonedError:
+            return
+        except GenerationFailedError:
+            self._jobs.update(job_id, lambda j: j.fail(JobError.FAILED))
+        except QuotaExceededError:
+            self._jobs.update(job_id, lambda j: j.fail(JobError.QUOTA))
+        except (ValueError, DocumentNotAllowedError, ClassroomNotVisibleError):
+            self._jobs.update(job_id, lambda j: j.fail(JobError.INVALID))
+        except Exception:
+            self._jobs.update(job_id, lambda j: j.fail(JobError.FAILED))
+            raise
+        else:
+            self._jobs.update(job_id, lambda j: j.finish(draft.id, self._clock.now()))
+            self._provider_quota.invalidate()
+
+    def job(self, actor: Actor, classroom_id: int, job_id: int) -> JobProgress:
+        """T-03c: only the Instructor who started the job may read it."""
+        job = self._expire_if_stale(self._own_job(actor, classroom_id, job_id))
+        return job.progress(self._clock.now())
+
+    def cancel_job(self, actor: Actor, classroom_id: int, job_id: int) -> GenerationJob:
+        """T-03c "Cancel": stop waiting. The work stops at its next step."""
+        self._own_job(actor, classroom_id, job_id)
+        return self._jobs.update(job_id, lambda j: j.cancel())
 
     # ---- Drafts (T-01 list, T-04 stepper) --------------------------------------
 
@@ -317,9 +433,13 @@ class GenerationService:
 
     # ---- Internals ---------------------------------------------------------
 
-    def _call(self, request: GenerationRequest) -> GenerationResponse:
+    def _call(
+        self, request: GenerationRequest, on_step: Callable[[GenerationStep], None]
+    ) -> GenerationResponse:
         try:
-            return self._client.generate(request)
+            return self._client.generate(request, on_step)
+        except GenerationAbandonedError:
+            raise
         except Exception as error:  # noqa: BLE001 -- any client failure is T-03d
             raise GenerationFailedError from error
 
@@ -333,6 +453,45 @@ class GenerationService:
             raise ClassroomNotVisibleError
         if role is not ClassroomRole.OWNER:
             raise PermissionDeniedError
+
+    def _prepare(
+        self,
+        actor: Actor,
+        classroom_id: int,
+        prompt: str,
+        document_ids: list[int] | None,
+    ) -> tuple[str, list[int]]:
+        """What Generate checks before it spends anything."""
+        self._require_owner(actor, classroom_id)
+        prompt = prompt.strip()
+        if not prompt:
+            raise ValueError("describe the problem you want")
+        if document_ids is None:
+            document_ids = []
+        allowed = {
+            document.id for document in self._documents.documents_of(actor.user_id)
+        }
+        if not set(document_ids) <= allowed:
+            raise DocumentNotAllowedError
+        self._require_quota(actor)
+        return prompt, document_ids
+
+    def _own_job(self, actor: Actor, classroom_id: int, job_id: int) -> GenerationJob:
+        self._require_owner(actor, classroom_id)
+        job = self._jobs.get(job_id)
+        if job is None:
+            raise GenerationJobGoneError
+        if job.classroom_id != classroom_id or job.actor.user_id != actor.user_id:
+            raise ClassroomNotVisibleError
+        return job
+
+    def _expire_if_stale(self, job: GenerationJob) -> GenerationJob:
+        if not job.is_stale(self._clock.now()):
+            return job
+        return self._jobs.update(
+            job.id,
+            lambda j: j.fail(JobError.TIMEOUT) if j.is_stale(self._clock.now()) else j,
+        )
 
     def _require_quota(self, actor: Actor) -> None:
         if self.quota(actor).remaining <= 0:

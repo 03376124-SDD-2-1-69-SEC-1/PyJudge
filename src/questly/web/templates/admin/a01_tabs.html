@@ -1,0 +1,7 @@
+{% from "_components/ui.html" import page_header, tabs %}
+{{ page_header("Settings") }}
+{{ tabs([
+  ("users", "Users", "/admin/settings"),
+  ("ai", "AI", "/admin/settings/ai"),
+  ("status", "System status", "/admin/settings/status"),
+], tab, label="Admin tabs") }}

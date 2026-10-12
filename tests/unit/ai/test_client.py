@@ -20,6 +20,7 @@ from questly.ai.client import (
     StubGenerationClient,
     _parse_response,
 )
+from questly.core.generation.models import GenerationStep
 from questly.core.generation.schemas import GenerationRequest, GenerationResponse
 from questly.core.submissions.models import Execution, ExecutionStatus
 
@@ -32,7 +33,7 @@ def test_stub_client_returns_draft_with_citations() -> None:
     client = StubGenerationClient()
     request = GenerationRequest(prompt="two-sum problem")
 
-    response = client.generate(request)
+    response = client.generate(request, _ignore_step)
 
     assert response.draft.title
     assert response.draft.test_cases
@@ -43,7 +44,7 @@ def test_stub_client_echoes_prompt_into_statement() -> None:
     client = StubGenerationClient()
     request = GenerationRequest(prompt="reverse a linked list")
 
-    response = client.generate(request)
+    response = client.generate(request, _ignore_step)
 
     assert "reverse a linked list" in response.draft.statement
 
@@ -184,13 +185,17 @@ _NO_SOLUTION_LLM_RESPONSE = """{
 }"""
 
 
+def _ignore_step(step: GenerationStep) -> None:
+    pass
+
+
 def _generate(client: OpenRouterGenerationClient, llm_reply: str) -> GenerationResponse:
     with patch.object(
         client._client.chat,
         "send",
         return_value=_mock_result(llm_reply),
     ):
-        return client.generate(GenerationRequest(prompt="find max"))
+        return client.generate(GenerationRequest(prompt="find max"), _ignore_step)
 
 
 def test_openrouter_client_reads_the_model_on_every_call() -> None:
@@ -207,9 +212,9 @@ def test_openrouter_client_reads_the_model_on_every_call() -> None:
         "send",
         return_value=_mock_result(_VALID_LLM_RESPONSE),
     ) as create:
-        client.generate(GenerationRequest(prompt="find max"))
+        client.generate(GenerationRequest(prompt="find max"), _ignore_step)
         chosen[0] = "second/model"
-        client.generate(GenerationRequest(prompt="find max"))
+        client.generate(GenerationRequest(prompt="find max"), _ignore_step)
 
     assert [call.kwargs["model"] for call in create.call_args_list] == [
         "first/model",
@@ -225,7 +230,9 @@ def test_openrouter_client_returns_draft(monkeypatch: pytest.MonkeyPatch) -> Non
         "send",
         return_value=_mock_result(_VALID_LLM_RESPONSE),
     ):
-        response = client.generate(GenerationRequest(prompt="find max in array"))
+        response = client.generate(
+            GenerationRequest(prompt="find max in array"), _ignore_step
+        )
 
     assert response.draft.title == "Find Maximum"
     assert len(response.draft.test_cases) == 2
@@ -295,7 +302,7 @@ def test_openrouter_client_citations_are_empty(monkeypatch: pytest.MonkeyPatch) 
         "send",
         return_value=_mock_result(_VALID_LLM_RESPONSE),
     ):
-        response = client.generate(GenerationRequest(prompt="find max"))
+        response = client.generate(GenerationRequest(prompt="find max"), _ignore_step)
 
     assert response.citations == []
 
@@ -335,7 +342,7 @@ def test_openrouter_client_retries_a_rate_limit_then_parses_the_reply(
         transport=httpx.MockTransport(reply)
     )
 
-    response = client.generate(GenerationRequest(prompt="find max"))
+    response = client.generate(GenerationRequest(prompt="find max"), _ignore_step)
 
     assert response.draft.title == "Find Maximum"
     assert len(requests) == 2
@@ -368,7 +375,7 @@ def test_openrouter_client_logs_and_reraises_api_failure(
         caplog.at_level(logging.ERROR, logger="questly.ai.client"),
         pytest.raises(type(error)),
     ):
-        client.generate(GenerationRequest(prompt="anything"))
+        client.generate(GenerationRequest(prompt="anything"), _ignore_step)
 
     assert "some/model:free" in caplog.text
     assert "429 rate limited" in caplog.text
@@ -386,4 +393,60 @@ def test_openrouter_client_bad_json_raises(monkeypatch: pytest.MonkeyPatch) -> N
         ),
         pytest.raises(ValueError),
     ):
-        client.generate(GenerationRequest(prompt="anything"))
+        client.generate(GenerationRequest(prompt="anything"), _ignore_step)
+
+
+def _steps_of(
+    client: OpenRouterGenerationClient, llm_reply: str
+) -> list[GenerationStep]:
+    steps: list[GenerationStep] = []
+    with patch.object(
+        client._client.chat, "send", return_value=_mock_result(llm_reply)
+    ):
+        client.generate(GenerationRequest(prompt="find max"), steps.append)
+    return steps
+
+
+def test_openrouter_client_reports_the_stages_it_really_runs() -> None:
+    steps = _steps_of(_make_client(), _VALID_LLM_RESPONSE)
+
+    assert steps == [
+        GenerationStep.CALLING_MODEL,
+        GenerationStep.VALIDATING,
+        GenerationStep.RUNNING_SOLUTION,
+    ]
+
+
+def test_openrouter_client_skips_running_solution_when_there_is_none() -> None:
+    steps = _steps_of(_make_client(), _NO_SOLUTION_LLM_RESPONSE)
+
+    assert steps == [GenerationStep.CALLING_MODEL, GenerationStep.VALIDATING]
+
+
+def test_a_step_callback_that_raises_stops_before_the_next_stage() -> None:
+    class Stop(Exception):
+        pass
+
+    def stop_at_validating(step: GenerationStep) -> None:
+        if step is GenerationStep.VALIDATING:
+            raise Stop
+
+    runner = FakeCodeRunner([_ok("5"), _ok("42")])
+    client = _make_client(code_runner=runner)
+    with (
+        patch.object(
+            client._client.chat, "send", return_value=_mock_result(_VALID_LLM_RESPONSE)
+        ),
+        pytest.raises(Stop),
+    ):
+        client.generate(GenerationRequest(prompt="find max"), stop_at_validating)
+
+    assert runner.calls == []
+
+
+def test_stub_client_reports_the_stages_it_runs() -> None:
+    steps: list[GenerationStep] = []
+
+    StubGenerationClient().generate(GenerationRequest(prompt="x"), steps.append)
+
+    assert steps == [GenerationStep.CALLING_MODEL, GenerationStep.VALIDATING]

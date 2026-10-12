@@ -9,18 +9,25 @@
     {% call alert(tone="danger", state="T-03d") %}
       <span><strong>Generation failed — the model did not respond.</strong> Nothing was saved and no quota was used. Try again, or narrow the prompt to fewer documents.</span>
     {% endcall %}
+  {% elif error == "timeout" %}
+    {% call alert(tone="danger", state="T-03d") %}
+      <span><strong>Generation took too long and was stopped.</strong> Nothing was saved and no quota was used. Try again, or narrow the prompt to fewer documents.</span>
+    {% endcall %}
   {% elif error == "quota" %}
     {% call alert(tone="danger") %}You have used all {{ quota.limit }} generations for today. The quota resets at midnight.{% endcall %}
   {% elif error == "invalid" %}
     {% call alert(tone="danger") %}Describe the problem and choose documents from your library.{% endcall %}
+  {% endif %}
+  {% if provider.is_spent %}
+    {% call alert(tone="danger", state="T-03-provider-quota") %}OpenRouter's free-model quota is spent for today. Generate works again when it resets at {{ provider_resets }} (Bangkok time).{% endcall %}
   {% endif %}
   <form method="post" action="/classes/{{ classroom_id }}/generate" class="mt-4 grid gap-6 lg:grid-cols-[2fr_1fr]">
     {{ csrf_field() }}
     <div class="flex flex-col gap-3">
       {{ textarea_field("prompt", "What should the problem be about?", value=form.prompt, required=true, rows=5, placeholder="Write a problem about binary search on a sorted list of integers…") }}
       <div class="flex items-center gap-3">
-        {{ button("Try again" if error == "failed" else "Generate", variant="primary", disabled=quota.remaining == 0) }}
-        <span class="text-xxs text-mid">Uses 1 of your {{ quota.limit }} daily generations · {{ quota.remaining }} left today.</span>
+        {{ button("Try again" if error in ("failed", "timeout") else "Generate", variant="primary", disabled=quota.remaining == 0 or provider.is_spent) }}
+        {% include "instructor/t03_quota.html" %}
       </div>
     </div>
     <div class="flex flex-col gap-4">

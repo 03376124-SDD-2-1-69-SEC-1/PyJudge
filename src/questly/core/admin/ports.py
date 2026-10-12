@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Protocol
 
 from questly.core.admin.models import AISettings, SystemStatus
+from questly.core.generation.models import ProviderQuotaSnapshot
 
 
 class AdminRepository(Protocol):
@@ -19,6 +20,14 @@ class GenerationUsage(Protocol):
 
     def count_all_generations(self, since: datetime) -> int:
         """Every user's generations at or after `since`."""
+        ...
+
+
+class ProviderQuotaReader(Protocol):
+    """What the A-01 AI tab needs from the generation slice's ProviderQuota."""
+
+    def snapshot(self) -> ProviderQuotaSnapshot:
+        """What the model provider says is left today; never raises."""
         ...
 
 

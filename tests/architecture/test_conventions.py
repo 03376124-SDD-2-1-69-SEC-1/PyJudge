@@ -181,6 +181,13 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "changed_at",
     # generation: T-01 Drafts "Created" column and T-03a "Generated ...".
     "generated_at",
+    # generation (ADR-0010): T-03c shows elapsed and per-step seconds, and
+    # GenerationJob.is_stale (3 minutes) reads started_at.
+    "started_at",
+    "step_started_at",
+    "finished_at",
+    # generation (ADR-0010): T-03's "resets 07:00" line.
+    "resets_at",
     # submissions (ADR-0007 §5.6): is_late compares submitted_at with the
     # deadline; S-02g and T-02 show it in "Submitted".
     "submitted_at",
@@ -211,6 +218,8 @@ ALLOWED_ID_SUFFIX_FIELDS = {
     # results, PostingStats) -- the Counted Submission is found through it.
     "posting_id",
     "topic_id",
+    # generation (ADR-0010): a done job points T-03c at the Draft to open.
+    "draft_id",
 }
 
 
@@ -257,6 +266,15 @@ def test_domain_models_hold_no_table_only_fields() -> None:
     )
 
 
+# A process-memory adapter that production deliberately wires. Each entry needs
+# an ADR saying why; anything not listed here is still an accident.
+ALLOWED_IN_MEMORY_ADAPTERS = {
+    # ADR-0010: Generate jobs live in this process for the PoC (one user, one
+    # process). The GenerationJobStore port lets a database store replace it.
+    "InMemoryGenerationJobStore",
+}
+
+
 def test_no_in_memory_adapter_ships_inside_src() -> None:
     """Fakes live in tests/fakes/, never in the package.
 
@@ -271,7 +289,10 @@ def test_no_in_memory_adapter_ships_inside_src() -> None:
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
                 continue
-            if node.name.startswith(("InMemory", "Fake")):
+            if (
+                node.name.startswith(("InMemory", "Fake"))
+                and node.name not in ALLOWED_IN_MEMORY_ADAPTERS
+            ):
                 violations.append(f"{source_file}:{node.lineno}: {node.name}")
 
     assert not violations, (

@@ -27,8 +27,11 @@ class FakeAdminRepository:
 
 
 class FakeSystemHealthChecker:
-    def __init__(self, is_healthy: bool = True) -> None:
+    """All six services up, all down, or only the names in `down` down."""
+
+    def __init__(self, is_healthy: bool = True, down: tuple[str, ...] = ()) -> None:
         self.is_healthy = is_healthy
+        self.down = down
 
     def check_services_health(self) -> SystemStatus:
         status = (
@@ -45,5 +48,13 @@ class FakeSystemHealthChecker:
             "email delivery",
         )
         return SystemStatus(
-            services=[ServiceStatus(name=name, status=status) for name in names]
+            services=[
+                ServiceStatus(
+                    name=name,
+                    status=ServiceHealthStatus.UNHEALTHY
+                    if name in self.down
+                    else status,
+                )
+                for name in names
+            ]
         )
