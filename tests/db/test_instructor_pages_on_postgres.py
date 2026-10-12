@@ -10,7 +10,6 @@ waits for CORE-16 and OPS-20.)
 from dataclasses import replace
 from datetime import UTC, datetime
 
-import httpx
 import pytest
 from sqlalchemy import text
 
@@ -29,7 +28,7 @@ from questly.main import create_app
 from tests.fakes.app import fake_settings
 from tests.fakes.uploads import FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
-from tests.integration.forms import log_in, post_form
+from tests.integration.forms import asgi_client, log_in, post_form
 
 pytestmark = pytest.mark.postgres
 
@@ -99,12 +98,6 @@ class World:
         self.posting = published.postings[0]
         self.t02 = f"/classes/{self.classroom.id}/assignments/{self.assignment.id}"
 
-    def client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=self.app),
-            base_url="http://testserver",
-        )
-
     def rows(self, sql: str) -> list[tuple]:
         with self.session_factory() as session:
             return [tuple(row) for row in session.execute(text(sql)).all()]
@@ -116,7 +109,7 @@ async def test_t05_submit_creates_a_new_version_and_moves_the_chosen_deadline(
     postgres_url: str, session_factory: SessionFactory
 ) -> None:
     world = World(postgres_url, session_factory)
-    client = world.client()
+    client = asgi_client(world.app)
     await log_in(client, INSTRUCTOR_EMAIL, PASSWORD)
     edit = world.t02 + "/edit"
     page = await client.get(edit)
@@ -175,7 +168,7 @@ async def test_t05_blank_reason_writes_no_version(
     postgres_url: str, session_factory: SessionFactory
 ) -> None:
     world = World(postgres_url, session_factory)
-    client = world.client()
+    client = asgi_client(world.app)
     await log_in(client, INSTRUCTOR_EMAIL, PASSWORD)
     edit = world.t02 + "/edit"
     tests = world.assignment.test_cases
@@ -209,7 +202,7 @@ async def test_t02_search_and_notify_students_read_and_write_postgres(
     postgres_url: str, session_factory: SessionFactory
 ) -> None:
     world = World(postgres_url, session_factory)
-    client = world.client()
+    client = asgi_client(world.app)
     await log_in(client, INSTRUCTOR_EMAIL, PASSWORD)
 
     empty = await client.get(world.t02)
