@@ -90,6 +90,13 @@
   .icon-dot {
     @apply relative inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border border-line bg-pap;
   }
+  /* G-02a: the bell is a <summary>; drop the disclosure marker. */
+  .bell {
+    @apply flex cursor-pointer list-none items-center gap-1.5;
+  }
+  .bell::-webkit-details-marker {
+    display: none;
+  }
   .count {
     @apply absolute -top-2 -right-2 min-w-4 rounded-full bg-acc px-1 text-center font-mono text-[10px] leading-4 text-pap;
   }
