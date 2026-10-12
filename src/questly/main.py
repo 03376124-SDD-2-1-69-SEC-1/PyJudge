@@ -28,6 +28,7 @@ from questly.ai.app.service import VectorService
 from questly.ai.client import OpenRouterGenerationClient, StubGenerationClient
 from questly.ai.quota import OpenRouterProviderQuota, StubProviderQuota
 from questly.config import Settings, get_settings
+from questly.core.admin.pages import router as admin_page_router
 from questly.core.admin.ports import AdminRepository, SystemHealthChecker
 from questly.core.admin.routes import router as admin_router
 from questly.core.admin.service import AdminService
@@ -284,6 +285,19 @@ def create_app(
             ),
             email_available=(not isinstance(email_sender, StubEmailSender)),
         )
+    if provider_quota is None:
+        if use_settings().openrouter_api_key:
+            provider_quota = OpenRouterProviderQuota(
+                OpenRouter(
+                    api_key=use_settings().openrouter_api_key,
+                    timeout_ms=_QUOTA_TIMEOUT_MS,
+                ),
+                model=lambda: admin_repository.get_ai_settings().model,
+                generations_since=draft_repository.count_all_generations,
+                clock=clock,
+            )
+        else:
+            provider_quota = StubProviderQuota(clock)
     auth_service = AuthService(auth_repository, notification_service, clock)
     application.state.auth_service = auth_service
     admin_service = AdminService(
@@ -291,6 +305,7 @@ def create_app(
         auth_repository,
         system_health_checker,
         generation_usage=draft_repository,
+        provider_quota=provider_quota,
         clock=clock,
         allowed_models=use_settings().generation_model_allowlist,
     )
@@ -339,19 +354,6 @@ def create_app(
             )
         else:
             generation_client = StubGenerationClient()
-    if provider_quota is None:
-        if use_settings().openrouter_api_key:
-            provider_quota = OpenRouterProviderQuota(
-                OpenRouter(
-                    api_key=use_settings().openrouter_api_key,
-                    timeout_ms=_QUOTA_TIMEOUT_MS,
-                ),
-                model=lambda: admin_repository.get_ai_settings().model,
-                generations_since=draft_repository.count_all_generations,
-                clock=clock,
-            )
-        else:
-            provider_quota = StubProviderQuota(clock)
     if generation_job_store is None:
         generation_job_store = InMemoryGenerationJobStore()
     application.state.generation_service = GenerationService(
@@ -402,6 +404,7 @@ def create_app(
     application.include_router(auth_router)
     application.include_router(auth_page_router)
     application.include_router(admin_router)
+    application.include_router(admin_page_router)
     application.include_router(classroom_router)
     application.include_router(classroom_page_router)
     application.include_router(submission_router)

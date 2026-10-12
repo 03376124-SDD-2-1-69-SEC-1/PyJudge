@@ -21,6 +21,10 @@ class ModelNotAllowedError(Exception):
     """The chosen generation model is not in the configured allowlist: 422."""
 
 
+class InvalidAISettingsError(Exception):
+    """A daily quota or page limit below one: 422. The message names the field."""
+
+
 @dataclass(frozen=True, slots=True)
 class AISettings:
     """The single row of `core.ai_settings`."""

@@ -8,6 +8,7 @@ from questly.core.admin.models import (
     AISettings,
     AISettingsChange,
     AISettingsWithUsage,
+    InvalidAISettingsError,
     ModelNotAllowedError,
     SelfModificationError,
     SystemStatus,
@@ -16,6 +17,7 @@ from questly.core.admin.models import (
 from questly.core.admin.ports import (
     AdminRepository,
     GenerationUsage,
+    ProviderQuotaReader,
     SystemHealthChecker,
 )
 from questly.core.auth.models import (
@@ -27,6 +29,7 @@ from questly.core.auth.models import (
     User,
 )
 from questly.core.auth.ports import AuthRepository, Clock
+from questly.core.generation.models import ProviderQuotaSnapshot
 
 USAGE_ZONE = ZoneInfo("Asia/Bangkok")
 
@@ -38,6 +41,7 @@ class AdminService:
         auth_repo: AuthRepository,
         health_checker: SystemHealthChecker,
         generation_usage: GenerationUsage,
+        provider_quota: ProviderQuotaReader,
         clock: Clock,
         allowed_models: tuple[str, ...],
     ) -> None:
@@ -45,6 +49,7 @@ class AdminService:
         self.auth_repo = auth_repo
         self.health_checker = health_checker
         self.generation_usage = generation_usage
+        self.provider_quota_reader = provider_quota
         self.clock = clock
         self.allowed_models = allowed_models
 
@@ -125,9 +130,18 @@ class AdminService:
         self._require_admin(actor)
         if change.model is not None and change.model not in self.allowed_models:
             raise ModelNotAllowedError(change.model)
+        if change.daily_quota is not None and change.daily_quota < 1:
+            raise InvalidAISettingsError("Daily quota must be at least 1")
+        if change.max_pages is not None and change.max_pages < 1:
+            raise InvalidAISettingsError("Max pages must be at least 1")
         current = self.admin_repo.get_ai_settings()
         saved = self.admin_repo.update_ai_settings(_merge(current, change))
         return self._with_usage(saved)
+
+    def provider_quota(self, actor: Actor) -> ProviderQuotaSnapshot:
+        """The A-01 AI tab's real OpenRouter free quota, as T-03 prints it."""
+        self._require_admin(actor)
+        return self.provider_quota_reader.snapshot()
 
     # --- System Status ---
     def get_system_status(self, actor: Actor) -> SystemStatus:
