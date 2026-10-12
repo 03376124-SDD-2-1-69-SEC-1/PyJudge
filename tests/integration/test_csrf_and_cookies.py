@@ -166,8 +166,9 @@ async def test_root_shows_the_landing_page_to_a_visitor() -> None:
 @pytest.mark.parametrize(
     ("label", "href"),
     [
-        ("Log in", "/login"),
-        ("Sign up with your @kmitl.ac.th email", "/signup"),
+        ("เข้าสู่ระบบ", "/login"),
+        ("สมัครสมาชิก", "/signup"),
+        ("สมัครด้วยอีเมล @kmitl.ac.th", "/signup"),
     ],
 )
 async def test_landing_calls_to_action_lead_to_live_pages(
@@ -179,3 +180,13 @@ async def test_landing_calls_to_action_lead_to_live_pages(
 
     assert f'href="{href}"' in landing.text and f">{label}</a>" in landing.text
     assert target.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_landing_in_page_links_point_at_its_sections() -> None:
+    async with _client(build_app(auth_repository=_users())) as client:
+        landing = await client.get("/")
+
+    for section in ("features", "how", "problems"):
+        assert f'href="#{section}"' in landing.text
+        assert f'id="{section}"' in landing.text
