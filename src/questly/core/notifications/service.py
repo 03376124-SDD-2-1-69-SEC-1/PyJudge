@@ -1,9 +1,7 @@
 """Business logic for user notifications."""
 
-from datetime import datetime
-from typing import Protocol
-
-from questly.core.notifications.models import Notification
+from questly.core.auth.ports import Clock
+from questly.core.notifications.models import Notification, NotificationKind
 from questly.core.notifications.ports import (
     EmailSender,
     NotificationRepository,
@@ -12,14 +10,6 @@ from questly.core.notifications.ports import (
 
 class NotificationNotFoundError(Exception):
     """Raised when a notification does not exist for the requested user."""
-
-
-class Clock(Protocol):
-    """Provide the current time."""
-
-    def now(self) -> datetime:
-        """Return the current time."""
-        ...
 
 
 class NotificationService:
@@ -69,7 +59,7 @@ class NotificationService:
         self,
         *,
         user_id: int,
-        kind: str,
+        kind: NotificationKind,
         payload: dict[str, str | int | bool | None],
     ) -> Notification:
         """Persist a notification for one user."""

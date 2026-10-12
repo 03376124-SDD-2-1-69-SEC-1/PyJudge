@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from questly.core.notifications.models import NotificationKind
+
 
 class NotificationResponse(BaseModel):
     """One notification returned to its owner."""
@@ -11,7 +13,7 @@ class NotificationResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: int
-    kind: str
+    kind: NotificationKind
     payload: dict[str, str | int | bool | None]
     created_at: datetime
     read_at: datetime | None

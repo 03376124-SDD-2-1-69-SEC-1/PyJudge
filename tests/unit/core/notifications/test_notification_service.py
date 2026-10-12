@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from questly.core.notifications.models import Notification
+from questly.core.notifications.models import Notification, NotificationKind
 from questly.core.notifications.service import (
     NotificationNotFoundError,
     NotificationService,
@@ -53,7 +53,7 @@ def add_notification(
     return repository.create(
         Notification(
             user_id=user_id,
-            kind="assignment_published",
+            kind=NotificationKind.ASSIGNMENT_PUBLISHED,
             payload={"title": "Homework 1"},
             created_at=datetime(2026, 10, 10, 5, 0, tzinfo=UTC),
         )
@@ -108,11 +108,11 @@ def test_create_uses_clock_time(
 ) -> None:
     result = service.create(
         user_id=1,
-        kind="assignment_updated",
+        kind=NotificationKind.ASSIGNMENT_UPDATED,
         payload={"title": "Homework 1", "reason": "Deadline changed"},
     )
 
     assert result.id is not None
     assert result.created_at == FixedClock().now()
     assert result.user_id == 1
-    assert result.kind == "assignment_updated"
+    assert result.kind is NotificationKind.ASSIGNMENT_UPDATED
