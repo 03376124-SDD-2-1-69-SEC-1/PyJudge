@@ -373,9 +373,6 @@
   .h-8 {
     height: calc(var(--spacing) * 8);
   }
-  .h-14 {
-    height: calc(var(--spacing) * 14);
-  }
   .h-auto {
     height: auto;
   }
@@ -387,9 +384,6 @@
   }
   .min-h-screen {
     min-height: 100vh;
-  }
-  .w-14 {
-    width: calc(var(--spacing) * 14);
   }
   .w-56 {
     width: calc(var(--spacing) * 56);
@@ -411,9 +405,6 @@
   }
   .max-w-3xl {
     max-width: var(--container-3xl);
-  }
-  .max-w-\[400px\] {
-    max-width: 400px;
   }
   .max-w-sm {
     max-width: var(--container-sm);
@@ -438,6 +429,9 @@
   }
   .resize {
     resize: both;
+  }
+  .list-disc {
+    list-style-type: disc;
   }
   .grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -576,6 +570,9 @@
   .pb-4 {
     padding-bottom: calc(var(--spacing) * 4);
   }
+  .pl-5 {
+    padding-left: calc(var(--spacing) * 5);
+  }
   .text-center {
     text-align: center;
   }
@@ -591,9 +588,6 @@
   .text-xs {
     font-size: var(--text-xs);
     line-height: var(--tw-leading, var(--text-xs--line-height));
-  }
-  .text-\[20px\] {
-    font-size: 20px;
   }
   .text-ui {
     font-size: var(--text-ui);
@@ -2491,6 +2485,35 @@
   .mobile-logo {
     display: none;
   }
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 48px;
+    border-radius: 20px;
+    background: linear-gradient(145deg, #be185d, #ec4899 64%, #f472b6);
+    color: #fff;
+  }
+  .hero .eyebrow {
+    color: var(--color-brand-100);
+  }
+  .hero .h1 {
+    margin: 0;
+    font-size: var(--text-hero);
+    letter-spacing: -1.5px;
+  }
+  .hero .btn {
+    border-color: rgb(255 255 255 / 0.4);
+    background: transparent;
+    color: #fff;
+  }
+  .hero .btn-primary {
+    border-color: #fff;
+    background: #fff;
+    color: var(--color-acc-ink);
+    box-shadow: none;
+  }
   .verify-card {
     text-align: center;
     align-items: center;
@@ -2533,6 +2556,12 @@
     .mobile-logo {
       display: block;
       margin-bottom: 20px;
+    }
+    .hero {
+      padding: 32px 24px;
+    }
+    .hero .h1 {
+      font-size: 30px;
     }
     .solve-page {
       height: auto;

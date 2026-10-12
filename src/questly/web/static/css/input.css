@@ -1896,6 +1896,35 @@
   .mobile-logo {
     display: none;
   }
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 48px;
+    border-radius: 20px;
+    background: linear-gradient(145deg, #be185d, #ec4899 64%, #f472b6);
+    color: #fff;
+  }
+  .hero .eyebrow {
+    color: var(--color-brand-100);
+  }
+  .hero .h1 {
+    margin: 0;
+    font-size: var(--text-hero);
+    letter-spacing: -1.5px;
+  }
+  .hero .btn {
+    border-color: rgb(255 255 255 / 0.4);
+    background: transparent;
+    color: #fff;
+  }
+  .hero .btn-primary {
+    border-color: #fff;
+    background: #fff;
+    color: var(--color-acc-ink);
+    box-shadow: none;
+  }
   .verify-card {
     text-align: center;
     align-items: center;
@@ -1945,6 +1974,12 @@
     .mobile-logo {
       display: block;
       margin-bottom: 20px;
+    }
+    .hero {
+      padding: 32px 24px;
+    }
+    .hero .h1 {
+      font-size: 30px;
     }
     .solve-page {
       height: auto;
