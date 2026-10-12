@@ -207,6 +207,9 @@
   .static {
     position: static;
   }
+  .z-30 {
+    z-index: 30;
+  }
   .mx-auto {
     margin-inline: auto;
   }
@@ -336,8 +339,14 @@
   .max-w-xl {
     max-width: var(--container-xl);
   }
+  .min-w-0 {
+    min-width: 0px;
+  }
   .flex-1 {
     flex: 1;
+  }
+  .shrink-0 {
+    flex-shrink: 0;
   }
   .transform {
     transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
@@ -705,6 +714,16 @@
     border-width: 1px;
     border-color: var(--color-line);
     background-color: var(--color-pap);
+  }
+  .bell {
+    display: flex;
+    cursor: pointer;
+    list-style-type: none;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .bell::-webkit-details-marker {
+    display: none;
   }
   .count {
     position: absolute;

@@ -72,6 +72,8 @@ from questly.core.generation.ports import (
 from questly.core.generation.routes import classroom_router as draft_classroom_router
 from questly.core.generation.routes import router as draft_router
 from questly.core.generation.service import GenerationService
+from questly.core.notifications.pages import header_notifications
+from questly.core.notifications.pages import router as notification_page_router
 from questly.core.notifications.ports import EmailSender, NotificationRepository
 from questly.core.notifications.routes import router as notification_router
 from questly.core.notifications.service import DueSoonService, NotificationService
@@ -210,6 +212,7 @@ def create_app(
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
     templates.env.globals["asset_url"] = asset_url
     templates.env.globals["csrf_token"] = csrf_token
+    templates.env.globals["header_notifications"] = header_notifications
     templates.env.filters["local"] = local_time
     application.state.templates = templates
     # The "log in as" list on G-01 exists only when scripts/demo.py passes it.
@@ -403,6 +406,7 @@ def create_app(
     application.include_router(upload_router)
     application.include_router(vector_router)
     application.include_router(notification_router)
+    application.include_router(notification_page_router)
     application.include_router(auth_router)
     application.include_router(auth_page_router)
     application.include_router(admin_router)

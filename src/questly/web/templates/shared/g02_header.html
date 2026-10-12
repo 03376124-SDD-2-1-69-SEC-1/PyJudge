@@ -1,14 +1,53 @@
-{# G-02 header; 02a notifications dropdown; 02b mobile menu. Popovers, no JS. #}
-{% from "_components/forms.html" import action_form, toggle with context %}
-{% from "_components/ui.html" import short_name %}
+{# G-02 header; 02a notifications dropdown (<details>); 02b mobile menu. No JS. #}
+{% from "_components/forms.html" import action_form, button, csrf_field, hidden, toggle with context %}
+{% from "_components/ui.html" import badge, short_name %}
+{% set menu = header_notifications(request) %}
 <header class="site-header" data-page="G-02">
   <a class="logo" href="/classes">Questly</a>
   {% if breadcrumb is defined %}<span class="crumb">/ {{ breadcrumb }}</span>{% endif %}
   <div class="ml-auto flex items-center gap-5">
     {#- "My documents" (T-06) returns with the documents slice; /documents is 404 until then. -#}
-    {% call toggle("notifications", aria_label="Notifications") %}
-      <span class="icon-dot">{% if unread_count is defined and unread_count %}<span class="count">{{ unread_count }}</span>{% endif %}</span>
-    {% endcall %}
+    <details class="relative" data-page="G-02a">
+      <summary class="bell" aria-label="Notifications">
+        <span class="icon-dot"></span>
+        {% if menu.unread_count %}{{ badge(menu.unread_count, tone="accent") }}{% endif %}
+      </summary>
+      <div class="dropdown z-30" id="notifications">
+        <div class="flex items-center justify-between border-b border-hair px-3.5 py-3">
+          <strong>Notifications</strong>
+          {% if menu.unread_count %}
+          <form method="post" action="/notifications/read-all" class="inline">
+            {{ csrf_field() }}
+            {{ hidden("next", menu.return_to) }}
+            {{ button("Mark all read", variant="ghost", size="sm") }}
+          </form>
+          {% endif %}
+        </div>
+        {% for item in menu.due_soon %}
+        <div class="dropdown-item" data-kind="due_soon">
+          <a href="{{ item.href }}" class="block no-underline"><strong>{{ item.title }}</strong><br><span class="sub">Due {{ item.deadline|local }}</span></a>
+        </div>
+        {% endfor %}
+        {% for item in menu.recent %}
+        <div class="dropdown-item flex items-start justify-between gap-2" data-unread="{{ 'true' if item.unread else 'false' }}">
+          <a href="{{ item.href }}" class="block min-w-0 no-underline{% if not item.unread %} text-soft{% endif %}">
+            {% if item.unread %}<strong>{{ item.title }}</strong>{% else %}{{ item.title }}{% endif %}<br>
+            <span class="sub">{% if item.detail %}{{ item.detail }} · {% endif %}{{ item.created_at|local }}</span>
+          </a>
+          {% if item.unread %}
+          <form method="post" action="/notifications/{{ item.id }}/read" class="inline shrink-0">
+            {{ csrf_field() }}
+            {{ hidden("next", menu.return_to) }}
+            {{ button("Mark read", variant="ghost", size="sm") }}
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% if menu.is_empty %}
+        <p class="px-3.5 py-4 muted" data-state="G-02a-empty">No notifications yet.</p>
+        {% endif %}
+      </div>
+    </details>
     {% call toggle("account-menu", class="hidden items-center gap-2 sm:flex") %}
       <span class="icon-dot"></span><span>{{ short_name(actor.full_name) }} ▾</span>
     {% endcall %}
@@ -17,22 +56,6 @@
     {% endcall %}
   </div>
 </header>
-
-<div id="notifications" popover class="dropdown" data-page="G-02a">
-  <div class="flex items-center justify-between border-b border-hair px-3.5 py-3">
-    <strong>Notifications</strong>
-    {% if notifications is defined and notifications %}
-    {{ action_form("/notifications/read-all", "Mark all read", variant="ghost", size="sm") }}
-    {% endif %}
-  </div>
-  {% if notifications is defined and notifications %}
-    {% for item in notifications %}
-    <a class="dropdown-item" href="{{ item.href }}"><strong>{{ item.title }}</strong><br><span class="sub">{{ item.detail }}</span></a>
-    {% endfor %}
-  {% else %}
-    <p class="px-3.5 py-4 muted">No notifications yet.</p>
-  {% endif %}
-</div>
 
 <div id="account-menu" popover class="dropdown w-64">
   <div class="dropdown-item"><strong>{{ actor.full_name }}</strong><br><span class="sub">{{ actor.email }}</span></div>

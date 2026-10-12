@@ -59,9 +59,13 @@ async def test_s01_problems_shows_badges_and_filters(demo) -> None:
     assert "Resubmit needed" in everything.text
     assert "10/10" in everything.text
     assert "6 problems" in everything.text
-    assert "Sum of a list" not in unstarted.text
-    assert "Matrix transpose" in unstarted.text
-    assert "Matrix transpose" not in submitted.text
+    # The header's notifications dropdown names problems too (G-02a), so look
+    # only at the S-01 section.
+    unstarted_list = unstarted.text.split('data-page="S-01"', 1)[1]
+    submitted_list = submitted.text.split('data-page="S-01"', 1)[1]
+    assert "Sum of a list" not in unstarted_list
+    assert "Matrix transpose" in unstarted_list
+    assert "Matrix transpose" not in submitted_list
 
 
 @pytest.mark.anyio

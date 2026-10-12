@@ -346,8 +346,11 @@ async def test_t05_the_version_reason_reaches_the_student(demo: Demo) -> None:
     )
     page = await student.get(demo.url(BS))
 
-    assert "Sample 2 was wrong." in page.text
-    assert UPDATE_REASON not in page.text
+    # The header's notifications dropdown (G-02a) lists older reasons too, so
+    # look only at the S-02 section.
+    solve = page.text.split('data-page="S-02"', 1)[1]
+    assert "Sample 2 was wrong." in solve
+    assert UPDATE_REASON not in solve
 
 
 # ---- T-02 search --------------------------------------------------------------
