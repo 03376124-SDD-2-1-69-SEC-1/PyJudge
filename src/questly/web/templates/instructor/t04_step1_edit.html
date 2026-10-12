@@ -8,7 +8,7 @@
   {% include "instructor/t04_steps.html" %}
   <form method="post" action="/classes/{{ classroom_id }}/drafts/{{ draft.id }}/step1">
     {{ csrf_field() }}
-    <div class="card w-review gap-5">
+    <div class="card review-wrap gap-5">
       <div class="review-label flex items-center justify-between">{{ badge("AI GENERATED DRAFT", tone="accent") }}<small class="muted">แก้ไขได้ทุกส่วนก่อนเผยแพร่</small></div>
       {{ field("title", "ชื่อโจทย์ (Title)", value=draft.content.title, error="A title is required." if "title" in missing else "") }}
       {{ textarea_field("problem_statement", "คำอธิบาย (Description)", value=draft.content.problem_statement, rows=8, error="A description is required." if "description" in missing else "") }}

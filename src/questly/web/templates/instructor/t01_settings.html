@@ -5,7 +5,7 @@
 <section data-page="T-01" data-tab="settings">
   {% include "instructor/t01_header.html" %}
   {% include "instructor/t01_tabs.html" %}
-  <div class="w-settings flex flex-col gap-4">
+  <div class="settings-wrap flex flex-col gap-4">
     <form id="classroom-settings" method="post" action="/classes/{{ view.classroom.id }}/settings" class="card gap-4">
       {{ csrf_field() }}
       <h2 class="h2">ตั้งค่าห้องเรียน</h2>

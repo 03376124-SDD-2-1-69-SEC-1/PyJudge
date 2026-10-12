@@ -8,7 +8,7 @@
   {% include "instructor/t04_steps.html" %}
   <form method="post" action="/classes/{{ classroom_id }}/drafts/{{ draft.id }}/step4">
     {{ csrf_field() }}
-    <div class="card w-review gap-5">
+    <div class="card review-wrap gap-5">
       <div>
         <h2 class="h2">เลือกห้องเรียนที่จะเผยแพร่</h2>
         <p class="hint">โจทย์จะถูกเพิ่มไปยังห้องเรียนที่เลือก</p>

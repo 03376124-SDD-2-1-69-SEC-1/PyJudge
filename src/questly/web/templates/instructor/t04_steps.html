@@ -10,7 +10,7 @@
   {% endfor %}
 </ol>
 {% if missing %}
-  <div class="w-review mb-4">
+  <div class="review-wrap mb-4">
   {% call alert(tone="danger", state="T-04a") %}
     {{ icon("x", 18) }}<span>Fill in the required fields before continuing: {{ missing | join(", ") }}.</span>
   {% endcall %}

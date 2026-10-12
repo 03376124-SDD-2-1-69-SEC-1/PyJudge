@@ -10,7 +10,7 @@
     {% set rows = draft.content.test_cases %}
     {% set groups = [("sample", "Sample tests", "shown to students", "Add sample"), ("hidden", "Hidden tests", "pass/fail only", "Add hidden"), ("edge", "Edge cases", "", "Add edge case")] %}
     {% set ns = namespace(index=0) %}
-    <div class="card w-review gap-6">
+    <div class="card review-wrap gap-6">
     {% set tones = {"sample": "info", "hidden": "", "edge": "warn"} %}
     {% for kind, title, subtitle, add_label in groups %}
     <section>
@@ -35,7 +35,7 @@
     </section>
     {% endfor %}
     </div>
-    {% if "test cases" in missing %}<p class="error-text w-review">Add at least one test case.</p>{% endif %}
+    {% if "test cases" in missing %}<p class="error-text review-wrap">Add at least one test case.</p>{% endif %}
     {% include "instructor/t04_nav.html" %}
   </form>
 </section>

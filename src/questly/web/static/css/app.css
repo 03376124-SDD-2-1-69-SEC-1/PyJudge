@@ -388,12 +388,6 @@
   .w-full {
     width: 100%;
   }
-  .w-review {
-    width: var(--container-review);
-  }
-  .w-settings {
-    width: var(--container-settings);
-  }
   .max-w-2xl {
     max-width: var(--container-2xl);
   }
@@ -739,10 +733,10 @@
     max-width: var(--container-narrow);
     margin-inline: auto;
   }
-  .w-settings {
+  .settings-wrap {
     max-width: var(--container-settings);
   }
-  .w-review {
+  .review-wrap {
     max-width: var(--container-review);
     margin-inline: auto;
   }
@@ -1199,7 +1193,7 @@
   }
   .two-col {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 15px;
   }
   .class-check {
@@ -1781,7 +1775,7 @@
   }
   .class-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 20px;
   }
   .class-card {
@@ -1911,7 +1905,7 @@
   }
   .summary-grid {
     display: grid;
-    grid-template-columns: 1.5fr 1fr;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
     gap: 18px;
     margin-top: 24px;
   }
@@ -2191,7 +2185,7 @@
   }
   .results-layout {
     display: grid;
-    grid-template-columns: 1fr 410px;
+    grid-template-columns: minmax(0, 1fr) 410px;
     gap: 18px;
   }
   .code-panel {
@@ -2219,7 +2213,7 @@
   }
   .ai-layout {
     display: grid;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: minmax(0, 1fr) 300px;
     gap: 20px;
   }
   .ai-tip {
@@ -2368,7 +2362,7 @@
   }
   .admin-layout {
     display: grid;
-    grid-template-columns: 210px 1fr;
+    grid-template-columns: 210px minmax(0, 1fr);
     gap: 35px;
   }
   .admin-nav {
@@ -2517,7 +2511,7 @@
   }
   @media (max-width: 900px) {
     .class-grid {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .stats-strip {
       grid-template-columns: 1fr 1fr;
@@ -2529,16 +2523,16 @@
       border-top: 1px solid var(--color-hair);
     }
     .problem-row {
-      grid-template-columns: 40px minmax(0, 1fr) 80px 20px;
+      grid-template-columns: 40px minmax(0, 1fr) auto 20px;
     }
-    .problem-row > .deadline {
+    .problem-row > :nth-child(3), .problem-row > :nth-child(4) {
       display: none;
     }
     .test-case-row {
       grid-template-columns: 1fr;
     }
     .summary-grid, .results-layout, .ai-layout, .admin-layout, .auth-page, .solve-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
     .results-layout > aside {
       order: -1;
@@ -2573,6 +2567,9 @@
       align-items: flex-start;
       flex-direction: column;
     }
+    .page-top-main {
+      flex: none;
+    }
     .page-actions {
       width: 100%;
     }
@@ -2587,6 +2584,20 @@
     }
     .h1 {
       font-size: 24px;
+    }
+    .app-header .crumb, .site-header .crumb {
+      display: none;
+    }
+    .solve-top {
+      flex-wrap: wrap;
+      padding: 10px 16px;
+    }
+    .solve-title {
+      order: 3;
+      flex-basis: 100%;
+    }
+    .back-link {
+      white-space: nowrap;
     }
     .class-grid, .two-col, .test-case-row, .settings-row {
       grid-template-columns: 1fr;

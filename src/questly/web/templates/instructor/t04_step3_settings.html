@@ -6,7 +6,7 @@
   {% include "instructor/t04_steps.html" %}
   <form method="post" action="/classes/{{ classroom_id }}/drafts/{{ draft.id }}/step3">
     {{ csrf_field() }}
-    <div class="card w-review gap-5">
+    <div class="card review-wrap gap-5">
       <h2 class="h2">ตั้งค่าโจทย์</h2>
       <div class="two-col">
         {{ field("deadline", "กำหนดส่ง (Bangkok time)", type="datetime-local", value=deadline_value, error="A deadline is required." if "deadline" in missing else "") }}
