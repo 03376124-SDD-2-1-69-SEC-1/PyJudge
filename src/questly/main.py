@@ -32,6 +32,7 @@ from questly.core.admin.pages import router as admin_page_router
 from questly.core.admin.ports import AdminRepository, SystemHealthChecker
 from questly.core.admin.routes import router as admin_router
 from questly.core.admin.service import AdminService
+from questly.core.assignments.pages import router as assignment_page_router
 from questly.core.assignments.ports import (
     AssignmentRepository,
     PostingRepository,
@@ -395,6 +396,7 @@ def create_app(
     application.include_router(assignment_router)
     application.include_router(assignment_classroom_router)
     application.include_router(test_case_router)
+    application.include_router(assignment_page_router)
     application.include_router(draft_router)
     application.include_router(draft_classroom_router)
     application.include_router(generation_page_router)

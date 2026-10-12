@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import button, cell_check, cell_input, cell_textarea, checkbox, csrf_field, field, hidden, link_button, textarea_field, value_select with context %}
+{% from "_components/ui.html" import alert, modal, page_header %}
+{% block title %}Edit {{ assignment.title }} · Questly{% endblock %}
+{% block content %}
+<section data-page="T-05">
+  {% call page_header("Edit problem " ~ number ~ " · " ~ assignment.title, "Now version v" ~ assignment.current_version ~ ". Saving creates v" ~ next_version ~ ".") %}
+    {{ link_button(t02_url, "Cancel") }}
+  {% endcall %}
+  {% if submitted_total %}
+    {% call alert(tone="danger", state="T-05-submitted") %}
+      {{ submitted_total }} {{ "student has" if submitted_total == 1 else "students have" }} already submitted. Changes will mark {{ "their submission" if submitted_total == 1 else "their submissions" }} “Resubmit needed”.
+    {% endcall %}
+  {% endif %}
+  {% if error %}
+    {% call alert(tone="danger", state="T-05-error") %}{{ error }}{% endcall %}
+  {% endif %}
+  <form method="post" action="{{ t02_url }}/edit" class="flex flex-col gap-6">
+    {{ csrf_field() }}
+    <div class="grid gap-6 lg:grid-cols-[3fr_2fr]">
+      <div class="flex flex-col gap-4">
+        {{ field("title", "Title", value=form.title, required=true) }}
+        {{ textarea_field("problem_statement", "Description", value=form.problem_statement, rows=8, required=true) }}
+        <div class="grid grid-cols-2 gap-4">
+          {{ value_select("topic_id", "Topic", topic_options, selected=form.topic_id, blank="—") }}
+          {{ value_select("difficulty", "Difficulty", [("easy", "Easy"), ("medium", "Medium"), ("hard", "Hard")], selected=form.difficulty) }}
+        </div>
+        {{ textarea_field("reason", "Reason for change · required", value=form.reason, rows=3, required=true, hint="Students see this reason in their notification.", error="A reason for the change is required." if error and not form.reason.strip() else "") }}
+      </div>
+      <aside class="box self-start" aria-label="What changes for students">
+        <p class="text-xs font-semibold">What changes for students</p>
+        <ul class="flex flex-col gap-1 text-xs text-mid">
+          {% if submitted_total %}<li>· {{ submitted_total }} {{ "submission" if submitted_total == 1 else "submissions" }} marked “Resubmit needed”</li>{% endif %}
+          <li>· A notification is sent to {{ member_total }} {{ "student" if member_total == 1 else "students" }}</li>
+          <li>· Version becomes v{{ next_version }} in Version history</li>
+        </ul>
+      </aside>
+    </div>
+
+    {% set ns = namespace(index=0) %}
+    {% for kind, group_title, subtitle, add_label in kinds %}
+    <section>
+      <div class="mb-2 flex items-center justify-between">
+        <p class="eyebrow">{{ group_title }}{% if subtitle %} · {{ subtitle }}{% endif %}</p>
+        {{ button(add_label, size="sm", name="action", value="add_" ~ kind.value) }}
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Input</th><th>Expected output</th><th>Note</th><th></th></tr></thead>
+          <tbody>
+            {% for row in form.rows if row.kind == kind.value %}
+            <tr>
+              <td>{{ cell_textarea("input_data", row.input_data, "Input", class="font-mono") }}</td>
+              <td>{{ cell_textarea("expected_output", row.expected_output, "Expected output", class="font-mono") }}</td>
+              <td>{{ cell_input("note", row.note, "Note") }}{{ hidden("kind", kind.value) }}{{ hidden("test_case_id", row.id) }}</td>
+              <td class="text-right">{{ cell_check("delete", ns.index, "Delete") }}</td>
+            </tr>
+            {% set ns.index = ns.index + 1 %}
+            {% else %}
+            <tr><td colspan="4" class="muted">None yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endfor %}
+
+    <section>
+      <p class="eyebrow mb-2">Judging settings</p>
+      <div class="grid max-w-3xl gap-4 sm:grid-cols-2">
+        {{ field("time_limit_s", "Time limit per test (s)", type="number", value=form.time_limit_s, min="0.1", step="0.1") }}
+        {{ value_select("language", "Language", [("python3", "Python 3")], selected=form.language) }}
+      </div>
+      <div class="mt-3">
+        {{ checkbox("show_hidden_names", "Show hidden test names to students", checked=form.show_hidden_names) }}
+      </div>
+      <p class="hint mt-3">Deadline, max score and the late/resubmission policy belong to each classroom's posting and are not edited here, except through the deadline question when you save.</p>
+    </section>
+
+    <div class="flex justify-between gap-2.5">
+      {{ link_button(t02_url, "Cancel") }}
+      {% if form.choices %}
+        {{ button("Save and notify students", variant="primary", type="button", popovertarget="t05a") }}
+      {% else %}
+        {{ button("Save and notify students", variant="primary", name="action", value="save") }}
+      {% endif %}
+    </div>
+
+    {% if form.choices %}
+    {% call modal("t05a", "Extend the deadline?", page="T-05a") %}
+      <p class="-mt-2 text-xs text-mid">
+        {% if submitted_total %}{{ submitted_total }} {{ "student must" if submitted_total == 1 else "students must" }} resubmit. {% endif %}Tick the classrooms that get a new deadline; the others keep theirs.
+      </p>
+      {% for choice in form.choices %}
+      <div class="box" data-posting="{{ choice.posting_id }}">
+        <p class="text-xs font-semibold">{{ choice.classroom_label }}</p>
+        <p class="hint">{% if choice.submitted %}{{ choice.submitted }} {{ "student must" if choice.submitted == 1 else "students must" }} resubmit. {% endif %}The current deadline is {{ choice.deadline | local }}.</p>
+        {{ hidden("posting_id", choice.posting_id) }}
+        <div class="flex flex-wrap items-center gap-2.5">
+          {{ checkbox("extend", "Extend to", checked=choice.extend, value=choice.posting_id) }}
+          {{ cell_input("extend_to", choice.extend_to, "New deadline for " ~ choice.classroom_label, type="datetime-local", class="w-auto") }}
+        </div>
+        <p class="hint">Unticked keeps the current deadline. Times are Bangkok time.</p>
+      </div>
+      {% endfor %}
+      <div class="flex justify-between gap-2.5">
+        {{ button("Back", type="button", popovertarget="t05a", popovertargetaction="hide") }}
+        {{ button("Save and notify students", variant="primary", name="action", value="save") }}
+      </div>
+    {% endcall %}
+    {% endif %}
+  </form>
+</section>
+{% endblock %}

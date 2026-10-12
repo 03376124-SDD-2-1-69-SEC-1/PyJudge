@@ -315,6 +315,9 @@
   .w-\[18px\] {
     width: 18px;
   }
+  .w-auto {
+    width: auto;
+  }
   .w-full {
     width: 100%;
   }

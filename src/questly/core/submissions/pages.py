@@ -35,11 +35,11 @@ def _service(request: Request) -> SubmissionService:
 
 
 def _page_view(
-    request: Request, classroom_id: int, assignment_id: int
+    request: Request, classroom_id: int, assignment_id: int, query: str = ""
 ) -> StudentSolveView | InstructorResultsView:
     try:
         return _service(request).page(
-            current_actor(request), classroom_id, assignment_id
+            current_actor(request), classroom_id, assignment_id, query
         )
     except NOT_VISIBLE:
         raise HTTPException(status_code=404) from None
@@ -95,9 +95,15 @@ def problem_page(
     tab: str = "",
     attempt: int = 0,
     student: int = 0,
+    q: str = "",
+    notified: int = 0,
 ) -> HTMLResponse:
-    """S-02 (tabs problem, history) or T-02 (tabs results, versions)."""
-    view = _page_view(request, classroom_id, assignment_id)
+    """S-02 (tabs problem, history) or T-02 (tabs results, versions).
+
+    `q` is the T-02 student search; `notified` shows the "Notify students"
+    confirmation after the redirect.
+    """
+    view = _page_view(request, classroom_id, assignment_id, q)
     if isinstance(view, InstructorResultsView):
         chosen = _instructor_tab(tab or InstructorTab.RESULTS)
         if chosen is InstructorTab.VERSIONS:
@@ -106,7 +112,9 @@ def problem_page(
         if student and panel is None:
             raise HTTPException(status_code=404)
         return _render(
-            request, "instructor/t02_results.html", {"view": view, "panel": panel}
+            request,
+            "instructor/t02_results.html",
+            {"view": view, "panel": panel, "notified": bool(notified)},
         )
     if _student_tab(tab or StudentTab.PROBLEM) is StudentTab.HISTORY:
         shown = next((s for s in view.submissions if s.attempt == attempt), None)

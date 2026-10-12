@@ -9,6 +9,7 @@ from questly.core.assignments.models import (
     StudentProblem,
 )
 from questly.core.auth.models import Actor
+from questly.core.classrooms.models import MemberView
 from questly.core.submissions.models import Execution, Submission
 
 
@@ -53,9 +54,7 @@ class Problems(Protocol):
 class Roster(Protocol):
     """Who a Classroom's Members are; filled by ClassroomService."""
 
-    def member_names(
-        self, actor: Actor, classroom_id: int
-    ) -> list[tuple[int, str]]: ...
+    def members(self, actor: Actor, classroom_id: int) -> list[MemberView]: ...
 
     def is_archived(self, actor: Actor, classroom_id: int) -> bool: ...
 
