@@ -14,6 +14,7 @@ from questly.ai.app.models import (
     SourceCreationResult,
 )
 from questly.ai.app.repository import DuplicateChunkError, DuplicateSourceError
+from questly.ai.retrieval.models import RetrievalFilters
 
 
 class FakeVectorRepository:
@@ -92,6 +93,36 @@ class FakeVectorRepository:
             )
             for chunk in self._chunks.values()
             if chunk.embedding is not None and chunk.embedding_model == embedding_model
+        ]
+        matches.sort(key=lambda match: (-match.score, match.chunk_id))
+        return matches[:limit]
+
+    def search_filtered(
+        self,
+        embedding: Embedding,
+        *,
+        embedding_model: str,
+        limit: int,
+        filters: RetrievalFilters,
+    ) -> list[ChunkSearchResult]:
+        """Mirror PostgreSQL's ready-source metadata filtering and ranking."""
+        matches = [
+            ChunkSearchResult(
+                chunk_id=chunk.id,
+                source_id=chunk.source_id,
+                page=chunk.page,
+                text=chunk.text,
+                score=_cosine_similarity(embedding, chunk.embedding),
+            )
+            for chunk in self._chunks.values()
+            if chunk.embedding is not None
+            and chunk.embedding_model == embedding_model
+            and (source := self._sources[chunk.source_id]).status == "ready"
+            and (filters.topic is None or source.metadata.get("topic") == filters.topic)
+            and (
+                filters.difficulty is None
+                or source.metadata.get("difficulty") == filters.difficulty
+            )
         ]
         matches.sort(key=lambda match: (-match.score, match.chunk_id))
         return matches[:limit]
