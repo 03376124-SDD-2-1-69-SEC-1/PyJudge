@@ -202,7 +202,7 @@ async def test_pages_generate_review_and_publish() -> None:
     assert step2.headers["location"] == f"{base}?step=3"
     assert blocked.status_code == 422 and 'data-state="T-04a"' in blocked.text
     assert step3.headers["location"] == f"{base}?step=4"
-    assert "Approve and publish" in step4_page.text
+    assert "เผยแพร่โจทย์" in step4_page.text
     assert 'data-state="T-04b"' in t04b.text
     assert "1 · Binary search" in t01.text
 

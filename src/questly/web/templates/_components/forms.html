@@ -59,6 +59,24 @@
 </label>
 {%- endmacro %}
 
+{#- A checkbox drawn as a selectable card with an icon well; {% call %} adds trailing content. -#}
+{% macro check_card(name, value, label, note="", checked=false, icon_name="file") -%}
+<label class="class-check">
+  <input type="checkbox" name="{{ name }}" value="{{ value }}"{% if checked %} checked{% endif %}{{ attrs(kwargs) }}>
+  <span class="icon-well">{{ svg_icon(icon_name, 18) }}</span>
+  <span class="min-w-0 flex-1"><strong class="block text-ui font-semibold [overflow-wrap:anywhere]">{{ label }}</strong>{% if note %}<small class="hint">{{ note }}</small>{% endif %}</span>
+  {% if caller is defined %}{{ caller() }}{% endif %}
+</label>
+{%- endmacro %}
+
+{#- A boolean setting: label and note on the left, checkbox on the right. -#}
+{% macro toggle_row(name, label, note="", checked=false) -%}
+<label class="toggle-row">
+  <span><strong class="text-xs font-semibold text-label">{{ label }}</strong>{% if note %}<small>{{ note }}</small>{% endif %}</span>
+  <input type="checkbox" name="{{ name }}"{% if checked %} checked{% endif %}{{ attrs(kwargs) }}>
+</label>
+{%- endmacro %}
+
 {#- Every POST form carries this first; core/auth/csrf.py checks it. -#}
 {% macro csrf_field() -%}
 <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
