@@ -16,6 +16,7 @@ from questly.database.session import SessionFactory
 from questly.integrations.email import StubEmailSender
 from questly.main import create_app
 from tests.fakes.app import fake_settings
+from tests.fakes.auth import verification_path
 from tests.fakes.uploads import FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
 
@@ -43,7 +44,7 @@ def test_sign_up_verify_and_log_in_write_to_postgres(
         wants_instructor=True,
         faculty="Engineering",
     )
-    auth.verify_email(mailer.sent[-1][1].split("token=", 1)[1])
+    auth.verify_email(verification_path(mailer).split("token=", 1)[1])
     login = auth.log_in(email="somchai@kmitl.ac.th", password="correct horse")
 
     assert auth.resolve_session(login.token).full_name == "Somchai Prasert"

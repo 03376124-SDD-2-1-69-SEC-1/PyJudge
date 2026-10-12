@@ -9,7 +9,13 @@ from questly.core.auth.models import Role
 from questly.core.auth.pages import DemoAccount
 from questly.integrations.email import StubEmailSender
 from tests.fakes.app import build_app
-from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, FakeClock, seed_user
+from tests.fakes.auth import (
+    DEFAULT_PASSWORD,
+    FakeAuthRepository,
+    FakeClock,
+    seed_user,
+    verification_path,
+)
 from tests.integration.forms import post_form
 
 
@@ -117,7 +123,7 @@ async def test_signup_form_success_shows_04a_then_the_link_verifies() -> None:
     }
     async with _client(build_app(verification_mailer=mailer)) as client:
         waiting = await post_form(client, "/signup", form, page="/signup")
-        verified = await client.get(mailer.sent[-1][1])
+        verified = await client.get(verification_path(mailer))
 
     assert 'data-state="G-04a"' in waiting.text
     assert 'data-state="G-04b"' in verified.text
@@ -157,7 +163,7 @@ async def test_verify_page_shows_04c_for_an_expired_link() -> None:
     async with _client(build_app(verification_mailer=mailer, clock=clock)) as client:
         await post_form(client, "/signup", form, page="/signup")
         clock.advance(timedelta(hours=25))
-        response = await client.get(mailer.sent[-1][1])
+        response = await client.get(verification_path(mailer))
 
     assert response.status_code == 410
     assert 'data-state="G-04c"' in response.text

@@ -244,8 +244,12 @@ class AuthService:
         )
         self._notification_service.send_email(
             to=user.email,
-            subject="Verify your email",
-            body=verify_path,
+            subject="Verify your Questly email",
+            body=(
+                f"Hi {user.full_name},\n\n"
+                "Open this link to verify your email:\n\n"
+                f"{verify_path}\n"
+            ),
         )
 
     def _live_session(self, token: str) -> Session:

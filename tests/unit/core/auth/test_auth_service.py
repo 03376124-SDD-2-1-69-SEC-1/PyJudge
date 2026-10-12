@@ -1,5 +1,6 @@
 """AuthService use cases against the in-memory repository."""
 
+import logging
 from dataclasses import replace
 from datetime import timedelta
 
@@ -32,7 +33,13 @@ from questly.core.auth.service import (
 )
 from questly.core.notifications.service import NotificationService
 from questly.integrations.email import StubEmailSender
-from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, FakeClock, seed_user
+from tests.fakes.auth import (
+    DEFAULT_PASSWORD,
+    FakeAuthRepository,
+    FakeClock,
+    seed_user,
+    verification_path,
+)
 from tests.fakes.notifications import FakeNotificationRepository
 
 PASSWORD = "correct horse"
@@ -83,7 +90,7 @@ def _sign_up(
 
 
 def _last_token(mailer: StubEmailSender) -> str:
-    return mailer.sent[-1][1].split("token=", 1)[1]
+    return verification_path(mailer).split("token=", 1)[1]
 
 
 def test_sign_up_creates_an_unverified_student_and_emails_a_link(
@@ -94,8 +101,9 @@ def test_sign_up_creates_an_unverified_student_and_emails_a_link(
     assert user.role is Role.STUDENT
     assert user.email == "somchai@kmitl.ac.th"
     assert not user.email_verified
-    assert mailer.sent[-1][0] == "somchai@kmitl.ac.th"
-    assert mailer.sent[-1][1].startswith("/verify?token=")
+    assert mailer.messages[-1].to == "somchai@kmitl.ac.th"
+    assert "Hi Somchai Prasert," in mailer.messages[-1].body
+    assert verification_path(mailer) in mailer.messages[-1].body
 
 
 def test_sign_up_rejects_a_non_kmitl_email(service: AuthService) -> None:
@@ -174,11 +182,11 @@ def test_resend_is_silent_for_unknown_emails_and_sends_for_unverified(
     service: AuthService, mailer: StubEmailSender
 ) -> None:
     service.resend_verification("nobody@kmitl.ac.th")
-    assert mailer.sent == []
+    assert mailer.messages == []
 
     _sign_up(service)
     service.resend_verification("somchai@kmitl.ac.th")
-    assert len(mailer.sent) == 2
+    assert len(mailer.messages) == 2
 
 
 def test_log_in_rejects_a_wrong_password_and_an_unknown_email_alike(
@@ -376,3 +384,12 @@ def test_admin_home_returns_the_admin(
     actor = Actor(user_id=user.id, role=Role.ADMIN, full_name="Admin", email=user.email)
 
     assert service.admin_home(actor).id == user.id
+
+
+def test_stub_email_sender_logs_the_verify_link(
+    service: AuthService, mailer: StubEmailSender, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="questly.email"):
+        _sign_up(service)
+
+    assert verification_path(mailer) in caplog.text
