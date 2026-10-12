@@ -24,6 +24,9 @@ class MissingConfigurationError(RuntimeError):
 
 
 DEFAULT_GENERATION_MODEL = "poolside/laguna-s-2.1:free"
+# Changing it means re-embedding every chunk, and the replacement must return
+# 768 dimensions (VECTOR(768) in `rag`).
+DEFAULT_EMBEDDING_MODEL = "google/gemini-embedding-001"
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +42,7 @@ class Settings:
     # OpenRouter — optional: empty string means demo/stub mode
     openrouter_api_key: str = ""
     generation_model: str = DEFAULT_GENERATION_MODEL
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL
 
 
 def _required(variable: str) -> str:
@@ -93,5 +97,9 @@ def get_settings() -> Settings:
         generation_model=(
             os.environ.get("GENERATION_MODEL", DEFAULT_GENERATION_MODEL).strip()
             or DEFAULT_GENERATION_MODEL
+        ),
+        embedding_model=(
+            os.environ.get("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL).strip()
+            or DEFAULT_EMBEDDING_MODEL
         ),
     )
