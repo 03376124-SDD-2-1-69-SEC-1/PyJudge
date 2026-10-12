@@ -78,6 +78,14 @@ _Avoid_: File, upload, knowledge source (in core)
 The number of successful generations an Instructor may make per day.
 _Avoid_: Credits, limit
 
+**Provider quota**:
+How many free-model requests the AI provider still allows today, shared by every Instructor and reset at 00:00 UTC. It is not the Quota, which is per Instructor.
+_Avoid_: Credits, rate limit
+
+**Generation job**:
+One click of Generate, from the request until it ends as a Draft, a failure or a cancel. Only the Instructor who started it can see it.
+_Avoid_: Task, request (alone), run
+
 ## Solving
 
 **Submission**:
