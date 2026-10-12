@@ -40,6 +40,7 @@ from tests.fakes.auth import (
     seed_user,
     verification_path,
 )
+from tests.fakes.classrooms import FakeClassroomRepository
 from tests.fakes.notifications import FakeNotificationRepository
 
 PASSWORD = "correct horse"
@@ -68,6 +69,8 @@ def service(
         FakeNotificationRepository(),
         mailer,
         clock,
+        FakeClassroomRepository(),
+        repository,
     )
     return AuthService(repository, notification_service, clock)
 

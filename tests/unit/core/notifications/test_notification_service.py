@@ -4,11 +4,15 @@ from datetime import UTC, datetime
 
 import pytest
 
+from questly.core.classrooms.models import Membership
 from questly.core.notifications.models import Notification, NotificationKind
 from questly.core.notifications.service import (
     NotificationNotFoundError,
     NotificationService,
 )
+from questly.integrations.email import StubEmailSender
+from tests.fakes.auth import FakeAuthRepository, seed_user
+from tests.fakes.classrooms import FakeClassroomRepository
 from tests.fakes.notifications import FakeNotificationRepository
 
 
@@ -19,29 +23,39 @@ class FixedClock:
         return datetime(2026, 10, 10, 6, 0, tzinfo=UTC)
 
 
-class FakeEmailSender:
-    """Capture outgoing emails."""
-
-    def __init__(self) -> None:
-        self.messages: list[dict[str, str]] = []
-
-    def send(self, *, to: str, subject: str, body: str) -> None:
-        self.messages.append({"to": to, "subject": subject, "body": body})
-
-
 @pytest.fixture
 def repository() -> FakeNotificationRepository:
     return FakeNotificationRepository()
 
 
 @pytest.fixture
+def mailer() -> StubEmailSender:
+    return StubEmailSender()
+
+
+@pytest.fixture
+def classrooms() -> FakeClassroomRepository:
+    return FakeClassroomRepository()
+
+
+@pytest.fixture
+def users() -> FakeAuthRepository:
+    return FakeAuthRepository()
+
+
+@pytest.fixture
 def service(
     repository: FakeNotificationRepository,
+    mailer: StubEmailSender,
+    classrooms: FakeClassroomRepository,
+    users: FakeAuthRepository,
 ) -> NotificationService:
     return NotificationService(
         repository=repository,
-        email_sender=FakeEmailSender(),
+        email_sender=mailer,
         clock=FixedClock(),
+        members=classrooms,
+        accounts=users,
     )
 
 
@@ -116,3 +130,77 @@ def test_create_uses_clock_time(
     assert result.created_at == FixedClock().now()
     assert result.user_id == 1
     assert result.kind is NotificationKind.ASSIGNMENT_UPDATED
+
+
+def _member(
+    users: FakeAuthRepository,
+    classrooms: FakeClassroomRepository,
+    classroom_id: int,
+    email: str,
+    name: str,
+) -> int:
+    user = seed_user(users, email=email, full_name=name)
+    classrooms.add_membership(
+        Membership(
+            classroom_id=classroom_id, student_id=user.id, joined_at=FixedClock().now()
+        )
+    )
+    return user.id
+
+
+PAYLOAD = {"classroom_id": 7, "assignment_id": 3, "title": "Binary search"}
+
+
+def test_notify_members_stores_a_row_per_member_of_that_classroom_only(
+    service: NotificationService,
+    repository: FakeNotificationRepository,
+    users: FakeAuthRepository,
+    classrooms: FakeClassroomRepository,
+) -> None:
+    member = _member(users, classrooms, 7, "66010001@kmitl.ac.th", "Nattapong")
+    elsewhere = _member(users, classrooms, 8, "66010002@kmitl.ac.th", "Pimchanok")
+
+    service.notify_members(7, NotificationKind.ASSIGNMENT_PUBLISHED, PAYLOAD)
+
+    (stored,) = repository.list_for_user(member)
+    assert stored.kind is NotificationKind.ASSIGNMENT_PUBLISHED
+    assert stored.payload == PAYLOAD
+    assert stored.created_at == FixedClock().now()
+    assert repository.list_for_user(elsewhere) == []
+
+
+def test_notify_members_emails_each_member_with_a_link_to_the_problem(
+    service: NotificationService,
+    mailer: StubEmailSender,
+    users: FakeAuthRepository,
+    classrooms: FakeClassroomRepository,
+) -> None:
+    _member(users, classrooms, 7, "66010001@kmitl.ac.th", "Nattapong")
+    _member(users, classrooms, 7, "66010002@kmitl.ac.th", "Pimchanok")
+
+    service.notify_members(
+        7,
+        NotificationKind.ASSIGNMENT_UPDATED,
+        {**PAYLOAD, "reason": "Test 4 expected the wrong output"},
+    )
+
+    assert [m.to for m in mailer.messages] == [
+        "66010001@kmitl.ac.th",
+        "66010002@kmitl.ac.th",
+    ]
+    first = mailer.messages[0]
+    assert first.subject == "Problem updated: Binary search"
+    assert "Hi Nattapong," in first.body
+    assert "Test 4 expected the wrong output" in first.body
+    assert "/classes/7/assignments/3" in first.body
+
+
+def test_notify_members_of_an_empty_classroom_stores_and_sends_nothing(
+    service: NotificationService,
+    repository: FakeNotificationRepository,
+    mailer: StubEmailSender,
+) -> None:
+    service.notify_members(7, NotificationKind.ASSIGNMENT_NOTIFIED, PAYLOAD)
+
+    assert repository.list_for_user(1) == []
+    assert mailer.messages == []

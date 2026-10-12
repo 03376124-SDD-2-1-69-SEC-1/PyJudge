@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+# Stored as JSONB in `core.notifications.payload`.
+NotificationPayload = dict[str, str | int | bool | None]
+
 
 class NotificationKind(StrEnum):
     """What a stored notification is about; `core.notifications.kind` holds it."""
@@ -19,7 +22,7 @@ class Notification:
 
     user_id: int
     kind: NotificationKind
-    payload: dict[str, str | int | bool | None]
+    payload: NotificationPayload
     created_at: datetime
     id: int | None = None
     read_at: datetime | None = None

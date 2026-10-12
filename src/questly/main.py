@@ -245,6 +245,8 @@ def create_app(
         notification_repository,
         email_sender,
         clock,
+        classroom_repository,
+        auth_repository,
     )
     application.state.notification_service = notification_service
 
@@ -269,6 +271,7 @@ def create_app(
         classroom_service,
         posting_stats,
         clock,
+        notification_service,
     )
     application.state.assignment_service = assignment_service
 

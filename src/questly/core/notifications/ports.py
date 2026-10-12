@@ -1,8 +1,16 @@
-"""Repository and email ports for Notifications."""
+"""Repository, email and lookup ports for Notifications.
+
+main.py fills ClassroomMembers with the classrooms slice's repository and
+UserAccounts with the auth slice's repository. Both are repositories rather
+than services because AuthService sends its mail through NotificationService,
+so NotificationService is built before either service exists.
+"""
 
 from datetime import datetime
 from typing import Protocol
 
+from questly.core.auth.models import User
+from questly.core.classrooms.models import Membership
 from questly.core.notifications.models import Notification
 
 
@@ -46,3 +54,15 @@ class EmailSender(Protocol):
     def send(self, *, to: str, subject: str, body: str) -> None:
         """Send an email message."""
         ...
+
+
+class ClassroomMembers(Protocol):
+    """Who the Members of a Classroom are."""
+
+    def list_memberships(self, classroom_id: int) -> list[Membership]: ...
+
+
+class UserAccounts(Protocol):
+    """The account a notification email goes to."""
+
+    def get_user(self, user_id: int) -> User | None: ...

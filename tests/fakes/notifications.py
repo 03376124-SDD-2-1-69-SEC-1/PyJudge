@@ -3,7 +3,11 @@
 from dataclasses import replace
 from datetime import datetime
 
-from questly.core.notifications.models import Notification
+from questly.core.notifications.models import (
+    Notification,
+    NotificationKind,
+    NotificationPayload,
+)
 
 
 class FakeNotificationRepository:
@@ -74,3 +78,18 @@ class FakeNotificationRepository:
             updated += 1
 
         return updated
+
+
+class RecordingMemberNotifier:
+    """MemberNotifier that only records each call, for AssignmentService tests."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[int, NotificationKind, NotificationPayload]] = []
+
+    def notify_members(
+        self,
+        classroom_id: int,
+        kind: NotificationKind,
+        payload: NotificationPayload,
+    ) -> None:
+        self.calls.append((classroom_id, kind, payload))
