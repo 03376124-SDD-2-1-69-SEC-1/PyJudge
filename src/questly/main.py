@@ -15,11 +15,12 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openrouter import OpenRouter
 from sqlmodel import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from questly.ai.app.repository import VectorRepository
 from questly.ai.app.routes import router as vector_router
@@ -51,7 +52,7 @@ from questly.core.auth.models import (
     NotAuthenticatedError,
     PermissionDeniedError,
 )
-from questly.core.auth.pages import DemoAccount
+from questly.core.auth.pages import DemoAccount, error_page
 from questly.core.auth.pages import router as auth_page_router
 from questly.core.auth.ports import AuthRepository, Clock
 from questly.core.auth.routes import router as auth_router
@@ -437,15 +438,40 @@ def create_app(
                 status_code=403,
                 content={"detail": {"code": "forbidden", "message": "Not allowed"}},
             )
-        return HTMLResponse("<h1>403 · Not allowed</h1>", status_code=403)
+        return error_page(request, 403)
 
     @application.exception_handler(CsrfTokenError)
     def csrf_rejected(request: Request, error: CsrfTokenError) -> Response:
         """A form posted without its page's token (core/auth/csrf.py)."""
-        return HTMLResponse(
-            "<h1>403 · This form expired</h1><p>Go back, reload and try again.</p>",
-            status_code=403,
+        return error_page(
+            request,
+            403,
+            title="ฟอร์มนี้หมดอายุแล้ว",
+            message="กลับไปที่หน้าเดิม โหลดหน้าใหม่ แล้วลองส่งอีกครั้ง",
         )
+
+    @application.exception_handler(StarletteHTTPException)
+    def http_error(request: Request, error: StarletteHTTPException) -> Response:
+        """Browsers get G-05; `/api/`, `/health` and `/static` keep the JSON body."""
+        if request.url.path.startswith(("/api/", "/health", "/static/")):
+            return JSONResponse(
+                status_code=error.status_code,
+                content={"detail": error.detail},
+                headers=error.headers,
+            )
+        return error_page(request, error.status_code)
+
+    @application.exception_handler(Exception)
+    def server_error(request: Request, error: Exception) -> Response:
+        """An unhandled bug: a 500 page for browsers, the usual envelope for the API."""
+        if request.url.path.startswith(("/api/", "/health")):
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "detail": {"code": "internal_error", "message": "Server error"}
+                },
+            )
+        return error_page(request, 500)
 
     @application.exception_handler(RequestValidationError)
     def request_validation_error(
