@@ -36,3 +36,7 @@ data/
 setup-branch-protection.sh  
 # neonctl writes local project context here
 .neon
+
+plan.md
+Prompt model bakeoff.md
+Prompt ui tasks.md
