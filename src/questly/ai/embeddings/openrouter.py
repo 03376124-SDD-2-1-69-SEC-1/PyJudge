@@ -1,20 +1,34 @@
 """OpenRouter text embedding adapter for the existing 768-dimensional RAG schema.
 
-The client is injected for tests. Constructing a production client happens only
-when the factory is called, so imports remain credential- and network-free.
+Calls OpenRouter through the `openrouter` SDK (ADR-0009). The client is injected
+for tests, and the model name comes from `Settings.embedding_model`.
 """
 
-import os
 from math import hypot, isfinite
 from typing import Protocol
 
-from dotenv import load_dotenv
+import httpx
+from openrouter import OpenRouter
+from openrouter.errors import NoResponseError, OpenRouterError
+from openrouter.utils.retries import BackoffStrategy, RetryConfig
 
 from questly.ai.app.models import EMBEDDING_DIMENSION, Embedding
 from questly.ai.embeddings.ports import EmbeddingError
 
-MODEL = "google/gemini-embedding-001"
-BASE_URL = "https://openrouter.ai/api/v1"
+_TIMEOUT_MS = 60_000
+# Left unset, the SDK retries 5XX and connection errors for up to an hour.
+# A 5s budget allows two or three retries.
+_RETRY = RetryConfig(
+    "backoff",
+    BackoffStrategy(
+        initial_interval=500, max_interval=8_000, exponent=2, max_elapsed_time=5_000
+    ),
+    retry_connection_errors=True,
+    status_codes_override=["429", "5XX"],
+)
+# The SDK raises NoResponseError outside OpenRouterError, and lets httpx's
+# timeout and network errors through unwrapped once retries are spent.
+_SDK_ERRORS = (OpenRouterError, NoResponseError, httpx.TransportError)
 
 
 class _Embedding(Protocol):
@@ -26,7 +40,7 @@ class _Response(Protocol):
 
 
 class _Embeddings(Protocol):
-    def create(
+    def generate(
         self,
         *,
         model: str,
@@ -43,22 +57,26 @@ class OpenRouterClient(Protocol):
 class OpenRouterEmbeddingProvider:
     """Request 768 dimensions and L2-normalize the returned vector."""
 
-    def __init__(self, client: OpenRouterClient) -> None:
+    def __init__(self, client: OpenRouterClient, model: str) -> None:
         self._client = client
+        self._model = model
 
     @property
     def model(self) -> str:
-        return MODEL
+        return self._model
 
     def embed(self, text: str) -> Embedding:
         if not text.strip():
             raise EmbeddingError("cannot embed empty text")
-        response = self._client.embeddings.create(
-            model=MODEL,
-            input=text,
-            dimensions=EMBEDDING_DIMENSION,
-            encoding_format="float",
-        )
+        try:
+            response = self._client.embeddings.generate(
+                model=self._model,
+                input=text,
+                dimensions=EMBEDDING_DIMENSION,
+                encoding_format="float",
+            )
+        except _SDK_ERRORS as exc:
+            raise EmbeddingError(f"OpenRouter embedding call failed: {exc}") from exc
         data = response.data
         if data is None or len(data) != 1:
             raise EmbeddingError("provider must return one embedding")
@@ -83,22 +101,14 @@ class OpenRouterEmbeddingProvider:
         return tuple(value / magnitude for value in values)
 
 
-def create_openrouter_embedding_provider(api_key: str) -> OpenRouterEmbeddingProvider:
-    """Construct the production adapter only when explicitly configured."""
+def create_openrouter_embedding_provider(
+    api_key: str, model: str
+) -> OpenRouterEmbeddingProvider:
+    """Construct the production adapter from `Settings`."""
     if not api_key.strip():
         raise ValueError("OpenRouter API key is required")
-    return OpenRouterEmbeddingProvider(_new_client(api_key))
+    return OpenRouterEmbeddingProvider(_new_client(api_key), model)
 
 
 def _new_client(api_key: str) -> OpenRouterClient:
-    from openai import OpenAI
-
-    return OpenAI(base_url=BASE_URL, api_key=api_key, timeout=60.0)
-
-
-def create_openrouter_embedding_provider_from_env() -> OpenRouterEmbeddingProvider:
-    """Load local configuration only when the production adapter is requested."""
-    load_dotenv(override=False)
-    return create_openrouter_embedding_provider(
-        os.environ.get("OPENROUTER_API_KEY", "")
-    )
+    return OpenRouter(api_key=api_key, timeout_ms=_TIMEOUT_MS, retry_config=_RETRY)

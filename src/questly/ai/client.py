@@ -2,13 +2,14 @@
 
 StubGenerationClient is kept for demo mode and CI (no API key needed).
 OpenRouterGenerationClient is the production adapter: it calls any model
-available on OpenRouter through the OpenAI-compatible /chat/completions
-endpoint and returns a structured GenerationResponse.
+available on OpenRouter through the `openrouter` SDK (ADR-0009) and returns a
+structured GenerationResponse.
 
-Citations are returned as [] until AI-05 (retrieval) is wired in. The LLM
-writes a reference solution but never the expected outputs: each test case's
-expected_output is that solution's stdout from the CodeRunner, or "" when the
-run fails (always, under the stub runner) and the Instructor fills it at T-04.
+Citations are []: retrieval (AI-05) exists but is not wired into generation
+yet. The LLM writes a reference solution but never the expected outputs: each
+test case's expected_output is that solution's stdout from the CodeRunner, or
+"" when the run fails (always, under the stub runner) and the Instructor fills
+it at T-04.
 """
 
 from __future__ import annotations
@@ -18,7 +19,10 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from openai import OpenAI, OpenAIError
+import httpx
+from openrouter import OpenRouter
+from openrouter.errors import NoResponseError, OpenRouterError
+from openrouter.utils.retries import BackoffStrategy, RetryConfig
 
 from questly.core.generation.schemas import (
     AssignmentDraft,
@@ -32,8 +36,21 @@ from questly.core.submissions.ports import CodeRunner
 
 logger = logging.getLogger(__name__)
 
-_MAX_RETRIES = 4
-_TIMEOUT_SECONDS = 60.0
+_TIMEOUT_MS = 60_000
+# The SDK retries until a time budget runs out, not a count. Backoff of 0.5s
+# doubling to 8s spends 15s on four or five retries.
+_RETRY = RetryConfig(
+    "backoff",
+    BackoffStrategy(
+        initial_interval=500, max_interval=8_000, exponent=2, max_elapsed_time=15_000
+    ),
+    retry_connection_errors=True,
+    # chat.send retries only 5XX by default; free models hit transient 429s often.
+    status_codes_override=["429", "5XX"],
+)
+# The SDK raises NoResponseError outside OpenRouterError, and lets httpx's
+# timeout and network errors through unwrapped once retries are spent.
+_SDK_ERRORS = (OpenRouterError, NoResponseError, httpx.TransportError)
 _SOLUTION_LANGUAGE = "python"
 _SOLUTION_TIME_LIMIT_SECONDS = 5.0
 
@@ -101,9 +118,9 @@ class StubGenerationClient:
 
 
 class OpenRouterGenerationClient:
-    """Production adapter: calls OpenRouter via the OpenAI-compatible API.
+    """Production adapter: calls OpenRouter through the `openrouter` SDK.
 
-    - Citations are [] until AI-05 (retrieval) is wired in.
+    - Citations are []: retrieval (AI-05) is not wired into generation yet.
     - expected_output is the reference solution's stdout from the CodeRunner;
       a failed run, or a reply without a solution, leaves it "" for the
       Instructor and never fails the generation.
@@ -118,13 +135,8 @@ class OpenRouterGenerationClient:
         # used from the next call on.
         self._model = model
         self._code_runner = code_runner
-        # The SDK retries 429 and 5xx with exponential backoff and honours
-        # Retry-After; free models hit transient upstream 429s often.
-        self._client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
-            max_retries=_MAX_RETRIES,
-            timeout=_TIMEOUT_SECONDS,
+        self._client = OpenRouter(
+            api_key=api_key, timeout_ms=_TIMEOUT_MS, retry_config=_RETRY
         )
 
     def generate(self, request: GenerationRequest) -> GenerationResponse:
@@ -137,20 +149,21 @@ class OpenRouterGenerationClient:
         logger.debug("OpenRouterGenerationClient.generate model=%s", model)
 
         try:
-            completion = self._client.chat.completions.create(
+            result = self._client.chat.send(
                 model=model,
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
                     {"role": "user", "content": user_content},
                 ],
             )
-        except OpenAIError:
+        except _SDK_ERRORS:
             # GenerationService turns every client failure into one generic
             # GenerationFailedError, so this is the only place the cause is seen.
             logger.exception("OpenRouter call failed model=%s", model)
             raise
 
-        raw = completion.choices[0].message.content or ""
+        content = result.choices[0].message.content
+        raw = content if isinstance(content, str) else ""
         return self._with_expected_outputs(_parse_response(raw), model)
 
     def _with_expected_outputs(
@@ -265,7 +278,7 @@ def _parse_response(raw: str) -> _ParsedReply:
     solution = data.get("reference_solution")
     if not isinstance(solution, str) or not solution.strip():
         solution = ""
-    # Citations are empty until AI-05 (retrieval) is wired in.
+    # Citations stay empty until retrieval (AI-05) is wired into generation.
     return _ParsedReply(
         response=GenerationResponse(draft=draft, citations=[]),
         reference_solution=solution,

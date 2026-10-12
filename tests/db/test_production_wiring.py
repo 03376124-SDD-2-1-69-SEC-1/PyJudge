@@ -211,7 +211,7 @@ def test_admin_model_change_reaches_the_generation_client(
             admin_actor, AISettingsChange(model="chosen/by-admin")
         )
         with patch(
-            "openai.resources.chat.completions.completions.Completions.create",
+            "openrouter.chat.Chat.send",
             return_value=_chat_completion(reply),
         ) as create:
             app.state.generation_service.generate(

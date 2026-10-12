@@ -32,9 +32,6 @@ jobs:
       DATABASE_URL: postgresql+psycopg://user:pass@localhost:5432/questly_test
       DATABASE_URL_UNPOOLED: postgresql+psycopg://user:pass@localhost:5432/questly_test
       SECRET_KEY: ci-dummy-secret-key
-      AI_PROVIDER: gemini
-      GEMINI_API_KEY: ci-dummy-key
-      GEMINI_MODEL: gemini-3.5-flash
       R2_ENDPOINT_URL: https://example.r2.cloudflarestorage.com
       R2_BUCKET_NAME: ci-dummy-bucket
       R2_ACCESS_KEY_ID: ci-dummy-access-key
