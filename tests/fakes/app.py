@@ -25,6 +25,8 @@ from questly.core.generation.ports import (
     DocumentCatalog,
     DraftRepository,
     GenerationClient,
+    GenerationJobStore,
+    ProviderQuota,
 )
 from questly.core.submissions.ports import CodeRunner, SubmissionRepository
 from questly.core.topics.ports import TopicRepository
@@ -39,7 +41,12 @@ from tests.fakes.assignments import (
 )
 from tests.fakes.auth import FakeAuthRepository, FakeClock
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
-from tests.fakes.generation import FakeDocumentCatalog, FakeDraftRepository
+from tests.fakes.generation import (
+    FakeDocumentCatalog,
+    FakeDraftRepository,
+    FakeGenerationJobStore,
+    FakeProviderQuota,
+)
 from tests.fakes.notifications import FakeNotificationRepository
 from tests.fakes.submissions import FakeSubmissionRepository, ScriptedCodeRunner
 from tests.fakes.topics import FakeTopicRepository
@@ -75,6 +82,8 @@ def build_app(
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
+    provider_quota: ProviderQuota | None = None,
+    generation_job_store: GenerationJobStore | None = None,
     draft_repository: DraftRepository | None = None,
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
@@ -108,6 +117,10 @@ def build_app(
         knowledge_document_repository = FakeKnowledgeDocumentRepository()
     if object_storage is None:
         object_storage = FakeObjectStorage()
+    if provider_quota is None:
+        provider_quota = FakeProviderQuota()
+    if generation_job_store is None:
+        generation_job_store = FakeGenerationJobStore()
     if draft_repository is None:
         draft_repository = FakeDraftRepository()
     if document_catalog is None:
@@ -141,6 +154,8 @@ def build_app(
         knowledge_document_repository=knowledge_document_repository,
         object_storage=object_storage,
         generation_client=generation_client,
+        provider_quota=provider_quota,
+        generation_job_store=generation_job_store,
         draft_repository=draft_repository,
         document_catalog=document_catalog,
         vector_repository=vector_repository,

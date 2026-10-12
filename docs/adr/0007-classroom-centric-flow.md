@@ -230,9 +230,10 @@ There is no admin dashboard.
 ## 11. Known gaps (deliberate)
 
 - Submit and Generate are synchronous: no progress display and no Cancel
-  (S-02a, T-03c). PDF ingestion is asynchronous and T-06 refreshes every 5 s
-  with `<meta refresh>` while a document is processing (T-06b); its Cancel
-  is not built.
+  (S-02a, T-03c). Generate has had both since ADR-0010; Submit still has not.
+  PDF ingestion is asynchronous and T-06 refreshes every 5 s with
+  `<meta refresh>` while a document is processing (T-06b); its Cancel is not
+  built.
 - The T-04/T-05 cited-source preview shows the stored text snapshot, not a
   rendered PDF page.
 - T-06 upload is a file input, not drag and drop.

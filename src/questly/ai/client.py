@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -24,6 +25,7 @@ from openrouter import OpenRouter
 from openrouter.errors import NoResponseError, OpenRouterError
 from openrouter.utils.retries import BackoffStrategy, RetryConfig
 
+from questly.core.generation.models import GenerationStep
 from questly.core.generation.schemas import (
     AssignmentDraft,
     Citation,
@@ -96,10 +98,19 @@ class StubGenerationClient:
     """Returns a hardcoded draft regardless of the request.
 
     Used in demo mode and in tests that do not have an API key.
+    `step_delay_seconds` slows each stage so T-03c is watchable in a demo.
     """
 
-    def generate(self, request: GenerationRequest) -> GenerationResponse:
+    def __init__(self, step_delay_seconds: float = 0.0) -> None:
+        self._step_delay_seconds = step_delay_seconds
+
+    def generate(
+        self, request: GenerationRequest, on_step: Callable[[GenerationStep], None]
+    ) -> GenerationResponse:
         """Return a fixed draft and citation so the endpoint is callable end to end."""
+        for step in (GenerationStep.CALLING_MODEL, GenerationStep.VALIDATING):
+            on_step(step)
+            time.sleep(self._step_delay_seconds)
         draft = AssignmentDraft(
             title="Sample Assignment",
             statement=f"Stub draft generated for prompt: {request.prompt}",
@@ -139,7 +150,9 @@ class OpenRouterGenerationClient:
             api_key=api_key, timeout_ms=_TIMEOUT_MS, retry_config=_RETRY
         )
 
-    def generate(self, request: GenerationRequest) -> GenerationResponse:
+    def generate(
+        self, request: GenerationRequest, on_step: Callable[[GenerationStep], None]
+    ) -> GenerationResponse:
         """Call the LLM and parse a structured GenerationResponse."""
         model = self._model()
         user_content = request.prompt
@@ -148,6 +161,7 @@ class OpenRouterGenerationClient:
 
         logger.debug("OpenRouterGenerationClient.generate model=%s", model)
 
+        on_step(GenerationStep.CALLING_MODEL)
         try:
             result = self._client.chat.send(
                 model=model,
@@ -164,10 +178,14 @@ class OpenRouterGenerationClient:
 
         content = result.choices[0].message.content
         raw = content if isinstance(content, str) else ""
-        return self._with_expected_outputs(_parse_response(raw), model)
+        on_step(GenerationStep.VALIDATING)
+        return self._with_expected_outputs(_parse_response(raw), model, on_step)
 
     def _with_expected_outputs(
-        self, parsed: _ParsedReply, model: str
+        self,
+        parsed: _ParsedReply,
+        model: str,
+        on_step: Callable[[GenerationStep], None],
     ) -> GenerationResponse:
         draft = parsed.response.draft
         if not parsed.reference_solution:
@@ -178,6 +196,7 @@ class OpenRouterGenerationClient:
             )
             return parsed.response
 
+        on_step(GenerationStep.RUNNING_SOLUTION)
         test_cases = []
         for index, test_case in enumerate(draft.test_cases):
             execution = self._code_runner.run(

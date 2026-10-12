@@ -285,6 +285,37 @@ def test_results_view_counts_submitted_late_and_failing_tests(world: World) -> N
     assert (summary.submitted, summary.avg_score) == (2, 6.0)
 
 
+def test_results_search_matches_name_or_student_number(world: World) -> None:
+    aid = world.publish()
+    world.submit(aid)
+    world.submit(aid, who=world.other)
+
+    def shown(query: str) -> list[str]:
+        view = world.service.page(world.teacher, world.room.id, aid, query=query)
+        assert isinstance(view, InstructorResultsView)
+        return [row.name for row in view.shown]
+
+    assert shown("") == ["Nattapong Suwan", "Pimchanok Wong"]
+    assert shown("pimchanok") == ["Pimchanok Wong"]
+    assert shown("  SUWAN ") == ["Nattapong Suwan"]
+    assert shown("66010002") == ["Pimchanok Wong"]
+    assert shown("660100") == ["Nattapong Suwan", "Pimchanok Wong"]
+    assert shown("nobody") == []
+
+
+def test_results_search_filters_the_table_not_the_totals(world: World) -> None:
+    aid = world.publish()
+    world.submit(aid)
+    world.submit(aid, who=world.other)
+
+    view = world.service.page(world.teacher, world.room.id, aid, query="wong")
+
+    assert isinstance(view, InstructorResultsView)
+    assert view.query == "wong"
+    assert len(view.rows) == 2 and len(view.submitted) == 2
+    assert [row.student_number for row in view.shown] == ["66010002"]
+
+
 def test_get_submission_is_for_its_student_or_the_instructor(world: World) -> None:
     aid = world.publish()
     submission = world.submit(aid)

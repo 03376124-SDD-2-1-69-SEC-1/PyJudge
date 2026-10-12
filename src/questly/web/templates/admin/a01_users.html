@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, hidden, field, value_select, button, link_button, action_form with context %}
+{% from "_components/ui.html" import badge, empty_state, alert %}
+{% block title %}Users · Admin settings · Questly{% endblock %}
+{% block content %}
+<section data-page="A-01" data-tab="users">
+  {% include "admin/a01_tabs.html" %}
+  {% if error %}{% call alert(tone="danger") %}{{ error }}{% endcall %}{% endif %}
+
+  <h2 class="h2 mt-4">Pending instructor requests {% if pending %}{{ badge(pending | length, tone="accent") }}{% endif %}</h2>
+  <p class="sub mb-3">Approve to give the account instructor rights.</p>
+  {% if pending %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Email</th><th>Faculty</th><th>Requested</th><th></th></tr></thead>
+      <tbody>
+        {% for instructor_request, applicant in pending %}
+        <tr>
+          <td>{{ applicant.full_name }}</td>
+          <td>{{ applicant.email }}</td>
+          <td>{{ instructor_request.faculty }}</td>
+          <td>{{ instructor_request.requested_at | local("%-d %b, %H:%M") }}</td>
+          <td>
+            <div class="flex justify-end gap-2">
+              {{ action_form("/admin/settings/requests/" ~ instructor_request.id ~ "/reject", "Reject", variant="ghost", size="sm") }}
+              {{ action_form("/admin/settings/requests/" ~ instructor_request.id ~ "/approve", "Approve", variant="primary", size="sm") }}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty_state("No pending instructor requests", "New requests appear here when someone signs up with the instructor checkbox.", state="A-01b") }}
+  {% endif %}
+
+  <h2 class="h2 mt-8">All users · {{ total }}</h2>
+  <form method="get" action="/admin/settings" class="my-3 flex flex-wrap items-end gap-3">
+    {{ field("q", "Search name or email", type="search", value=q, id="f-q") }}
+    {{ value_select("role", "Role", role_options, selected=role, blank="All roles") }}
+    {{ button("Search", variant="primary") }}
+  </form>
+  {% if users %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last active</th><th></th></tr></thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>{{ user.full_name }}</td>
+          <td>{{ user.email }}</td>
+          <td>{{ user.role.value | capitalize }}{% if not user.is_active %} {{ badge("Deactivated", tone="danger") }}{% endif %}</td>
+          <td>{% if user.last_active_at %}{{ user.last_active_at | local("%-d %b, %H:%M") }}{% else %}—{% endif %}</td>
+          <td class="text-right">
+            {% if user.is_active %}
+            <details>
+              <summary class="btn btn-ghost btn-sm cursor-pointer">Deactivate</summary>
+              <form method="post" action="/admin/settings/users/{{ user.id }}/deactivate" class="box mt-2">
+                {{ csrf_field() }}
+                {{ hidden("q", q) }}
+                {{ hidden("role", role) }}
+                {{ hidden("page", page) }}
+                <p class="hint">{{ user.full_name }} will be logged out and cannot log in again.</p>
+                {{ button("Confirm deactivate", variant="danger", size="sm") }}
+              </form>
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="mt-3 flex items-center justify-between">
+    <span class="text-xxs text-soft">Page {{ page }} of {{ last_page }} · {{ page_size }} per page</span>
+    <div class="flex gap-2">
+      {% if previous_url %}{{ link_button(previous_url, "Previous", size="sm") }}{% endif %}
+      {% if next_url %}{{ link_button(next_url, "Next", size="sm") }}{% endif %}
+    </div>
+  </div>
+  {% else %}
+    {{ empty_state("No users match", "Try a different name, email or role.", art="people") }}
+  {% endif %}
+</section>
+{% endblock %}

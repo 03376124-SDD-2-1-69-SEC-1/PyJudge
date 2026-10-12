@@ -18,6 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from openrouter import OpenRouter
 from sqlmodel import Session
 
 from questly.ai.app.repository import VectorRepository
@@ -25,10 +26,13 @@ from questly.ai.app.routes import router as vector_router
 from questly.ai.app.schemas import ApplicationErrorResponse
 from questly.ai.app.service import VectorService
 from questly.ai.client import OpenRouterGenerationClient, StubGenerationClient
+from questly.ai.quota import OpenRouterProviderQuota, StubProviderQuota
 from questly.config import Settings, get_settings
+from questly.core.admin.pages import router as admin_page_router
 from questly.core.admin.ports import AdminRepository, SystemHealthChecker
 from questly.core.admin.routes import router as admin_router
 from questly.core.admin.service import AdminService
+from questly.core.assignments.pages import router as assignment_page_router
 from questly.core.assignments.ports import (
     AssignmentRepository,
     PostingRepository,
@@ -62,6 +66,8 @@ from questly.core.generation.ports import (
     DocumentCatalog,
     DraftRepository,
     GenerationClient,
+    GenerationJobStore,
+    ProviderQuota,
 )
 from questly.core.generation.routes import classroom_router as draft_classroom_router
 from questly.core.generation.routes import router as draft_router
@@ -112,12 +118,15 @@ from questly.database.session import (
 from questly.database.storage.r2 import R2ObjectStorage, build_r2_client, check_r2
 from questly.integrations.clock import SystemClock
 from questly.integrations.email import StubEmailSender
+from questly.integrations.generation_jobs import InMemoryGenerationJobStore
 from questly.integrations.judge0 import StubCodeRunner
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _WEB_DIR = _PACKAGE_DIR / "web"
 _TEMPLATE_DIR = _WEB_DIR / "templates"
 _STATIC_DIR = _WEB_DIR / "static"
+# The quota line is on every T-03 and T-03c load: give up on OpenRouter fast.
+_QUOTA_TIMEOUT_MS = 5_000
 
 
 DISPLAY_ZONE = ZoneInfo("Asia/Bangkok")
@@ -156,6 +165,8 @@ def create_app(
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
+    provider_quota: ProviderQuota | None = None,
+    generation_job_store: GenerationJobStore | None = None,
     draft_repository: DraftRepository | None = None,
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
@@ -278,6 +289,19 @@ def create_app(
             ),
             email_available=(not isinstance(email_sender, StubEmailSender)),
         )
+    if provider_quota is None:
+        if use_settings().openrouter_api_key:
+            provider_quota = OpenRouterProviderQuota(
+                OpenRouter(
+                    api_key=use_settings().openrouter_api_key,
+                    timeout_ms=_QUOTA_TIMEOUT_MS,
+                ),
+                model=lambda: admin_repository.get_ai_settings().model,
+                generations_since=draft_repository.count_all_generations,
+                clock=clock,
+            )
+        else:
+            provider_quota = StubProviderQuota(clock)
     auth_service = AuthService(auth_repository, notification_service, clock)
     application.state.auth_service = auth_service
     admin_service = AdminService(
@@ -285,6 +309,7 @@ def create_app(
         auth_repository,
         system_health_checker,
         generation_usage=draft_repository,
+        provider_quota=provider_quota,
         clock=clock,
         allowed_models=use_settings().generation_model_allowlist,
     )
@@ -333,6 +358,8 @@ def create_app(
             )
         else:
             generation_client = StubGenerationClient()
+    if generation_job_store is None:
+        generation_job_store = InMemoryGenerationJobStore()
     application.state.generation_service = GenerationService(
         draft_repository,
         generation_client,
@@ -341,6 +368,8 @@ def create_app(
         assignment_service,
         clock,
         daily_quota=get_daily_quota,
+        jobs=generation_job_store,
+        provider_quota=provider_quota,
     )
 
     if topic_repository is None:
@@ -370,6 +399,7 @@ def create_app(
     application.include_router(assignment_router)
     application.include_router(assignment_classroom_router)
     application.include_router(test_case_router)
+    application.include_router(assignment_page_router)
     application.include_router(draft_router)
     application.include_router(draft_classroom_router)
     application.include_router(generation_page_router)
@@ -380,6 +410,7 @@ def create_app(
     application.include_router(auth_router)
     application.include_router(auth_page_router)
     application.include_router(admin_router)
+    application.include_router(admin_page_router)
     application.include_router(classroom_router)
     application.include_router(classroom_page_router)
     application.include_router(submission_router)

@@ -6,6 +6,7 @@ import pytest
 
 from questly.core.admin.models import (
     AISettingsChange,
+    InvalidAISettingsError,
     ModelNotAllowedError,
     SelfModificationError,
     UserNotFoundError,
@@ -26,7 +27,7 @@ from tests.fakes.admin import (
     FakeSystemHealthChecker,
 )
 from tests.fakes.auth import DEFAULT_NOW, FakeAuthRepository, FakeClock, seed_user
-from tests.fakes.generation import FakeDraftRepository
+from tests.fakes.generation import FakeDraftRepository, FakeProviderQuota
 
 
 def _actor(user: User) -> Actor:
@@ -40,11 +41,13 @@ class Admin:
         self.auth = FakeAuthRepository()
         self.settings = FakeAdminRepository()
         self.drafts = FakeDraftRepository()
+        self.provider = FakeProviderQuota()
         self.service = AdminService(
             self.settings,
             self.auth,
             FakeSystemHealthChecker(),
             generation_usage=self.drafts,
+            provider_quota=self.provider,
             clock=FakeClock(now),
             allowed_models=(DEFAULT_AI_SETTINGS.model, "other/model"),
         )
@@ -142,3 +145,30 @@ def test_usage_this_month_starts_at_midnight_on_the_first_in_bangkok() -> None:
     current = admin.service.get_ai_settings(admin.admin)
 
     assert current.usage_this_month == 2
+
+
+def test_provider_quota_is_the_snapshot_the_provider_reports() -> None:
+    admin = Admin()
+
+    assert admin.service.provider_quota(admin.admin) == admin.provider.current
+
+
+def test_only_an_admin_may_read_the_provider_quota() -> None:
+    admin = Admin()
+
+    with pytest.raises(PermissionDeniedError):
+        admin.service.provider_quota(_actor(admin.student))
+
+
+@pytest.mark.parametrize(
+    "change", [AISettingsChange(daily_quota=0), AISettingsChange(max_pages=-1)]
+)
+def test_a_quota_or_page_limit_below_one_is_refused_and_nothing_is_saved(
+    change: AISettingsChange,
+) -> None:
+    admin = Admin()
+
+    with pytest.raises(InvalidAISettingsError):
+        admin.service.update_ai_settings(admin.admin, change)
+
+    assert admin.settings.settings == DEFAULT_AI_SETTINGS

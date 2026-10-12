@@ -40,14 +40,14 @@ async def test_admin_lands_on_a_page_that_exists() -> None:
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("email", [TEACHER, STUDENT])
-async def test_admin_placeholder_is_admin_only(email: str) -> None:
+async def test_admin_settings_is_admin_only(email: str) -> None:
     client = await _client(_app(), email)
 
     assert (await client.get("/admin/settings")).status_code == 403
 
 
 @pytest.mark.anyio
-async def test_admin_placeholder_needs_a_login() -> None:
+async def test_admin_settings_needs_a_login() -> None:
     async with AsyncClient(
         transport=ASGITransport(app=_app()), base_url="http://testserver"
     ) as client:

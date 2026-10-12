@@ -2,9 +2,15 @@
 
 import re
 
-from httpx import AsyncClient, Response
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient, Response
 
 TOKEN = re.compile(r'name="csrf_token" value="([^"]+)"')
+
+
+def asgi_client(app: FastAPI) -> AsyncClient:
+    """A client that talks to `app` in-process, as a browser on plain HTTP."""
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver")
 
 
 async def csrf_token(client: AsyncClient, page: str) -> str:
