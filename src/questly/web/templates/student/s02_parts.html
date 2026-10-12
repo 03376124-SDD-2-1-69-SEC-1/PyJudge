@@ -1,11 +1,10 @@
 {#- Pieces shared by the S-02 tabs. -#}
 {% from "_components/ui.html" import page_header, tabs, state_badge %}
+{% from "_components/icons.html" import icon %}
 
 {% macro s02_header(view, current, url) -%}
 {% set problem = view.problem %}
-{% call page_header(problem.number ~ " · " ~ problem.assignment.title, "Problem " ~ problem.number) %}
-  <a class="link text-xs" href="/classes/{{ problem.posting.classroom_id }}?tab=problems">Back to problems</a>
-{% endcall %}
+{{ page_header(problem.number ~ " · " ~ problem.assignment.title, "Problem " ~ problem.number, eyebrow="SUBMISSION HISTORY", back_href="/classes/" ~ problem.posting.classroom_id ~ "?tab=problems", back_label="กลับไปที่โจทย์") }}
 {{ tabs([("problem", "Problem", url), ("history", "Submission history", url ~ "?tab=history")], current, label="Problem tabs") }}
 {%- endmacro %}
 
@@ -35,12 +34,28 @@
       <tr>
         <td>{{ test_label(result, ns.hidden, show_names) }}</td>
         <td>{{ "visible" if result.kind.value == "sample" else "hidden" }}</td>
-        <td{% if not result.passed %} class="error-text"{% endif %}>{{ verdict_text(result) }}</td>
+        <td{% if not result.passed %} class="text-danger"{% endif %}>{{ verdict_text(result) }}</td>
         <td class="text-right">{{ "%.2f" | format(result.time_seconds) }}s</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
-{% if ns.trouble %}<div data-state="S-02d">{% if ns.trace %}<pre class="code-cell box">{{ ns.trace }}</pre>{% else %}<p class="text-xxs text-soft">A test hit the time limit or crashed. Hidden tests do not show their error.</p>{% endif %}</div>{% endif %}
+{% if ns.trouble %}<div data-state="S-02d">{% if ns.trace %}<pre class="code-preview">{{ ns.trace }}</pre>{% else %}<p class="text-xxs text-soft">A test hit the time limit or crashed. Hidden tests do not show their error.</p>{% endif %}</div>{% endif %}
+{%- endmacro %}
+
+{#- Console summary: icon, heading, case dots (one per test). detail is the small line. -#}
+{% macro result_banner(results, heading, detail="") -%}
+{%- set total = results | length -%}
+{%- set passed = results | selectattr("passed") | list | length -%}
+{%- set errors = results | selectattr("verdict.value", "in", ["runtime_error", "time_limit"]) | list | length -%}
+{%- set tone = "passed" if total and passed == total else ("error" if errors and not passed else "partial") -%}
+<div class="test-result test-result-{{ tone }}">
+  <div class="result-title">
+    <span>{{ icon("check" if tone == "passed" else "x") }}</span>
+    <div><strong id="results-title">{{ heading }}</strong>{% if detail %}<small>{{ detail }}</small>{% endif %}</div>
+    {% if caller is defined %}<div class="ml-auto">{{ caller() }}</div>{% endif %}
+  </div>
+  <div class="case-dots" aria-hidden="true">{% for result in results %}<i class="{{ 'pass' if result.passed else 'fail' }}"></i>{% endfor %}</div>
+</div>
 {%- endmacro %}

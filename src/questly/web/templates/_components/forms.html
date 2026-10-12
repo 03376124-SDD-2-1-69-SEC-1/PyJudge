@@ -59,6 +59,11 @@
 </label>
 {%- endmacro %}
 
+{#- The S-02 dark editor: a bare textarea posted with the form named by form_id's page. -#}
+{% macro code_editor(name, value, label="Your code") -%}
+<textarea class="editor-code" name="{{ name }}" aria-label="{{ label }}" spellcheck="false"{{ attrs(kwargs) }}>{{ value }}</textarea>
+{%- endmacro %}
+
 {#- A checkbox drawn as a selectable card with an icon well; {% call %} adds trailing content. -#}
 {% macro check_card(name, value, label, note="", checked=false, icon_name="file") -%}
 <label class="class-check">

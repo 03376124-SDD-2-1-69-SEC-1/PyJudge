@@ -528,6 +528,9 @@
   .bg-fill {
     background-color: var(--color-fill);
   }
+  .bg-pap {
+    background-color: var(--color-pap);
+  }
   .bg-subtle {
     background-color: var(--color-subtle);
   }
@@ -542,6 +545,9 @@
   }
   .px-3\.5 {
     padding-inline: calc(var(--spacing) * 3.5);
+  }
+  .px-4 {
+    padding-inline: calc(var(--spacing) * 4);
   }
   .py-0 {
     padding-block: 0px;
@@ -563,6 +569,9 @@
   }
   .pb-3 {
     padding-bottom: calc(var(--spacing) * 3);
+  }
+  .pb-4 {
+    padding-bottom: calc(var(--spacing) * 4);
   }
   .text-center {
     text-align: center;
@@ -1975,6 +1984,24 @@
     font-size: var(--text-tiny);
     color: var(--color-soft);
   }
+  .solve-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--spacing-header));
+  }
+  .solve-notices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 22px;
+    border-bottom: 1px solid var(--color-line);
+    background: #fff;
+  }
+  .editor-form {
+    display: flex;
+    flex: 1 1 50%;
+    min-height: 180px;
+  }
   .solve-top {
     display: flex;
     align-items: center;
@@ -1993,7 +2020,9 @@
   }
   .solve-grid {
     display: grid;
+    flex: 1;
     grid-template-columns: 42% 58%;
+    grid-template-rows: minmax(0, 1fr);
     min-height: 0;
   }
   .problem-description {
@@ -2052,6 +2081,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
     background: var(--color-editor);
   }
   .editor-head {
@@ -2065,12 +2095,13 @@
     color: var(--color-editor-ink);
   }
   .editor-head small {
-    color: var(--color-pass);
+    color: var(--color-soft);
   }
   .editor-code {
     display: block;
+    flex: 1;
     width: 100%;
-    min-height: 280px;
+    min-height: 0;
     padding: 15px;
     border: 0;
     border-radius: 0;
@@ -2086,8 +2117,9 @@
     box-shadow: none;
   }
   .console {
-    flex: 1;
+    flex: 1 1 40%;
     min-height: 140px;
+    overflow: auto;
     background: #fff;
     color: var(--color-ink-2);
   }
@@ -2506,6 +2538,15 @@
     .mobile-logo {
       display: block;
       margin-bottom: 20px;
+    }
+    .solve-page {
+      height: auto;
+    }
+    .solve-grid {
+      grid-template-rows: auto;
+    }
+    .editor-form {
+      min-height: 320px;
     }
     .page-top, .page-header {
       align-items: flex-start;
