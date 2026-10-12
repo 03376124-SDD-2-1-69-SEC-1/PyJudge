@@ -158,19 +158,26 @@ class StudentResult:
 
     student_id: int
     name: str
+    student_number: str | None
     counted: Submission | None
     attempts: int
 
 
 @dataclass(frozen=True, slots=True)
 class InstructorResultsView:
-    """T-02 for the owning Instructor."""
+    """T-02 for the owning Instructor.
+
+    `rows` is every Member and feeds the totals; `shown` is the rows matching
+    the search `query` (all of them when it is empty) and feeds the table.
+    """
 
     problem: InstructorProblem
     rows: tuple[StudentResult, ...]
     failures: tuple[TestFailure, ...]
     versions: tuple[AssignmentVersion, ...]
     closed: bool
+    shown: tuple[StudentResult, ...]
+    query: str
 
     @property
     def submitted(self) -> tuple[StudentResult, ...]:
