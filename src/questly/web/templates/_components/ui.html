@@ -86,6 +86,17 @@
 <div class="alert{% if tone %} alert-{{ tone }}{% endif %}" role="alert"{% if state %} data-state="{{ state }}"{% endif %}>{{ caller() }}</div>
 {%- endmacro %}
 
+{#- A pass/fail toast pinned to the top right of the page; it fades out by CSS alone.
+    tone: ok | danger. Render it once per page, inside <main>. -#}
+{% macro toast(tone, title, text="", state="") -%}
+<div class="toast-stack" role="status" aria-live="polite">
+  <div class="toast toast-{{ tone }}"{% if state %} data-state="{{ state }}"{% endif %}>
+    <span class="toast-icon">{{ icon("check" if tone == "ok" else "x", 18) }}</span>
+    <div><strong>{{ title }}</strong>{% if text %}<p>{{ text }}</p>{% endif %}</div>
+  </div>
+</div>
+{%- endmacro %}
+
 {#- "Somchai Prasert" -> "Somchai P." as the G-02 header shows it. -#}
 {% macro short_name(full_name) -%}
 {%- set parts = full_name.split() -%}

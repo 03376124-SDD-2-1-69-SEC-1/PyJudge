@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_components/forms.html" import csrf_field, code_editor, button, link_button with context %}
-{% from "_components/ui.html" import alert, badge, difficulty_badge %}
+{% from "_components/ui.html" import alert, badge, difficulty_badge, toast %}
 {% from "_components/icons.html" import icon %}
 {% from "student/s02_parts.html" import results_table, result_banner with context %}
 {% set problem = view.problem %}
@@ -8,6 +8,22 @@
 {% block title %}{{ problem.assignment.title }} · Questly{% endblock %}
 {% block main %}
 <main class="solve-page" data-page="S-02" data-tab="problem"{% if view.closed %} data-state="S-02f"{% elif view.update %} data-state="S-02e"{% endif %}>
+  {% if error %}
+    {{ toast("danger", "ดำเนินการไม่สำเร็จ", error, state="toast-fault") }}
+  {% elif run %}
+    {% set passed = run.results | selectattr("passed") | list | length %}
+    {% if passed == run.results | length %}
+      {{ toast("ok", "Run ผ่านทุกเทสต์", passed ~ " of " ~ passed ~ " sample tests passed", state="toast-pass") }}
+    {% else %}
+      {{ toast("danger", "Run ไม่ผ่าน", passed ~ " of " ~ (run.results | length) ~ " sample tests passed", state="toast-fault") }}
+    {% endif %}
+  {% elif submitted and view.counted %}
+    {% if view.counted.all_passed %}
+      {{ toast("ok", "Submit ผ่านทุกเทสต์", "Score " ~ view.counted.score ~ "/" ~ view.counted.max_score, state="toast-pass") }}
+    {% else %}
+      {{ toast("danger", "Submit ไม่ผ่าน", view.counted.passed_count ~ " of " ~ (view.counted.results | length) ~ " tests passed · score " ~ view.counted.score ~ "/" ~ view.counted.max_score, state="toast-fault") }}
+    {% endif %}
+  {% endif %}
   <div class="solve-top">
     <a class="back-link" href="/classes/{{ problem.posting.classroom_id }}?tab=problems">{{ icon("arrow") }} กลับไปที่โจทย์</a>
     <div class="solve-title"><strong class="[overflow-wrap:anywhere]">{{ problem.number }} · {{ problem.assignment.title }}</strong>{{ difficulty_badge(problem.assignment.difficulty) }}</div>

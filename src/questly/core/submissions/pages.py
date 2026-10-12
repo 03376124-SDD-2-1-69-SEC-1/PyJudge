@@ -77,12 +77,19 @@ def _solve(
     code: str,
     run: RunReport | None = None,
     error: str = "",
+    submitted: bool = False,
     status_code: int = 200,
 ) -> HTMLResponse:
     return _render(
         request,
         "student/s02_solve.html",
-        {"view": view, "code": code, "run": run, "error": error},
+        {
+            "view": view,
+            "code": code,
+            "run": run,
+            "error": error,
+            "submitted": submitted,
+        },
         status_code,
     )
 
@@ -97,11 +104,13 @@ def problem_page(
     student: int = 0,
     q: str = "",
     notified: int = 0,
+    submitted: int = 0,
 ) -> HTMLResponse:
     """S-02 (tabs problem, history) or T-02 (tabs results, versions).
 
     `q` is the T-02 student search; `notified` shows the "Notify students"
-    confirmation after the redirect.
+    confirmation after the redirect; `submitted` shows the pass/fail toast
+    after a Submit.
     """
     view = _page_view(request, classroom_id, assignment_id, q)
     if isinstance(view, InstructorResultsView):
@@ -124,7 +133,7 @@ def problem_page(
             request, "student/s02g_history.html", {"view": view, "shown": shown}
         )
     code = view.counted.code if view.counted is not None else ""
-    return _solve(request, view, code=code)
+    return _solve(request, view, code=code, submitted=bool(submitted))
 
 
 @router.post("/classes/{classroom_id}/assignments/{assignment_id}", response_model=None)
@@ -144,7 +153,7 @@ def run_or_submit(
         if action == "submit":
             service.submit(actor, classroom_id, assignment_id, code)
             return RedirectResponse(
-                f"/classes/{classroom_id}/assignments/{assignment_id}",
+                f"/classes/{classroom_id}/assignments/{assignment_id}?submitted=1",
                 status_code=status.HTTP_303_SEE_OTHER,
             )
         report = service.run(actor, classroom_id, assignment_id, code)
