@@ -128,8 +128,8 @@
 {%- endmacro %}
 
 {#- The 4-up strip: {% call stats_strip() %}{{ stat_cell(...) }}...{% endcall %}. -#}
-{% macro stats_strip() -%}
-<div class="stats-strip">{{ caller() }}</div>
+{% macro stats_strip(cols=4) -%}
+<div class="stats-strip" style="--cols: {{ cols }}">{{ caller() }}</div>
 {%- endmacro %}
 
 {% macro stat_cell(label, value, icon_name="chart") -%}

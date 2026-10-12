@@ -1,13 +1,18 @@
 {% extends "base.html" %}
-{% from "_components/ui.html" import stat_box %}
+{% from "_components/ui.html" import stats_strip, stat_cell %}
 {% block title %}Summary · {{ view.classroom.course_name }} · Questly{% endblock %}
 {% block content %}
 <section data-page="S-01" data-tab="summary">
   {% include "student/s01_tabs.html" %}
-  <div class="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
-    {{ stat_box("Solved", summary.solved ~ " / " ~ summary.total) }}
-    {{ stat_box("All tests passed", summary.passed ~ " / " ~ summary.total) }}
-    {{ stat_box("Average score", ("%.1f" | format(summary.avg_score)) if summary.avg_score is not none else "—") }}
+  {% call stats_strip(3) %}
+    {{ stat_cell("Solved", summary.solved ~ " / " ~ summary.total, "check") }}
+    {{ stat_cell("All tests passed", summary.passed ~ " / " ~ summary.total, "shield") }}
+    {{ stat_cell("Average score", ("%.1f" | format(summary.avg_score)) if summary.avg_score is not none else "—", "chart") }}
+  {% endcall %}
+  {% set solved_pct = ((summary.solved / summary.total) * 100) | round | int if summary.total else 0 %}
+  <div class="card mx-auto max-w-sm items-center">
+    <h2 class="h2">สรุปผลการเรียน</h2>
+    <div class="donut" style="--p: {{ solved_pct }}"><div><strong>{{ solved_pct }}%</strong><small>Solved</small></div></div>
   </div>
   <p class="sub mt-3">Counts cover this classroom only.</p>
 </section>

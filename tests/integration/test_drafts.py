@@ -204,7 +204,7 @@ async def test_pages_generate_review_and_publish() -> None:
     assert step3.headers["location"] == f"{base}?step=4"
     assert "เผยแพร่โจทย์" in step4_page.text
     assert 'data-state="T-04b"' in t04b.text
-    assert "1 · Binary search" in t01.text
+    assert "Binary search" in t01.text and "Problem 1" in t01.text
 
 
 @pytest.mark.anyio
