@@ -88,6 +88,9 @@ from questly.database.core.draft_repository import SQLDraftRepository
 from questly.database.core.knowledge_document_repository import (
     SQLKnowledgeDocumentRepository,
 )
+from questly.database.core.notification_repository import (
+    SQLNotificationRepository,
+)
 from questly.database.core.posting_repository import SQLPostingRepository
 from questly.database.core.submission_repository import SQLSubmissionRepository
 from questly.database.core.topic_repository import SQLTopicRepository
@@ -236,10 +239,7 @@ def create_app(
         email_sender = StubEmailSender()
 
     if notification_repository is None:
-        raise RuntimeError(
-            "notification_repository must be provided "
-            "until the SQL adapter is available"
-        )
+        notification_repository = SQLNotificationRepository(use_session_factory())
 
     notification_service = NotificationService(
         notification_repository,

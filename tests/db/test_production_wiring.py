@@ -16,7 +16,6 @@ from questly.database.session import SessionFactory
 from questly.integrations.email import StubEmailSender
 from questly.main import create_app
 from tests.fakes.app import fake_settings
-from tests.fakes.notifications import FakeNotificationRepository
 from tests.fakes.uploads import FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
 
@@ -31,7 +30,6 @@ def test_sign_up_verify_and_log_in_write_to_postgres(
     app = create_app(
         settings=replace(fake_settings(), database_url=postgres_url),
         email_sender=mailer,
-        notification_repository=FakeNotificationRepository(),
         object_storage=FakeObjectStorage(),
         vector_repository=FakeVectorRepository(),
     )

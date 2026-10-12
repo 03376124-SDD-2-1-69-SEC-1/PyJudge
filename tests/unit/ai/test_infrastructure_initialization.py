@@ -11,9 +11,9 @@ import pytest
 
 from questly import config, main
 from questly.database import session
+from questly.database.core.notification_repository import SQLNotificationRepository
 from questly.database.rag import vector_repository as postgres_adapter
 from questly.database.storage import r2
-from tests.fakes.notifications import FakeNotificationRepository
 
 
 @pytest.fixture(autouse=True)
@@ -85,10 +85,14 @@ def test_production_composition_wires_the_postgres_vector_repository(
     monkeypatch.setattr(session, "create_engine", Mock(return_value=object()))
     monkeypatch.setattr(r2, "boto3", Mock())
 
-    application = main.create_app(notification_repository=FakeNotificationRepository())
+    application = main.create_app()
 
     assert application.state.vector_service._repository is repository
     adapter_factory.assert_called_once()
+    assert isinstance(
+        application.state.notification_service._repository,
+        SQLNotificationRepository,
+    )
 
 
 def test_postgres_repository_rejects_non_psycopg_urls() -> None:
