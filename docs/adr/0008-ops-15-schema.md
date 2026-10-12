@@ -126,6 +126,9 @@ CHECK on `provider`, because the allowlist lives in configuration. Storing a
 URL in the table was rejected: an Admin could then send the API key to any
 host.
 
+Superseded in part by ADR-0009: the seed's provider is now `openrouter`, with
+model `DEFAULT_GENERATION_MODEL` from `config.py`.
+
 ## Card numbers (C-01), as ADR-0007 §7 left them open
 
 - A Student's "pending" Postings are the ones not Closed whose Counted

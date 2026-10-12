@@ -124,8 +124,11 @@ R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 ```
 
-Set `GEMINI_API_KEY` when working on Gemini integration. Never commit `.env` or
-place real credentials in `.env.example`.
+Set `OPENROUTER_API_KEY` to call OpenRouter for generation and embeddings
+(ADR-0009); leave it empty to run on the stub generation client.
+`GENERATION_MODEL` and `EMBEDDING_MODEL` pick the models and default to the
+values in `src/questly/config.py`. Never commit `.env` or place real
+credentials in `.env.example`.
 
 ### 5. Apply Database Migrations
 
@@ -426,7 +429,7 @@ erDiagram
         JSONB draft "title, statement, test_cases — no default"
         JSONB citations "chunk_id, source_id, page, score, text_snapshot"
         TEXT model_provider "nullable"
-        TEXT model_name "nullable, e.g. gemini-2.0-flash"
+        TEXT model_name "nullable, e.g. poolside/laguna-s-2.1:free"
         TEXT review_status "CHECK: pending | applied | discarded"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
