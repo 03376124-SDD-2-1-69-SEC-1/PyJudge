@@ -304,9 +304,6 @@
   .my-1 {
     margin-block: var(--spacing);
   }
-  .my-3 {
-    margin-block: calc(var(--spacing) * 3);
-  }
   .my-4 {
     margin-block: calc(var(--spacing) * 4);
   }
@@ -330,9 +327,6 @@
   }
   .mt-6 {
     margin-top: calc(var(--spacing) * 6);
-  }
-  .mt-8 {
-    margin-top: calc(var(--spacing) * 8);
   }
   .mb-2 {
     margin-bottom: calc(var(--spacing) * 2);
@@ -518,6 +512,9 @@
   }
   .border-line {
     border-color: var(--color-line);
+  }
+  .bg-brand-50 {
+    background-color: var(--color-brand-50);
   }
   .bg-fill {
     background-color: var(--color-fill);
