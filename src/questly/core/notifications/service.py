@@ -1,17 +1,27 @@
 """Business logic for user notifications (ADR-0007 §6)."""
 
+from datetime import timedelta
+
+from questly.core.assignments.models import ProblemFilter
+from questly.core.auth.models import Actor, Role
 from questly.core.auth.ports import Clock
+from questly.core.classrooms.models import ClassroomFilter
 from questly.core.notifications.models import (
+    DueSoon,
     Notification,
     NotificationKind,
     NotificationPayload,
 )
 from questly.core.notifications.ports import (
     ClassroomMembers,
+    ClassroomProblems,
     EmailSender,
+    JoinedClassrooms,
     NotificationRepository,
     UserAccounts,
 )
+
+DUE_SOON_WINDOW = timedelta(hours=24)
 
 _SUBJECTS = {
     NotificationKind.ASSIGNMENT_PUBLISHED: "New problem: {title}",
@@ -121,6 +131,48 @@ class NotificationService:
     ) -> None:
         """Send an email through the notification-owned email port."""
         self._email_sender.send(to=to, subject=subject, body=body)
+
+
+class DueSoonService:
+    """ "Deadline tomorrow" for the G-02a dropdown (ADR-0007 §6.2)."""
+
+    def __init__(
+        self,
+        classrooms: JoinedClassrooms,
+        problems: ClassroomProblems,
+        clock: Clock,
+    ) -> None:
+        self._classrooms = classrooms
+        self._problems = problems
+        self._clock = clock
+
+    def due_soon(self, actor: Actor) -> list[DueSoon]:
+        """Open Postings the Student has not submitted, due within 24 h."""
+        if actor.role is not Role.STUDENT:
+            return []
+        now = self._clock.now()
+        due = []
+        for card in self._classrooms.picker(actor, ClassroomFilter.ACTIVE).cards:
+            listing = self._problems.problems(
+                actor, card.classroom.id, ProblemFilter.NOT_STARTED
+            )
+            for problem in listing.problems:
+                posting = problem.posting
+                deadline = posting.schedule.deadline
+                if (
+                    posting.is_closed(now)
+                    or not now < deadline <= now + DUE_SOON_WINDOW
+                ):
+                    continue
+                due.append(
+                    DueSoon(
+                        classroom_id=posting.classroom_id,
+                        assignment_id=posting.assignment_id,
+                        title=problem.assignment.title,
+                        deadline=deadline,
+                    )
+                )
+        return sorted(due, key=lambda item: item.deadline)
 
 
 def _member_email(full_name: str, subject: str, payload: NotificationPayload) -> str:

@@ -1,6 +1,6 @@
 """HTTP tests for the notifications API and T-02c "Notify students", per role."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -14,7 +14,7 @@ from questly.core.assignments.models import (
 from questly.core.auth.models import Actor, Role
 from questly.integrations.email import StubEmailSender
 from tests.fakes.app import build_app
-from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
+from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, FakeClock, seed_user
 
 DEADLINE = datetime(2026, 10, 15, 16, 59, tzinfo=UTC)
 TEACHER = "somchai.p@kmitl.ac.th"
@@ -44,7 +44,10 @@ class Campus:
                 user_id=user.id, role=role, full_name=name, email=email
             )
         self.mailer = StubEmailSender()
-        self.app = build_app(auth_repository=users, verification_mailer=self.mailer)
+        self.clock = FakeClock()
+        self.app = build_app(
+            auth_repository=users, verification_mailer=self.mailer, clock=self.clock
+        )
         classrooms = self.app.state.classroom_service
         self.classroom = classrooms.create(
             accounts[TEACHER],
@@ -212,3 +215,33 @@ async def test_notify_students_for_an_unposted_assignment_is_404() -> None:
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_list_carries_deadline_tomorrow_for_a_student_only() -> None:
+    campus = Campus()
+    campus.clock.current = DEADLINE - timedelta(hours=2)
+    student = await campus.client_for(STUDENT)
+    teacher = await campus.client_for(TEACHER)
+
+    listed = await student.get("/api/v1/notifications")
+
+    assert listed.json()["due_soon"] == [
+        {
+            "classroom_id": campus.classroom.id,
+            "assignment_id": campus.assignment_id,
+            "title": "Binary search",
+            "deadline": "2026-10-15T16:59:00Z",
+        }
+    ]
+    assert (await teacher.get("/api/v1/notifications")).json()["due_soon"] == []
+
+
+@pytest.mark.anyio
+async def test_deadline_a_week_away_is_not_due_soon() -> None:
+    campus = Campus()
+    student = await campus.client_for(STUDENT)
+
+    listed = await student.get("/api/v1/notifications")
+
+    assert listed.json()["due_soon"] == []

@@ -26,3 +26,16 @@ class Notification:
     created_at: datetime
     id: int | None = None
     read_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DueSoon:
+    """ "Deadline tomorrow": a Posting the Student has not submitted, due soon.
+
+    Computed on read and never stored or emailed (ADR-0007 §6.2).
+    """
+
+    classroom_id: int
+    assignment_id: int
+    title: str
+    deadline: datetime

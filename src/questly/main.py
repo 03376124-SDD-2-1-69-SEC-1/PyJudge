@@ -65,7 +65,7 @@ from questly.core.generation.routes import router as draft_router
 from questly.core.generation.service import GenerationService
 from questly.core.notifications.ports import EmailSender, NotificationRepository
 from questly.core.notifications.routes import router as notification_router
-from questly.core.notifications.service import NotificationService
+from questly.core.notifications.service import DueSoonService, NotificationService
 from questly.core.submissions.pages import router as submission_page_router
 from questly.core.submissions.ports import CodeRunner, SubmissionRepository
 from questly.core.submissions.routes import (
@@ -274,6 +274,9 @@ def create_app(
         notification_service,
     )
     application.state.assignment_service = assignment_service
+    application.state.due_soon_service = DueSoonService(
+        classroom_service, assignment_service, clock
+    )
 
     if code_runner is None:
         code_runner = StubCodeRunner()

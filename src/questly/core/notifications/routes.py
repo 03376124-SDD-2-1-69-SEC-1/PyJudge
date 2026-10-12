@@ -5,11 +5,13 @@ from fastapi import APIRouter, HTTPException, Request, status
 from questly.core.auth.current import current_actor
 from questly.core.notifications.models import Notification
 from questly.core.notifications.schemas import (
+    DueSoonResponse,
     MarkAllReadResponse,
     NotificationListResponse,
     NotificationResponse,
 )
 from questly.core.notifications.service import (
+    DueSoonService,
     NotificationNotFoundError,
     NotificationService,
 )
@@ -20,6 +22,11 @@ router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 def notification_service(request: Request) -> NotificationService:
     """Resolve NotificationService from application state."""
     return request.app.state.notification_service
+
+
+def due_soon_service(request: Request) -> DueSoonService:
+    """Resolve DueSoonService from application state."""
+    return request.app.state.due_soon_service
 
 
 def notification_response(
@@ -40,12 +47,22 @@ def notification_response(
 
 @router.get("", response_model=NotificationListResponse)
 def list_notifications(request: Request) -> NotificationListResponse:
-    """List notifications belonging to the logged-in user."""
+    """List the logged-in user's notifications and what is due within 24 h."""
     actor = current_actor(request)
     items = notification_service(request).list_for_user(actor.user_id)
+    due = due_soon_service(request).due_soon(actor)
 
     return NotificationListResponse(
-        items=[notification_response(item) for item in items]
+        items=[notification_response(item) for item in items],
+        due_soon=[
+            DueSoonResponse(
+                classroom_id=item.classroom_id,
+                assignment_id=item.assignment_id,
+                title=item.title,
+                deadline=item.deadline,
+            )
+            for item in due
+        ],
     )
 
 

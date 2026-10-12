@@ -19,10 +19,22 @@ class NotificationResponse(BaseModel):
     read_at: datetime | None
 
 
+class DueSoonResponse(BaseModel):
+    """A Posting due within 24 h that the Student has not submitted."""
+
+    model_config = ConfigDict(frozen=True)
+
+    classroom_id: int
+    assignment_id: int
+    title: str
+    deadline: datetime
+
+
 class NotificationListResponse(BaseModel):
-    """Notifications belonging to the current user."""
+    """Notifications belonging to the current user, plus "Deadline tomorrow"."""
 
     items: list[NotificationResponse]
+    due_soon: list[DueSoonResponse]
 
 
 class MarkAllReadResponse(BaseModel):

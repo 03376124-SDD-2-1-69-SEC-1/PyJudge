@@ -4,13 +4,26 @@ main.py fills ClassroomMembers with the classrooms slice's repository and
 UserAccounts with the auth slice's repository. Both are repositories rather
 than services because AuthService sends its mail through NotificationService,
 so NotificationService is built before either service exists.
+
+DueSoonService is built after them, so main.py fills JoinedClassrooms with
+ClassroomService and ClassroomProblems with AssignmentService.
 """
 
 from datetime import datetime
 from typing import Protocol
 
-from questly.core.auth.models import User
-from questly.core.classrooms.models import Membership
+from questly.core.assignments.models import (
+    InstructorProblemList,
+    ProblemFilter,
+    StudentProblemList,
+)
+from questly.core.auth.models import Actor, User
+from questly.core.classrooms.models import (
+    ClassroomFilter,
+    InstructorPicker,
+    Membership,
+    StudentPicker,
+)
 from questly.core.notifications.models import Notification
 
 
@@ -66,3 +79,19 @@ class UserAccounts(Protocol):
     """The account a notification email goes to."""
 
     def get_user(self, user_id: int) -> User | None: ...
+
+
+class JoinedClassrooms(Protocol):
+    """The Classrooms an Actor sees on C-01."""
+
+    def picker(
+        self, actor: Actor, classroom_filter: ClassroomFilter
+    ) -> InstructorPicker | StudentPicker: ...
+
+
+class ClassroomProblems(Protocol):
+    """A Classroom's Postings as the Actor sees them on S-01."""
+
+    def problems(
+        self, actor: Actor, classroom_id: int, problem_filter: ProblemFilter
+    ) -> InstructorProblemList | StudentProblemList: ...
