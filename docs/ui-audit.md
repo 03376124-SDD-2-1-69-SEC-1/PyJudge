@@ -6,7 +6,7 @@ Result key: **matches** = same layout and components as Figma; **adapted** = Fig
 
 | Page id | Template | Figma screen | Result | Notes |
 |---|---|---|---|---|
-| G-00 | `shared/g00_landing.html` | none | no mock | Thai landing in the auth brand look (pink gradient, "Learn. Code. Grow.", code card), laid out after the Edumark template: nav, hero, highlight strip, features, steps for both roles side by side (no JS toggle), sample problems, CTA band, footer. Sample problems are illustrative copy. |
+| G-00 | `shared/g00_landing.html` | none | no mock | Thai landing in the auth brand look (pink gradient, "Learn. Code. Grow.", code card), laid out after the Edumark template: nav, hero, highlight strip, features, steps for both roles side by side (no JS toggle), sample problems, CTA band, footer credit to Doonminus2. CSS-only motion (load-in, floating code card, scroll reveal where `animation-timeline` is supported), off under `prefers-reduced-motion`. Sample problems are illustrative copy. |
 | G-01 | `shared/g01_login.html` | Auth (login) | matches | Demo "log in as" list kept (`data-demo="log-in-as"`) under the divider, as a one-column list, not the two-button Figma pair. No "remember me" or "forgot password" (no backend). |
 | G-03 | `shared/g03_signup.html` | Auth (signup) | adapted | Keeps the instructor checkbox and faculty select (not in Figma). |
 | G-04 | `shared/g04_verify.html` | Auth (verify) | adapted | Waiting, verified, expired and invalid states all use the verify card. No "I verified" button (the link does it). |

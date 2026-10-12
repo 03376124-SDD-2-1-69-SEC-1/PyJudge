@@ -190,3 +190,12 @@ async def test_landing_in_page_links_point_at_its_sections() -> None:
     for section in ("features", "how", "problems"):
         assert f'href="#{section}"' in landing.text
         assert f'id="{section}"' in landing.text
+
+
+@pytest.mark.anyio
+async def test_landing_footer_credits_the_author_on_github() -> None:
+    async with _client(build_app(auth_repository=_users())) as client:
+        landing = await client.get("/")
+
+    assert 'href="https://github.com/Doonminus2"' in landing.text
+    assert ">Doonminus2</a>" in landing.text
