@@ -37,8 +37,16 @@ def check_db(session: Session) -> dict:
     }
 
 
+CONFIGURED_NOT_PROBED = "configured (not probed)"
+
+
 class SQLSystemHealthChecker(SystemHealthChecker):
-    """Check database connectivity and report configured runtime adapters."""
+    """Probe the database; report whether the other adapters are configured.
+
+    Only the database is actually contacted. PDF processing, AI generation,
+    the sandbox and email say "configured (not probed)" when healthy, so A-01
+    does not claim more than was checked.
+    """
 
     def __init__(
         self,
@@ -63,28 +71,28 @@ class SQLSystemHealthChecker(SystemHealthChecker):
 
         return SystemStatus(
             services=[
-                self._status("web application", True),
-                self._status(
+                ServiceStatus("web application", ServiceHealthStatus.HEALTHY),
+                self._probed(
                     "database",
                     database_ready,
                     "Database connection or required schemas unavailable",
                 ),
-                self._status(
+                self._configured(
                     "PDF processing",
                     find_spec("fitz") is not None,
                     "PyMuPDF is not installed",
                 ),
-                self._status(
+                self._configured(
                     "AI generation",
                     self._generation_available,
                     "Generation provider is not configured",
                 ),
-                self._status(
+                self._configured(
                     "code execution sandbox",
                     self._sandbox_available,
                     "Code execution adapter is not configured",
                 ),
-                self._status(
+                self._configured(
                     "email delivery",
                     self._email_available,
                     "Email delivery adapter is not configured",
@@ -93,13 +101,15 @@ class SQLSystemHealthChecker(SystemHealthChecker):
         )
 
     @staticmethod
-    def _status(
-        name: str, ready: bool, unavailable_detail: str | None = None
-    ) -> ServiceStatus:
-        return ServiceStatus(
-            name=name,
-            status=(
-                ServiceHealthStatus.HEALTHY if ready else ServiceHealthStatus.UNHEALTHY
-            ),
-            details=None if ready else unavailable_detail,
-        )
+    def _probed(name: str, ready: bool, unavailable_detail: str) -> ServiceStatus:
+        if ready:
+            return ServiceStatus(name, ServiceHealthStatus.HEALTHY)
+        return ServiceStatus(name, ServiceHealthStatus.UNHEALTHY, unavailable_detail)
+
+    @staticmethod
+    def _configured(name: str, configured: bool, missing_detail: str) -> ServiceStatus:
+        if configured:
+            return ServiceStatus(
+                name, ServiceHealthStatus.HEALTHY, CONFIGURED_NOT_PROBED
+            )
+        return ServiceStatus(name, ServiceHealthStatus.UNHEALTHY, missing_detail)
