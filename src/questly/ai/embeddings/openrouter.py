@@ -17,7 +17,7 @@ from questly.ai.embeddings.ports import EmbeddingError
 
 _TIMEOUT_MS = 60_000
 # Left unset, the SDK retries 5XX and connection errors for up to an hour.
-# A 5s budget gives two or three retries, close to the openai client's two.
+# A 5s budget allows two or three retries.
 _RETRY = RetryConfig(
     "backoff",
     BackoffStrategy(

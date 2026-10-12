@@ -6,10 +6,10 @@ available on OpenRouter through the `openrouter` SDK (ADR-0009) and returns a
 structured GenerationResponse.
 
 Citations are []: retrieval (AI-05) exists but is not wired into generation
-yet. The LLM
-writes a reference solution but never the expected outputs: each test case's
-expected_output is that solution's stdout from the CodeRunner, or "" when the
-run fails (always, under the stub runner) and the Instructor fills it at T-04.
+yet. The LLM writes a reference solution but never the expected outputs: each
+test case's expected_output is that solution's stdout from the CodeRunner, or
+"" when the run fails (always, under the stub runner) and the Instructor fills
+it at T-04.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT_MS = 60_000
 # The SDK retries until a time budget runs out, not a count. Backoff of 0.5s
-# doubling to 8s spends 15s on four or five retries, close to the old four.
+# doubling to 8s spends 15s on four or five retries.
 _RETRY = RetryConfig(
     "backoff",
     BackoffStrategy(
