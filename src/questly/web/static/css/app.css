@@ -3,15 +3,15 @@
 @layer theme, base, components, utilities;
 @layer theme {
   :root, :host {
-    --font-sans: "Helvetica Neue", Helvetica, Arial, "Noto Sans Thai", sans-serif;
-    --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-sans: "Noto Sans Thai", system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --spacing: 0.25rem;
     --container-md: 28rem;
     --container-lg: 32rem;
     --container-xl: 36rem;
     --container-2xl: 42rem;
     --container-3xl: 48rem;
-    --text-xs: 0.75rem;
+    --text-xs: 12px;
     --text-xs--line-height: calc(1 / 0.75);
     --text-base: 1rem;
     --text-base--line-height: calc(1.5 / 1);
@@ -22,19 +22,22 @@
     --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     --default-font-family: var(--font-sans);
     --default-mono-font-family: var(--font-mono);
-    --color-ink: #24231f;
-    --color-mid: #6f6c66;
-    --color-soft: #8d8a83;
-    --color-line: #c7c4be;
-    --color-hair: #e2dfda;
-    --color-fill: #eceae6;
+    --color-ink: #1f2937;
+    --color-mid: #6b7280;
+    --color-soft: #9ca3af;
+    --color-line: #e5e7eb;
+    --color-hair: #f3f4f6;
+    --color-fill: #fbfbfc;
     --color-pap: #ffffff;
-    --color-acc: #b68235;
-    --color-acc-ink: #7d5a23;
-    --color-danger: #7a2d2d;
-    --radius-ui: 3px;
+    --color-acc: #db2777;
+    --color-acc-ink: #be185d;
+    --color-brand-500: #ec4899;
+    --color-danger: #dc2626;
     --text-xxs: 11px;
     --text-ui: 13px;
+    --text-body: 14px;
+    --radius-ui: 8px;
+    --container-app: 1200px;
   }
 }
 @layer base {
@@ -615,28 +618,37 @@
 }
 @layer base {
   body {
+    margin: 0;
+    min-width: 320px;
     font-family: var(--font-sans);
-    font-size: var(--text-ui);
-    line-height: 1.45;
+    font-size: var(--text-body);
+    line-height: 1.5;
     color: var(--color-ink);
-    background: var(--color-pap);
+    background: var(--color-fill);
+    font-synthesis: none;
+  }
+  input, textarea, select, button {
+    font: inherit;
   }
   a {
     color: inherit;
   }
+  *:focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
 }
 @layer components {
   .page {
+    width: min(var(--container-app), calc(100% - 40px));
     margin-inline: auto;
-    width: 100%;
-    max-width: 1440px;
-    padding-inline: calc(var(--spacing) * 4);
-    padding-block: calc(var(--spacing) * 5);
-    @media (width >= 40rem) {
-      padding-inline: calc(var(--spacing) * 8);
+    padding-top: 42px;
+    padding-bottom: calc(var(--spacing) * 16);
+    @media (width < 600px) {
+      width: calc(100% - 28px);
     }
-    @media (width >= 40rem) {
-      padding-block: calc(var(--spacing) * 6);
+    @media (width < 600px) {
+      padding-top: calc(var(--spacing) * 8);
     }
   }
   .page-narrow {

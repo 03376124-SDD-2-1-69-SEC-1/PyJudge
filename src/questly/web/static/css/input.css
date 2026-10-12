@@ -2,52 +2,150 @@
 @source "../../templates";
 
 /*
- * Design tokens from docs/wireframes/Questly wireframes - Prototype.html
- * (the :root block every screen shares). Use them as Tailwind utilities:
- * text-ink, bg-fill, border-line, text-acc, font-mono ...
+ * Design tokens from the Figma Make prototype (docs/ui-redesign/tokens/theme.css).
+ * Legacy names (ink, mid, soft, line, hair, fill, pap, acc ...) are kept and
+ * remapped, so existing utilities (text-ink, bg-fill, border-line, text-acc,
+ * rounded-ui) pick up the new look.
  */
 @theme {
-  --color-ink: #24231f;
-  --color-mid: #6f6c66;
-  --color-soft: #8d8a83;
-  --color-line: #c7c4be;
-  --color-hair: #e2dfda;
-  --color-fill: #eceae6;
-  --color-pap: #ffffff;
-  --color-acc: #b68235;
-  --color-acc-ink: #7d5a23;
-  --color-danger: #7a2d2d;
-  --color-code: #fbfaf9;
-  --color-code-ink: #4c4a44;
+  /* ---- Neutrals (remapped legacy names) ----------------------------- */
+  --color-ink: #1f2937;      /* body text            (gray-800) */
+  --color-ink-2: #374151;    /* secondary button text (gray-700) */
+  --color-mid: #6b7280;      /* muted text           (gray-500) */
+  --color-label: #4b5563;    /* form labels          (gray-600) */
+  --color-soft: #9ca3af;     /* captions, th, hints  (gray-400) */
+  --color-faint: #d1d5db;    /* problem numbers, disabled (gray-300) */
+  --color-line: #e5e7eb;     /* input + button borders (gray-200) */
+  --color-hair: #f3f4f6;     /* row dividers, track bg (gray-100) */
+  --color-fill: #fbfbfc;     /* app background */
+  --color-pap: #ffffff;      /* surfaces */
+  --color-subtle: #fafafa;   /* test-case rows, page bg */
+  --color-thead: #fcfcfd;    /* table header bg */
 
-  /* Latin text in Helvetica; Thai glyphs fall through to Noto Sans Thai. */
-  --font-sans: "Helvetica Neue", Helvetica, Arial, "Noto Sans Thai", sans-serif;
-  --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* ---- Brand: pink ----------------------------------------------------- */
+  --color-acc: #db2777;      /* primary (pink-600) */
+  --color-acc-ink: #be185d;  /* primary hover / active text (pink-700) */
+  --color-acc-deep: #831843; /* shadow tint (pink-900) */
+  --color-brand-500: #ec4899;
+  --color-brand-400: #f472b6;
+  --color-brand-300: #f9a8d4; /* hover border, dashed borders */
+  --color-brand-200: #fbcfe8; /* tip panel border */
+  --color-brand-100: #fce7f3; /* focus ring, avatar bg, loading track */
+  --color-brand-50: #fdf2f8;  /* tinted icon wells, active nav, hover bg */
+  --color-brand-25: #fffafb;  /* table/list row hover */
+  --color-brand-row: #fff5fa; /* selected table row */
 
-  --radius-ui: 3px;
-  --text-xxs: 11px;
-  --text-ui: 13px;
+  /* Pink-tinted hairlines used on cards (instead of plain gray) */
+  --color-card-line: #eee6ea;
+  --color-card-line-2: #f0e4ea;
+  --color-header-line: #f1e5ec;
+
+  /* ---- Semantic ------------------------------------------------------- */
+  --color-danger: #dc2626;
+  --color-danger-bg: #fef2f2;
+  --color-danger-line: #fca5a5;
+  --color-danger-zone: #fecaca;
+  --color-ok: #047857;
+  --color-ok-strong: #059669;
+  --color-ok-bg: #ecfdf5;
+  --color-ok-line: #a7f3d0;
+  --color-ok-dot: #10b981;
+  --color-warn: #b45309;
+  --color-warn-strong: #d97706;
+  --color-warn-bg: #fffbeb;
+  --color-warn-line: #fde68a;
+  --color-warn-ink: #92400e;
+  --color-info: #2563eb;
+  --color-info-bg: #eff6ff;
+  --color-pass: #34d399;     /* test-case dot: pass, mini progress */
+  --color-fail: #f87171;     /* test-case dot: fail */
+  --color-amber: #fbbf24;    /* donut "in progress" slice */
+
+  /* ---- Code -------------------------------------------------------------- */
+  --color-code: #f8fafc;      /* light <pre> in problem statement */
+  --color-code-ink: #4b5563;
+  --color-editor: #111827;    /* dark editor + code preview */
+  --color-editor-head: #1f2937;
+  --color-editor-ink: #e5e7eb;
+  --color-editor-gutter: #4b5563;
+
+  /* ---- Classroom cover gradients (used as bg-linear-135 from-.. to-..) --- */
+  --color-cover-pink-from: #db2777;
+  --color-cover-pink-to: #f472b6;
+  --color-cover-violet-from: #7c3aed;
+  --color-cover-violet-to: #a78bfa;
+  --color-cover-blue-from: #2563eb;
+  --color-cover-blue-to: #60a5fa;
+
+  /* ---- Typography ----------------------------------------------------- */
+  /* Figma Make uses Noto Sans Thai for Latin AND Thai. */
+  --font-sans: "Noto Sans Thai", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-tiny: 10px;   /* stat labels, row captions, table subtext */
+  --text-xxs: 11px;    /* eyebrow, badges, hints, table th */
+  --text-xs: 12px;     /* labels, table body */
+  --text-ui: 13px;     /* buttons, body copy, problem titles */
+  --text-body: 14px;   /* page descriptions */
+  --text-h2: 17px;     /* section heads */
+  --text-h1: 28px;     /* page titles (24px under 600px) */
+  --text-auth-h1: 27px;
+  --text-hero: 43px;   /* auth brand panel headline */
+
+  /* ---- Radius ------------------------------------------------------- */
+  --radius-ui: 8px;    /* inputs (legacy name, was 3px) */
+  --radius-btn: 9px;   /* buttons, small panels */
+  --radius-icon: 10px; /* avatar, stat icon well */
+  --radius-card: 14px; /* panels, class cards, tip panel */
+  --radius-list: 13px; /* tables, lists, stats strip */
+
+  /* ---- Shadow ------------------------------------------------------- */
+  --shadow-card: 0 2px 8px #11182708;
+  --shadow-card-hover: 0 10px 28px #83184312;
+  --shadow-btn: 0 3px 8px #db27772b;
+  --shadow-menu: 0 12px 32px #8318431a;
+  --shadow-focus: 0 0 0 3px #fce7f3;
+
+  /* ---- Layout -------------------------------------------------------- */
+  --container-app: 1200px;      /* .container width */
+  --container-narrow: 620px;    /* join / create classroom */
+  --container-settings: 870px;  /* classroom settings */
+  --container-review: 850px;    /* T-04 review panel */
+  --spacing-header: 72px;       /* sticky header height */
 }
 
 @layer base {
-  /* Root stays 16px so rem-based utilities (h-9 = 36px) match the prototype;
-     body text is the prototype's 13px. */
+  /* Root stays 16px so rem-based utilities (h-9 = 36px) keep their size. */
   body {
+    margin: 0;
+    min-width: 320px;
     font-family: var(--font-sans);
-    font-size: var(--text-ui);
-    line-height: 1.45;
+    font-size: var(--text-body);
+    line-height: 1.5;
     color: var(--color-ink);
-    background: var(--color-pap);
+    background: var(--color-fill);
+    font-synthesis: none;
+  }
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
   }
   a {
     color: inherit;
+  }
+  *:focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
   }
 }
 
 @layer components {
   /* ---- Layout ------------------------------------------------------- */
   .page {
-    @apply mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-8 sm:py-6;
+    width: min(var(--container-app), calc(100% - 40px));
+    @apply mx-auto pt-[42px] pb-16 max-[600px]:w-[calc(100%-28px)] max-[600px]:pt-8;
   }
   .page-narrow {
     @apply mx-auto flex min-h-screen w-full max-w-[440px] flex-col justify-center gap-5 px-4 py-10;
