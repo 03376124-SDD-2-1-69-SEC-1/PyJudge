@@ -7,6 +7,7 @@ it is generated in must be one the Instructor owns.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
@@ -47,9 +48,6 @@ from questly.core.generation.schemas import (
     GenerationResponse,
 )
 
-# ADR-0007 §4.4: daily, reset at midnight Bangkok. A-01 will make the limit
-# configurable; until the admin slice lands it is this default.
-DEFAULT_DAILY_QUOTA = 20
 QUOTA_ZONE = ZoneInfo("Asia/Bangkok")
 STEPS = (1, 2, 3, 4)
 
@@ -98,7 +96,7 @@ class GenerationService:
         classrooms: ClassroomLookup,
         publisher: AssignmentPublisher,
         clock: Clock,
-        daily_quota: int = DEFAULT_DAILY_QUOTA,
+        daily_quota: Callable[[], int],
     ) -> None:
         self._drafts = drafts
         self._client = client
@@ -119,7 +117,7 @@ class GenerationService:
         self._require_instructor(actor)
         return QuotaStatus(
             used=self._drafts.count_generations(actor.user_id, self._day_start()),
-            limit=self._daily_quota,
+            limit=self._daily_quota(),
         )
 
     def generate(

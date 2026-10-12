@@ -1,21 +1,29 @@
-"""Email adapters. The stub logs instead of sending (ADR-0007: stubs first)."""
+"""Email adapter. The stub records and logs messages instead of sending them."""
 
 import logging
+from dataclasses import dataclass
 
 logger = logging.getLogger("questly.email")
 
 
+@dataclass(frozen=True, slots=True)
+class SentEmail:
+    to: str
+    subject: str
+    body: str
+
+
 class StubEmailSender:
-    """Records every message and logs verification links for local use."""
+    """Capture outgoing emails without requiring a mail server.
+
+    The whole body is logged so a verification link can be followed in demo
+    mode (scripts/demo.py promises that).
+    """
 
     def __init__(self) -> None:
-        self.sent: list[tuple[str, str]] = []
+        self.messages: list[SentEmail] = []
 
-    def send_verification(
-        self, *, email: str, full_name: str, verify_path: str
-    ) -> None:
-        """Satisfy auth's VerificationMailer without a mail server."""
-        self.sent.append((email, verify_path))
-        logger.warning(
-            "verification link for %s <%s>: %s", full_name, email, verify_path
-        )
+    def send(self, *, to: str, subject: str, body: str) -> None:
+        """Record an email sent through the notification email port."""
+        self.messages.append(SentEmail(to=to, subject=subject, body=body))
+        logger.warning("email to %s: %s\n%s", to, subject, body)

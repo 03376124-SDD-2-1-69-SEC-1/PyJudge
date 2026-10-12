@@ -36,12 +36,14 @@ from questly.core.assignments.ports import (
     AssignmentRepository,
     ClassroomAccess,
     Clock,
+    MemberNotifier,
     PostingRepository,
     PostingStats,
     VersionRepository,
 )
 from questly.core.auth.models import Actor, PermissionDeniedError, Role
 from questly.core.classrooms.models import ClassroomRole
+from questly.core.notifications.models import NotificationKind, NotificationPayload
 from questly.core.rounding import average
 
 FIRST_VERSION_REASON = "Published"
@@ -84,6 +86,7 @@ class AssignmentService:
         classrooms: ClassroomAccess,
         stats: PostingStats,
         clock: Clock,
+        notifier: MemberNotifier,
     ) -> None:
         self._assignments = assignments
         self._versions = versions
@@ -91,6 +94,7 @@ class AssignmentService:
         self._classrooms = classrooms
         self._stats = stats
         self._clock = clock
+        self._notifier = notifier
 
     # ---- Publishing ------------------------------------------------------
 
@@ -138,6 +142,12 @@ class AssignmentService:
             )
             for classroom_id in sorted(set(classroom_ids))
         ]
+        for posting in postings:
+            self._notifier.notify_members(
+                posting.classroom_id,
+                NotificationKind.ASSIGNMENT_PUBLISHED,
+                _payload(assignment, posting.classroom_id),
+            )
         return PublishedAssignment(assignment=assignment, postings=postings)
 
     # ---- Classroom views (T-01, S-01) -----------------------------------
@@ -262,6 +272,18 @@ class AssignmentService:
         self._require_owner(actor, classroom_id)
         self._postings.delete(self._posting(classroom_id, assignment_id).id)
 
+    def notify_students(
+        self, actor: Actor, classroom_id: int, assignment_id: int
+    ) -> None:
+        """T-02c "Notify students": every Member of this Classroom hears of it."""
+        self._require_owner(actor, classroom_id)
+        self._posting(classroom_id, assignment_id)
+        self._notifier.notify_members(
+            classroom_id,
+            NotificationKind.ASSIGNMENT_NOTIFIED,
+            _payload(self._assignment(assignment_id), classroom_id),
+        )
+
     # ---- Content and Versions ----------------------------------------------
 
     def get(self, actor: Actor, assignment_id: int) -> Assignment:
@@ -332,6 +354,12 @@ class AssignmentService:
             posting = own_postings[posting_id]
             self._postings.update(
                 replace(posting, schedule=replace(posting.schedule, deadline=deadline))
+            )
+        for posting in own_postings.values():
+            self._notifier.notify_members(
+                posting.classroom_id,
+                NotificationKind.ASSIGNMENT_UPDATED,
+                {**_payload(updated, posting.classroom_id), "reason": reason.strip()},
             )
         return updated
 
@@ -539,6 +567,14 @@ def _ordered(test_cases: list[TestCase]) -> list[TestCase]:
         replace(test_case, order_index=index)
         for index, test_case in enumerate(test_cases)
     ]
+
+
+def _payload(assignment: Assignment, classroom_id: int) -> NotificationPayload:
+    return {
+        "classroom_id": classroom_id,
+        "assignment_id": assignment.id,
+        "title": assignment.title,
+    }
 
 
 def _snapshot(assignment: Assignment, reason: str, now: datetime) -> AssignmentVersion:

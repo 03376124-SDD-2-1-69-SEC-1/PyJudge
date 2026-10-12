@@ -6,7 +6,12 @@ from httpx import ASGITransport, AsyncClient
 from questly.core.auth.models import Role
 from questly.integrations.email import StubEmailSender
 from tests.fakes.app import build_app
-from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
+from tests.fakes.auth import (
+    DEFAULT_PASSWORD,
+    FakeAuthRepository,
+    seed_user,
+    verification_path,
+)
 
 SIGN_UP = {
     "full_name": "Somchai Prasert",
@@ -25,7 +30,7 @@ async def test_sign_up_verify_login_me_logout_round_trip() -> None:
     mailer = StubEmailSender()
     async with _client(build_app(verification_mailer=mailer)) as client:
         created = await client.post("/api/v1/auth/signup", json=SIGN_UP)
-        token = mailer.sent[-1][1].split("token=", 1)[1]
+        token = verification_path(mailer).split("token=", 1)[1]
         verified = await client.post("/api/v1/auth/verify", json={"token": token})
         login = await client.post(
             "/api/v1/auth/login",

@@ -111,7 +111,7 @@ class KnowledgeSource(SQLModel, table=True):
     r2_object_key: str = Field(nullable=False)  # ซ้ำกับ core ตั้งใจ ใช้ verify link
     content_hash: str = Field(nullable=False)
     status: str = Field(nullable=False, default="pending")
-    embedding_model: str | None = Field(default=None)  # เช่น "text-embedding-004"
+    embedding_model: str | None = Field(default=None)  # เช่น "gemini-embedding-001"
     embedding_dim: int | None = Field(default=None)
     metadata_: dict = (
         _metadata_jsonb()

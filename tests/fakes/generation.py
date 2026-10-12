@@ -124,6 +124,9 @@ class FakeDraftRepository:
     def count_generations(self, user_id: int, since: datetime) -> int:
         return sum(1 for who, at in self.generations if who == user_id and at >= since)
 
+    def count_all_generations(self, since: datetime) -> int:
+        return sum(1 for _, at in self.generations if at >= since)
+
 
 class FakeDocumentCatalog:
     """Documents per owner, set by a test or the demo seed."""

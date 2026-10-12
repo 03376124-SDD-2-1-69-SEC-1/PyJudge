@@ -1,19 +1,21 @@
 """The OpenRouter adapter validates and normalizes 768-dimensional responses."""
 
-import sys
+import json
 from dataclasses import dataclass
 from math import isclose
-from types import SimpleNamespace
 
+import httpx
 import pytest
+from openrouter.errors import NoResponseError, OpenRouterError
 
 from questly.ai.embeddings import openrouter
 from questly.ai.embeddings.openrouter import (
     OpenRouterEmbeddingProvider,
     create_openrouter_embedding_provider,
-    create_openrouter_embedding_provider_from_env,
 )
 from questly.ai.embeddings.ports import EmbeddingError
+
+MODEL = "google/gemini-embedding-001"
 
 
 @dataclass(slots=True)
@@ -27,30 +29,32 @@ class FakeResponse:
 
 
 class FakeEmbeddings:
-    def __init__(self, response: FakeResponse) -> None:
+    def __init__(self, response: FakeResponse | Exception) -> None:
         self.response = response
         self.calls: list[dict[str, object]] = []
 
-    def create(self, **kwargs: object) -> FakeResponse:
+    def generate(self, **kwargs: object) -> FakeResponse:
         self.calls.append(kwargs)
+        if isinstance(self.response, Exception):
+            raise self.response
         return self.response
 
 
 class FakeClient:
-    def __init__(self, response: FakeResponse) -> None:
+    def __init__(self, response: FakeResponse | Exception) -> None:
         self.embeddings = FakeEmbeddings(response)
 
 
 def test_requests_document_embedding_and_normalizes_it() -> None:
     client = FakeClient(FakeResponse([FakeEmbedding([3.0, 4.0] + [0.0] * 766)]))
-    provider = OpenRouterEmbeddingProvider(client)
+    provider = OpenRouterEmbeddingProvider(client, MODEL)
 
     vector = provider.embed("โจทย์")
 
-    assert provider.model == "google/gemini-embedding-001"
+    assert provider.model == MODEL
     assert client.embeddings.calls == [
         {
-            "model": "google/gemini-embedding-001",
+            "model": MODEL,
             "input": "โจทย์",
             "dimensions": 768,
             "encoding_format": "float",
@@ -74,84 +78,79 @@ def test_requests_document_embedding_and_normalizes_it() -> None:
 )
 def test_refuses_unusable_provider_responses(response: FakeResponse) -> None:
     with pytest.raises(EmbeddingError):
-        OpenRouterEmbeddingProvider(FakeClient(response)).embed("text")
+        OpenRouterEmbeddingProvider(FakeClient(response), MODEL).embed("text")
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        OpenRouterError(
+            "rate limited",
+            httpx.Response(429, request=httpx.Request("POST", "https://x")),
+        ),
+        NoResponseError(),
+        httpx.ReadTimeout("timed out"),
+    ],
+    ids=["openrouter-error", "no-response", "timeout"],
+)
+def test_sdk_failures_become_embedding_errors(error: Exception) -> None:
+    provider = OpenRouterEmbeddingProvider(FakeClient(error), MODEL)
+
+    with pytest.raises(EmbeddingError) as raised:
+        provider.embed("text")
+
+    assert raised.value.__cause__ is error
 
 
 def test_refuses_empty_text_without_provider_call() -> None:
     client = FakeClient(FakeResponse([FakeEmbedding([1.0] * 768)]))
 
     with pytest.raises(EmbeddingError, match="empty text"):
-        OpenRouterEmbeddingProvider(client).embed(" \n ")
+        OpenRouterEmbeddingProvider(client, MODEL).embed(" \n ")
 
     assert client.embeddings.calls == []
 
 
 def test_factory_requires_explicit_key_before_creating_client() -> None:
     with pytest.raises(ValueError, match="API key"):
-        create_openrouter_embedding_provider(" ")
+        create_openrouter_embedding_provider(" ", MODEL)
 
 
-def test_factory_uses_existing_sdk_with_openrouter_base_url(
+def test_factory_builds_the_sdk_client_and_requests_the_configured_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    observed: list[dict[str, object]] = []
-    fake = FakeClient(FakeResponse(None))
+    requests: list[httpx.Request] = []
 
-    def make_client(api_key: str) -> FakeClient:
-        observed.append({"api_key": api_key})
-        return fake
+    def reply(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "object": "list",
+                "model": "other/embedder",
+                "data": [
+                    {
+                        "object": "embedding",
+                        "index": 0,
+                        "embedding": [3.0, 4.0] + [0.0] * 766,
+                    }
+                ],
+            },
+        )
 
-    monkeypatch.setattr(openrouter, "_new_client", make_client)
+    provider = create_openrouter_embedding_provider("test-only-value", "other/embedder")
+    sdk = provider._client
+    assert isinstance(sdk, openrouter.OpenRouter)
+    sdk.sdk_configuration.client = httpx.Client(transport=httpx.MockTransport(reply))
 
-    provider = create_openrouter_embedding_provider("test-only-value")
+    vector = provider.embed("โจทย์")
 
-    assert isinstance(provider, OpenRouterEmbeddingProvider)
-    assert observed == [{"api_key": "test-only-value"}]
-
-
-def test_client_uses_openrouter_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
-    observed: list[dict[str, object]] = []
-    fake = FakeClient(FakeResponse(None))
-
-    def make_client(**kwargs: object) -> FakeClient:
-        observed.append(kwargs)
-        return fake
-
-    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=make_client))
-
-    assert openrouter._new_client("test-only-value") is fake
-    assert observed == [
-        {
-            "base_url": "https://openrouter.ai/api/v1",
-            "api_key": "test-only-value",
-            "timeout": 60.0,
-        }
-    ]
-
-
-def test_env_factory_requires_key_without_creating_client(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(openrouter, "load_dotenv", lambda **_kwargs: None)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-
-    with pytest.raises(ValueError, match="API key"):
-        create_openrouter_embedding_provider_from_env()
-
-
-def test_env_factory_passes_key_without_exposing_it(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    observed: list[str] = []
-    sentinel = OpenRouterEmbeddingProvider(FakeClient(FakeResponse(None)))
-
-    def create(api_key: str) -> OpenRouterEmbeddingProvider:
-        observed.append(api_key)
-        return sentinel
-
-    monkeypatch.setattr(openrouter, "load_dotenv", lambda **_kwargs: None)
-    monkeypatch.setattr(openrouter, "create_openrouter_embedding_provider", create)
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-only-value")
-
-    assert create_openrouter_embedding_provider_from_env() is sentinel
-    assert observed == ["test-only-value"]
+    assert isclose(vector[0], 0.6)
+    assert requests[0].url == "https://openrouter.ai/api/v1/embeddings"
+    assert requests[0].headers["authorization"] == "Bearer test-only-value"
+    assert json.loads(requests[0].content) == {
+        "input": "โจทย์",
+        "model": "other/embedder",
+        "dimensions": 768,
+        "encoding_format": "float",
+    }

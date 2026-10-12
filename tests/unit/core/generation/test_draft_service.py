@@ -34,6 +34,7 @@ from tests.fakes.generation import (
     FakeGenerationClient,
     binary_search_response,
 )
+from tests.fakes.notifications import RecordingMemberNotifier
 
 DEADLINE = datetime(2026, 10, 15, 16, 59, tzinfo=UTC)
 
@@ -54,6 +55,7 @@ class World:
             self.classrooms,
             FakePostingStats(),
             self.clock,
+            RecordingMemberNotifier(),
         )
         self.drafts = FakeDraftRepository()
         self.client = FakeGenerationClient(binary_search_response())
@@ -65,7 +67,7 @@ class World:
             self.classrooms,
             assignments,
             self.clock,
-            daily_quota=quota,
+            daily_quota=lambda: quota,
         )
 
         def actor(email: str, role: Role) -> Actor:
