@@ -499,6 +499,10 @@ def _results(
     return tuple(results)
 
 
+# How long each generation stage lasts in the demo (T-03c shows them).
+DEMO_STEP_DELAY_SECONDS = 2.0
+
+
 def _seed_generation(app: FastAPI, seed: DemoSeed) -> None:
     """Somchai's T-06 library and the T-01 draft "Stack with min() in O(1)"."""
     seed.documents.by_owner[seed.somchai.id] = [
@@ -575,7 +579,11 @@ def main() -> None:
             "Run/Submit answer 'not configured'; set ALLOW_UNSAFE_RUNNER=1 to "
             "execute student code with the local Python (unsandboxed, demo only)"
         )
-    uvicorn.run(build_demo_app(seed), host="127.0.0.1", port=port)
+    app = build_demo_app(seed)
+    # After seeding, so the seed's own draft is not slowed. A pause between
+    # stages makes T-03c's step list watchable.
+    seed.generation_client.step_delay_seconds = DEMO_STEP_DELAY_SECONDS
+    uvicorn.run(app, host="127.0.0.1", port=port)
 
 
 if __name__ == "__main__":
