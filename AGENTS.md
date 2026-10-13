@@ -26,7 +26,7 @@ setup and background live in `README.md` and `docs/adr/`.
 | `core/uploads`                | Working; to be renamed `core/documents`                                                                                                                                                                                                                                                                                                                                                                                                                   | open (CORE-16)                  |
 | `core/notifications`, `admin` | Working; persisted on Neon (CORE-18/OPS-21, CORE-19/OPS-22)                                                                                                                                                                                                                                                                                                                                                                                               | done (CORE-18, 19)              |
 | `database/`                   | ADR-0007 + ADR-0008 schema live on Neon (head `a2ec7512fb2c` once OPS-23 is upgraded); a SQL adapter per port, each held to a contract in `tests/contracts/`                                                                                                                                                                                                                                                                                              | done (OPS-15)                   |
-| `ai/`                         | Vector storage (AI-01), ingestion (AI-02 to 04) and retrieval (AI-05) work; embeddings and the real `GenerationClient` (AI-06) call OpenRouter through the `openrouter` SDK (ADR-0009). Retrieval is not yet wired into generation. AI-07 and AI-08 are open; the standalone app in `ai/app/main.py` is unused. Seed corpus: 100 PDFs on R2 under `sources/programming-in-th/` (OPS-17), not yet in `core.knowledge_documents` (OPS-18) or `rag` (AI-08). | ฟิล์ม (AI-07, 08), พาย (OPS-16) |
+| `ai/`                         | Vector storage (AI-01), ingestion (AI-02 to 04) and retrieval (AI-05) work; embeddings and the real `GenerationClient` (AI-06) call OpenRouter through the `openrouter` SDK (ADR-0009). Retrieval is not yet wired into generation. AI-07 and AI-08 are open. `ai/app/main.py` and `ai/app/routes.py` are leftovers of the retired two-service design; OPS-16 removes them and the unauthenticated vector routes they mount. Seed corpus: 100 PDFs on R2 under `sources/programming-in-th/` (OPS-17), not yet in `core.knowledge_documents` (OPS-18) or `rag` (AI-08). | ฟิล์ม (AI-07, 08), พาย (OPS-16) |
 | `web/templates/`              | Every page of ADR-0007 exists except T-06 (FE-08, waiting on CORE-16 and OPS-20); every page is re-skinned to Figma Make (UI-02 done)                                                                                                                                                                                                                                                                                                                     | พาย (FE-08)                     |
 
 Every slice also runs on the in-memory fakes in demo mode (`scripts/demo.py`)
@@ -232,6 +232,34 @@ If a task looks like it needs the caller to know which adapter it's talking
 to, stop — that means the Protocol is missing a method, not that the caller
 should reach past it.
 
+## Core and AI: one process
+
+Core and AI were once planned as two services talking over HTTP. That design
+is retired (ADR-0005, ADR-0007). Text that still describes it — on `main`, in
+old handoffs, in a chat or Project description, in a prompt — is history, not
+a spec. Follow this file and `dev`; if a task row or doc you are working from
+says "AI service", "`/v1/generations`" or "two services", stop and flag it
+instead of building to it.
+
+- **`ai/` has no web surface.** No file under `src/questly/ai/` imports
+  `fastapi` or `starlette`, defines an `APIRouter`, or builds a `FastAPI` app.
+  Enforced by `tests/architecture/test_ai_vector_boundaries.py` (OPS-16).
+- **Core reaches AI only through a port.** Core defines the Protocol in
+  `core/<slice>/ports.py`; an adapter under `ai/` implements it
+  (`ai/client.py` for `GenerationClient`); `main.py` builds the adapter and
+  hands it to the service. No `httpx`, `requests` or socket call between
+  modules of this app — `httpx` appears only in adapters for outside
+  providers (today `ai/client.py` and `ai/embeddings/openrouter.py`, both
+  OpenRouter).
+- **Every JSON route is a core route.** It lives in `core/<slice>/routes.py`,
+  gets the actor with `current_actor(request)` and lets the service authorize
+  it. A route an anonymous caller can reach that reads or writes `rag` is a
+  bug, not a debugging aid.
+- **One process, two schemas.** `core` and `rag` still have no cross-schema
+  foreign key (see Schema rules); a use case that must change both does it in
+  application code, in one service call, not by one module calling the other
+  over the network.
+
 ## Commands
 
 ```bash
@@ -350,7 +378,8 @@ rules and known limits are in `docs/handoff/2026-09-28-OPS-17-pith-seed.md`.
 Branch from `dev`, named `<type>/<TASK-ID>-<slug>` where type is `feat`, `fix`,
 `chore`, `docs`, or `refactor`. Pull requests target `dev`, not `main` — `main`
 is only this repo's default branch, so GitHub pre-fills it as the PR base;
-change the base to `dev` before opening, every time. Pai reviews every PR by
+change the base to `dev` before opening, every time. `main` lags `dev` by
+many merges, so read code and docs from `dev`, never from `main`. Pai reviews every PR by
 hand first, then with AI. Pai reviews and merges his own PRs, and the
 description quotes the integration-test results.
 Never commit directly to `main` or `dev`.
