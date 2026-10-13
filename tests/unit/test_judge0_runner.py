@@ -3,6 +3,7 @@
 import base64
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -15,7 +16,13 @@ from questly.core.submissions.models import (
     RunnerUnavailableError,
     UnsupportedLanguageError,
 )
-from questly.integrations.judge0 import JUDGE0_LANGUAGE_IDS, Judge0CodeRunner
+from questly.integrations.judge0 import (
+    JUDGE0_LANGUAGE_IDS,
+    Judge0CodeRunner,
+    StubCodeRunner,
+)
+from questly.main import build_code_runner
+from tests.fakes.app import fake_settings
 
 BASE = "http://judge0.test"
 
@@ -302,3 +309,11 @@ def test_run_is_a_batch_of_one() -> None:
 
     assert execution.stdout == "7"
     assert [r.method for r in judge0.requests] == ["POST", "GET"]
+
+
+def test_the_app_runs_code_on_judge0_only_when_a_url_is_configured() -> None:
+    off = fake_settings()
+    on = replace(off, judge0_url="http://judge0:2358", judge0_auth_token="t")
+
+    assert isinstance(build_code_runner(off), StubCodeRunner)
+    assert isinstance(build_code_runner(on), Judge0CodeRunner)

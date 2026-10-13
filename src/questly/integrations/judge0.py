@@ -38,6 +38,12 @@ _FINISHED: dict[int, ExecutionStatus] = {
 }
 _FIELDS = "token,stdout,stderr,compile_output,status_id,time"
 
+# A Run or Submit holds its request open while Judge0 works, so the whole
+# batch gets a bound; each HTTP call gets a shorter one.
+_POLL_INTERVAL_SECONDS = 0.5
+_BATCH_TIMEOUT_SECONDS = 30.0
+_HTTP_TIMEOUT_SECONDS = 10.0
+
 
 class _Created(BaseModel):
     token: str
@@ -189,6 +195,17 @@ class Judge0CodeRunner:
             logger.warning("Judge0 %s failed: %s", method, error)
             raise RunnerUnavailableError("Judge0 is unreachable") from error
         return reply
+
+
+def connect_judge0(base_url: str, auth_token: str) -> Judge0CodeRunner:
+    """The production runner: a pooled HTTP client and the default bounds."""
+    return Judge0CodeRunner(
+        base_url=base_url,
+        auth_token=auth_token,
+        client=httpx.Client(timeout=_HTTP_TIMEOUT_SECONDS),
+        poll_interval_seconds=_POLL_INTERVAL_SECONDS,
+        timeout_seconds=_BATCH_TIMEOUT_SECONDS,
+    )
 
 
 def _language_id(language: str) -> int:

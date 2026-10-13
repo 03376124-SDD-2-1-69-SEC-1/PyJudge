@@ -119,7 +119,7 @@ from questly.database.storage.r2 import R2ObjectStorage, build_r2_client, check_
 from questly.integrations.clock import SystemClock
 from questly.integrations.email import StubEmailSender
 from questly.integrations.generation_jobs import InMemoryGenerationJobStore
-from questly.integrations.judge0 import StubCodeRunner
+from questly.integrations.judge0 import StubCodeRunner, connect_judge0
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _WEB_DIR = _PACKAGE_DIR / "web"
@@ -152,6 +152,13 @@ def asset_url(path: str) -> str:
     """
     version = int((_STATIC_DIR / path).stat().st_mtime)
     return f"/static/{path}?v={version}"
+
+
+def build_code_runner(settings: Settings) -> CodeRunner:
+    """Judge0 CE when JUDGE0_URL is set; otherwise the stub, which runs nothing."""
+    if not settings.judge0_url:
+        return StubCodeRunner()
+    return connect_judge0(settings.judge0_url, settings.judge0_auth_token)
 
 
 def create_app(
@@ -274,6 +281,9 @@ def create_app(
 
     if admin_repository is None:
         admin_repository = SQLAdminRepository(use_session_factory())
+    # Resolved before the health checker, which reports whether it is a stub.
+    if code_runner is None:
+        code_runner = build_code_runner(use_settings())
     if system_health_checker is None:
         system_health_checker = SQLSystemHealthChecker(
             use_session_factory(),
@@ -284,9 +294,7 @@ def create_app(
                     and not isinstance(generation_client, StubGenerationClient)
                 )
             ),
-            sandbox_available=(
-                code_runner is not None and not isinstance(code_runner, StubCodeRunner)
-            ),
+            sandbox_available=not isinstance(code_runner, StubCodeRunner),
             email_available=(not isinstance(email_sender, StubEmailSender)),
         )
     if provider_quota is None:
@@ -343,8 +351,6 @@ def create_app(
         classroom_service, assignment_service, clock
     )
 
-    if code_runner is None:
-        code_runner = StubCodeRunner()
     application.state.submission_service = SubmissionService(
         submission_repository, code_runner, assignment_service, classroom_service, clock
     )

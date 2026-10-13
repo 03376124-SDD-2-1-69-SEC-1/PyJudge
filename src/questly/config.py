@@ -45,6 +45,9 @@ class Settings:
     # Models an Admin may pick on A-01; defaults to just generation_model.
     generation_model_allowlist: tuple[str, ...] = (DEFAULT_GENERATION_MODEL,)
     embedding_model: str = DEFAULT_EMBEDDING_MODEL
+    # Judge0 CE: empty URL means no Judge0, and Run/Submit use the stub runner.
+    judge0_url: str = ""
+    judge0_auth_token: str = ""
 
 
 def _required(variable: str) -> str:
@@ -115,4 +118,6 @@ def get_settings() -> Settings:
             os.environ.get("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL).strip()
             or DEFAULT_EMBEDDING_MODEL
         ),
+        judge0_url=os.environ.get("JUDGE0_URL", "").strip(),
+        judge0_auth_token=os.environ.get("JUDGE0_AUTH_TOKEN", "").strip(),
     )
