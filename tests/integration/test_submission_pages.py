@@ -250,11 +250,77 @@ async def test_api_run_submit_list_and_get(demo: Demo) -> None:
     fetched = await client.get(f"/api/v1/submissions/{created.json()['id']}")
 
     assert run.status_code == 200 and run.json()["total"] == 2
-    assert created.status_code == 201 and created.json()["attempt"] == 2
-    hidden = [r for r in created.json()["results"] if r["kind"] != "sample"]
-    assert all(r["actual_output"] is None for r in hidden)
+    assert created.status_code == 202 and created.json()["attempt"] == 2
     assert [s["attempt"] for s in listed.json()] == [1, 2]
-    assert fetched.status_code == 200
+    assert fetched.status_code == 200 and fetched.json()["status"] == "done"
+    hidden = [r for r in fetched.json()["results"] if r["kind"] != "sample"]
+    assert hidden and all(r["actual_output"] is None for r in hidden)
+
+
+@pytest.mark.anyio
+async def test_api_submit_answers_202_with_the_status_url_and_no_score_yet(
+    demo: Demo,
+) -> None:
+    client = await demo.client(demo.seed.students[1].email)
+    api = "/api/v1/classrooms" + demo.url(BS).removeprefix("/classes")
+
+    created = await client.post(api + "/submissions", json={"code": "print(3)"})
+    status = await client.get(created.headers["location"])
+
+    body = created.json()
+    assert created.status_code == 202
+    assert created.headers["location"] == f"/api/v1/submissions/{body['id']}"
+    assert (body["status"], body["score"], body["results"]) == ("received", None, [])
+    assert body["recovery"] == "none"
+    judged = status.json()
+    assert judged["status"] == "done" and judged["score"] is not None
+    assert judged["total"] == len(judged["results"]) > 0
+
+
+@pytest.mark.anyio
+async def test_api_refuses_submit_and_run_while_a_submission_is_pending(
+    demo: Demo,
+) -> None:
+    client = await demo.client(demo.seed.students[1].email)
+    api = "/api/v1/classrooms" + demo.url(BS).removeprefix("/classes")
+
+    kept = await client.post(api + "/submissions", json={"code": "# judge down"})
+    again = await client.post(api + "/submissions", json={"code": "print(3)"})
+    run = await client.post(api + "/runs", json={"code": "print(3)"})
+    status = await client.get(kept.headers["location"])
+
+    assert kept.status_code == 202
+    assert status.json()["status"] == "received"
+    for refused in (again, run):
+        assert refused.status_code == 409
+        assert refused.json()["detail"]["code"] == "submission_pending"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("who", "status"),
+    [("owner", 200), ("teacher", 200), ("classmate", 404), ("sec2_student", 404)],
+)
+async def test_api_submission_status_is_for_its_student_and_instructor(
+    demo: Demo, who: str, status: int
+) -> None:
+    owner = await demo.client(demo.seed.students[1].email)
+    api = "/api/v1/classrooms" + demo.url(BS).removeprefix("/classes")
+    created = await owner.post(api + "/submissions", json={"code": "# judge down"})
+    email = {
+        "owner": demo.seed.students[1].email,
+        "teacher": demo.seed.somchai.email,
+        "classmate": demo.seed.students[3].email,
+        "sec2_student": demo.seed.students[7].email,
+    }[who]
+    client = await demo.client(email)
+
+    response = await client.get(created.headers["location"])
+
+    assert response.status_code == status
+    if status == 200:
+        assert response.json()["status"] == "received"
+        assert response.json()["score"] is None
 
 
 @pytest.mark.anyio
