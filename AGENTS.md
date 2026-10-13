@@ -206,7 +206,7 @@ the full list: `CONTEXT.md`.
 
 ## Ports and adapters
 
-Every external dependency — AI service, database, storage — is called through
+Every external dependency — AI provider, database, storage — is called through
 a `typing.Protocol` defined in the module that needs it, never through a
 concrete client type directly.
 
