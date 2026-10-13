@@ -14,6 +14,7 @@ from questly.core.submissions.models import (
     InstructorTab,
     PostingClosedError,
     ResubmissionNotAllowedError,
+    RunnerUnavailableError,
     RunReport,
     StudentSolveView,
     StudentTab,
@@ -22,11 +23,25 @@ from questly.core.submissions.service import NOT_VISIBLE, SubmissionService
 
 router = APIRouter(tags=["pages"], include_in_schema=False)
 
-_REFUSALS = {
-    ClassroomArchivedError: "This classroom is archived. Submissions are closed.",
-    EmptyCodeError: "Write some code first.",
-    PostingClosedError: "Submissions are closed for this problem.",
-    ResubmissionNotAllowedError: "This problem allows one submission only.",
+_REFUSALS: dict[type[Exception], tuple[str, int]] = {
+    ClassroomArchivedError: (
+        "This classroom is archived. Submissions are closed.",
+        status.HTTP_409_CONFLICT,
+    ),
+    EmptyCodeError: ("Write some code first.", status.HTTP_422_UNPROCESSABLE_CONTENT),
+    PostingClosedError: (
+        "Submissions are closed for this problem.",
+        status.HTTP_409_CONFLICT,
+    ),
+    ResubmissionNotAllowedError: (
+        "This problem allows one submission only.",
+        status.HTTP_409_CONFLICT,
+    ),
+    RunnerUnavailableError: (
+        "The code runner is unavailable right now, so nothing was saved. "
+        "Please try again in a moment.",
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+    ),
 }
 
 
@@ -163,15 +178,8 @@ def run_or_submit(
         view = _page_view(request, classroom_id, assignment_id)
         if not isinstance(view, StudentSolveView):
             raise HTTPException(status_code=403) from None
-        return _solve(
-            request,
-            view,
-            code=code,
-            error=_REFUSALS[type(refusal)],
-            status_code=status.HTTP_409_CONFLICT
-            if type(refusal) is not EmptyCodeError
-            else status.HTTP_422_UNPROCESSABLE_ENTITY,
-        )
+        message, status_code = _REFUSALS[type(refusal)]
+        return _solve(request, view, code=code, error=message, status_code=status_code)
     view = _page_view(request, classroom_id, assignment_id)
     if not isinstance(view, StudentSolveView):
         raise HTTPException(status_code=403)

@@ -28,6 +28,7 @@ from questly.core.submissions.models import (
     InstructorResultsView,
     PostingClosedError,
     ResubmissionNotAllowedError,
+    RunnerUnavailableError,
     StudentSolveView,
     Submission,
     SubmissionNotFoundError,
@@ -269,6 +270,21 @@ def test_resubmission_off_allows_one_submit(world: World) -> None:
     with pytest.raises(ResubmissionNotAllowedError):
         world.submit(aid)
     assert not world.service.page(world.student, world.room.id, aid).can_submit
+
+
+def test_an_unreachable_runner_stores_nothing_and_spends_no_attempt(
+    world: World,
+) -> None:
+    aid = world.publish(allow_resubmission=False)
+
+    with pytest.raises(RunnerUnavailableError):
+        world.submit(aid, "# judge down")
+    with pytest.raises(RunnerUnavailableError):
+        world.service.run(world.student, world.room.id, aid, "# judge down")
+
+    assert world.service.submissions(world.student, world.room.id, aid) == ()
+    assert world.service.page(world.student, world.room.id, aid).can_submit
+    assert world.submit(aid).attempt == 1
 
 
 def test_empty_code_is_refused(world: World) -> None:

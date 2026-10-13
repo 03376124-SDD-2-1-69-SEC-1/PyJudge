@@ -216,3 +216,7 @@ class ResubmissionNotAllowedError(Exception):
 
 class EmptyCodeError(ValueError):
     pass
+
+
+class RunnerUnavailableError(Exception):
+    """The CodeRunner could not judge the code; nothing was graded or kept."""
