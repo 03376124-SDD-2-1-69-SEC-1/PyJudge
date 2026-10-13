@@ -1,6 +1,7 @@
 """CodeRunner adapters. Judge0 CE comes later; the stub runs nothing."""
 
 import logging
+from collections.abc import Sequence
 
 from questly.core.submissions.models import Execution, ExecutionStatus
 
@@ -27,4 +28,22 @@ class StubCodeRunner:
             stdout="",
             stderr="The code runner is not configured.",
             time_seconds=0.0,
+        )
+
+    def run_many(
+        self,
+        *,
+        code: str,
+        language: str,
+        stdins: Sequence[str],
+        time_limit_seconds: float,
+    ) -> tuple[Execution, ...]:
+        return tuple(
+            self.run(
+                code=code,
+                language=language,
+                stdin=stdin,
+                time_limit_seconds=time_limit_seconds,
+            )
+            for stdin in stdins
         )

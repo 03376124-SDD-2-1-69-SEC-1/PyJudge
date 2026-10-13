@@ -223,30 +223,29 @@ class SubmissionService:
         self, assignment: Assignment, test_cases: list[TestCase], code: str
     ) -> tuple[TestResult, ...]:
         settings = assignment.settings
-        results = []
-        for position, (test_case, ordinal) in enumerate(
-            zip(test_cases, ordinals(test_cases), strict=True), start=1
-        ):
-            execution = self._runner.run(
-                code=code,
-                language=settings.language.value,
-                stdin=test_case.input_data,
-                time_limit_seconds=settings.time_limit_ms / 1000,
+        executions = self._runner.run_many(
+            code=code,
+            language=settings.language.value,
+            stdins=[test_case.input_data for test_case in test_cases],
+            time_limit_seconds=settings.time_limit_ms / 1000,
+        )
+        return tuple(
+            TestResult(
+                position=position,
+                ordinal=ordinal,
+                kind=test_case.kind,
+                note=test_case.note,
+                verdict=judge(test_case, execution),
+                time_seconds=execution.time_seconds,
+                expected_output=test_case.expected_output,
+                actual_output=execution.stdout,
+                error=execution.stderr,
             )
-            results.append(
-                TestResult(
-                    position=position,
-                    ordinal=ordinal,
-                    kind=test_case.kind,
-                    note=test_case.note,
-                    verdict=judge(test_case, execution),
-                    time_seconds=execution.time_seconds,
-                    expected_output=test_case.expected_output,
-                    actual_output=execution.stdout,
-                    error=execution.stderr,
-                )
+            for position, (test_case, ordinal, execution) in enumerate(
+                zip(test_cases, ordinals(test_cases), executions, strict=True),
+                start=1,
             )
-        return tuple(results)
+        )
 
     def _solve(
         self, actor: Actor, classroom_id: int, problem: StudentProblem

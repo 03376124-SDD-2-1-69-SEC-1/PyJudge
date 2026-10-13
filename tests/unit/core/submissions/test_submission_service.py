@@ -167,7 +167,7 @@ def test_run_executes_sample_tests_only_and_keeps_nothing(world: World) -> None:
     report = world.service.run(world.student, world.room.id, aid, "print(x)")
 
     assert [r.kind for r in report.results] == [TestCaseKind.SAMPLE] * 2
-    assert world.runner.calls == ["1", "2"]
+    assert world.runner.batches == [("1", "2")]
     assert world.service.submissions(world.student, world.room.id, aid) == ()
 
 
@@ -177,6 +177,7 @@ def test_submit_grades_every_test_and_counts_attempts(world: World) -> None:
     first = world.submit(aid, "# crash")
     second = world.submit(aid)
 
+    assert world.runner.batches == [("1", "2", "3", "")] * 2
     assert first.results[0].verdict is Verdict.RUNTIME_ERROR
     assert (first.attempt, first.score) == (1, 0)
     assert (second.attempt, second.score, second.all_passed) == (2, 10, True)
