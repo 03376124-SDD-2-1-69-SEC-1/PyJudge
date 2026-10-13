@@ -27,6 +27,9 @@ from questly.ai.app.routes import router as vector_router
 from questly.ai.app.schemas import ApplicationErrorResponse
 from questly.ai.app.service import VectorService
 from questly.ai.client import OpenRouterGenerationClient, StubGenerationClient
+from questly.ai.embeddings.openrouter import create_openrouter_embedding_provider
+from questly.ai.ingestion.pdf_extractor import PyMuPDFPageExtractor
+from questly.ai.ingestor import PdfDocumentIngestor, UnavailableDocumentIngestor
 from questly.ai.quota import OpenRouterProviderQuota, StubProviderQuota
 from questly.config import Settings, get_settings
 from questly.core.admin.pages import router as admin_page_router
@@ -89,7 +92,11 @@ from questly.core.submissions.stats import SubmissionPostingStats
 from questly.core.topics.ports import TopicRepository
 from questly.core.topics.routes import router as topic_router
 from questly.core.topics.service import TopicService
-from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
+from questly.core.uploads.ports import (
+    DocumentIngestor,
+    KnowledgeDocumentRepository,
+    ObjectStorage,
+)
 from questly.core.uploads.routes import router as upload_router
 from questly.core.uploads.service import UploadService
 from questly.database.core.admin_repository import SQLAdminRepository
@@ -171,6 +178,7 @@ def create_app(
     draft_repository: DraftRepository | None = None,
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
+    document_ingestor: DocumentIngestor | None = None,
     auth_repository: AuthRepository | None = None,
     email_sender: EmailSender | None = None,
     notification_repository: NotificationRepository | None = None,
@@ -386,15 +394,27 @@ def create_app(
         knowledge_document_repository = SQLKnowledgeDocumentRepository(
             use_session_factory()
         )
-    application.state.upload_service = UploadService(
-        object_storage,
-        knowledge_document_repository,
-        max_upload_size_bytes=use_settings().max_upload_size_bytes,
-    )
-
     if vector_repository is None:
         vector_repository = PostgresVectorRepository(use_session_factory())
     application.state.vector_service = VectorService(vector_repository)
+
+    if document_ingestor is None:
+        if use_settings().openrouter_api_key:
+            document_ingestor = PdfDocumentIngestor(
+                PyMuPDFPageExtractor(),
+                create_openrouter_embedding_provider(
+                    use_settings().openrouter_api_key, use_settings().embedding_model
+                ),
+                application.state.vector_service,
+            )
+        else:
+            document_ingestor = UnavailableDocumentIngestor()
+    application.state.upload_service = UploadService(
+        object_storage,
+        knowledge_document_repository,
+        document_ingestor,
+        max_upload_size_bytes=use_settings().max_upload_size_bytes,
+    )
 
     application.include_router(topic_router)
     application.include_router(assignment_router)

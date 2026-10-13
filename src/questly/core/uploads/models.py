@@ -48,3 +48,22 @@ class KnowledgeDocument:
     uploaded_by: int | None = None
     page_count: int | None = None
     id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class StoredUpload:
+    """What `UploadService.store` did with an upload.
+
+    `created` is `False` when identical bytes were already on record, so the
+    caller knows there is nothing new to ingest.
+    """
+
+    document: KnowledgeDocument
+    created: bool
+
+
+@dataclass(frozen=True, slots=True)
+class IngestionOutcome:
+    """What a successful ingestion learned about the document."""
+
+    page_count: int

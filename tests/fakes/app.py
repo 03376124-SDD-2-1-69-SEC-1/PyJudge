@@ -30,7 +30,11 @@ from questly.core.generation.ports import (
 )
 from questly.core.submissions.ports import CodeRunner, SubmissionRepository
 from questly.core.topics.ports import TopicRepository
-from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
+from questly.core.uploads.ports import (
+    DocumentIngestor,
+    KnowledgeDocumentRepository,
+    ObjectStorage,
+)
 from questly.integrations.email import StubEmailSender
 from questly.main import create_app
 from tests.fakes.admin import FakeAdminRepository, FakeSystemHealthChecker
@@ -50,7 +54,11 @@ from tests.fakes.generation import (
 from tests.fakes.notifications import FakeNotificationRepository
 from tests.fakes.submissions import FakeSubmissionRepository, ScriptedCodeRunner
 from tests.fakes.topics import FakeTopicRepository
-from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
+from tests.fakes.uploads import (
+    FakeDocumentIngestor,
+    FakeKnowledgeDocumentRepository,
+    FakeObjectStorage,
+)
 from tests.fakes.vector import FakeVectorRepository
 
 
@@ -87,6 +95,7 @@ def build_app(
     draft_repository: DraftRepository | None = None,
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
+    document_ingestor: DocumentIngestor | None = None,
     auth_repository: AuthRepository | None = None,
     notification_repository: FakeNotificationRepository | None = None,
     admin_repository: AdminRepository | None = None,
@@ -127,6 +136,8 @@ def build_app(
         document_catalog = FakeDocumentCatalog()
     if vector_repository is None:
         vector_repository = FakeVectorRepository()
+    if document_ingestor is None:
+        document_ingestor = FakeDocumentIngestor()
     if auth_repository is None:
         auth_repository = FakeAuthRepository()
     if admin_repository is None:
@@ -159,6 +170,7 @@ def build_app(
         draft_repository=draft_repository,
         document_catalog=document_catalog,
         vector_repository=vector_repository,
+        document_ingestor=document_ingestor,
         auth_repository=auth_repository,
         email_sender=verification_mailer,
         notification_repository=notification_repository,

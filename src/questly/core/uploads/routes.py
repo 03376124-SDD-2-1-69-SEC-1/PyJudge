@@ -2,8 +2,16 @@
 
 from typing import NoReturn
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 
+from questly.core.auth.current import current_actor
 from questly.core.uploads.models import KnowledgeDocument
 from questly.core.uploads.schemas import KnowledgeDocumentResponse
 from questly.core.uploads.service import (
@@ -62,8 +70,15 @@ def _raise_empty_upload() -> NoReturn:
     response_model=KnowledgeDocumentResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_upload(request: Request, file: UploadFile) -> KnowledgeDocumentResponse:
-    """Store an uploaded file and index it as a knowledge document."""
+def create_upload(
+    request: Request, file: UploadFile, background_tasks: BackgroundTasks
+) -> KnowledgeDocumentResponse:
+    """Store an uploaded file and index it as a knowledge document.
+
+    The answer is `uploaded`; ingestion runs after it is sent, so poll
+    `GET /api/v1/uploads/{id}` for `ready` or `failed`.
+    """
+    actor = current_actor(request)
     service = _service(request)
     filename = file.filename
     if filename is None:
@@ -73,11 +88,14 @@ def create_upload(request: Request, file: UploadFile) -> KnowledgeDocumentRespon
     # oversized upload is never held in memory in full.
     data = file.file.read(service.max_upload_size_bytes + 1)
     try:
-        return _response(service.store(filename=filename, data=data))
+        stored = service.store(actor, filename=filename, data=data)
     except UploadTooLargeError:
         _raise_too_large()
     except EmptyUploadError:
         _raise_empty_upload()
+    if stored.created:
+        background_tasks.add_task(service.ingest, stored.document.id, data)
+    return _response(stored.document)
 
 
 @router.get("/{document_id}", response_model=KnowledgeDocumentResponse)

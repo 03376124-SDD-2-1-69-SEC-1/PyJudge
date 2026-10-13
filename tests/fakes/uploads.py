@@ -1,10 +1,15 @@
-"""In-memory ObjectStorage and KnowledgeDocumentRepository for tests."""
+"""In-memory ObjectStorage, KnowledgeDocumentRepository and DocumentIngestor."""
 
 from __future__ import annotations
 
 from dataclasses import replace
 
-from questly.core.uploads.models import KnowledgeDocument, StoredObject
+from questly.core.uploads.models import (
+    IngestionOutcome,
+    KnowledgeDocument,
+    StoredObject,
+)
+from questly.core.uploads.ports import DocumentIngestionError
 
 FAKE_BUCKET = "fake-bucket"
 
@@ -56,3 +61,20 @@ class FakeKnowledgeDocumentRepository:
             raise KeyError(document.id)
         self._items[document.id] = document
         return document
+
+
+class FakeDocumentIngestor:
+    """Record what it was asked to ingest instead of calling an AI provider."""
+
+    def __init__(self, *, page_count: int = 3, fails: bool = False) -> None:
+        """Succeed with `page_count`, or raise DocumentIngestionError when `fails`."""
+        self.page_count = page_count
+        self.fails = fails
+        self.ingested: list[tuple[KnowledgeDocument, bytes]] = []
+
+    def ingest(self, document: KnowledgeDocument, data: bytes) -> IngestionOutcome:
+        """Remember the call, then succeed or fail as configured."""
+        self.ingested.append((document, data))
+        if self.fails:
+            raise DocumentIngestionError("fake ingestion failure")
+        return IngestionOutcome(page_count=self.page_count)

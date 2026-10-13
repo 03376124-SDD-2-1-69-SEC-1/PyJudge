@@ -1,13 +1,18 @@
-"""Ports the upload use case needs: object storage and the document index.
+"""Ports the upload use case needs: object storage, the document index, ingestion.
 
 `database/storage/r2.py` provides the R2 adapter for ObjectStorage and
 `database/core/knowledge_document_repository.py` the SQL adapter for the
-repository. Nothing in `core/` may import either; only `main.py` wires them in.
+repository; `ai/ingestor.py` provides the DocumentIngestor. Nothing in `core/`
+may import any of them; only `main.py` wires them in.
 """
 
 from typing import Protocol
 
-from questly.core.uploads.models import KnowledgeDocument, StoredObject
+from questly.core.uploads.models import (
+    IngestionOutcome,
+    KnowledgeDocument,
+    StoredObject,
+)
 
 
 class ObjectStorage(Protocol):
@@ -34,4 +39,16 @@ class KnowledgeDocumentRepository(Protocol):
 
     def update(self, document: KnowledgeDocument) -> KnowledgeDocument:
         """Replace the stored document; `KeyError` when its id is unknown."""
+        ...
+
+
+class DocumentIngestionError(Exception):
+    """The document cannot be turned into searchable chunks."""
+
+
+class DocumentIngestor(Protocol):
+    """Turns a stored document's bytes into chunks generation can retrieve."""
+
+    def ingest(self, document: KnowledgeDocument, data: bytes) -> IngestionOutcome:
+        """Index `data` for `document`, or raise DocumentIngestionError."""
         ...
