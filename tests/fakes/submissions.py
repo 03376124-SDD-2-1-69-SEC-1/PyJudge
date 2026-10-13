@@ -1,4 +1,8 @@
-"""In-memory SubmissionRepository and two CodeRunners for tests and the demo."""
+"""In-memory SubmissionRepository and two runners for tests and the demo.
+
+Both runners fill CodeRunner and BatchRunner; the batch half keeps its
+results in a RunnerBackend.
+"""
 
 import contextlib
 import math
@@ -13,11 +17,14 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import datetime
 
 from questly.core.submissions.models import (
+    BatchResult,
+    BatchState,
     Claim,
     Execution,
     ExecutionStatus,
@@ -195,6 +202,57 @@ class FakeSubmissionRepository:
         )
 
 
+class RunnerBackend:
+    """What a fake runner keeps between start and collect, as Judge0 keeps
+    submissions. Share one between two runners to model Judge0 surviving our
+    restart; a new one models Judge0 having lost everything."""
+
+    def __init__(self) -> None:
+        self._executions: dict[str, Execution] = {}
+        self._held = False
+        self._down = False
+
+    def hold(self) -> None:
+        """Every batch reads as running until `resume()`."""
+        self._held = True
+
+    def forget(self) -> None:
+        """Drops every batch, so collecting one reads as gone."""
+        self._executions.clear()
+
+    def down(self) -> None:
+        """start and collect raise RunnerUnavailableError until `resume()`."""
+        self._down = True
+
+    def resume(self) -> None:
+        self._held = False
+        self._down = False
+
+    def start(self, judge: Callable[[], Sequence[Execution]]) -> tuple[str, ...]:
+        self._require_up()
+        tokens = []
+        for execution in judge():
+            token = str(uuid.uuid4())
+            self._executions[token] = execution
+            tokens.append(token)
+        return tuple(tokens)
+
+    def collect(self, tokens: Sequence[str]) -> BatchResult:
+        self._require_up()
+        if any(token not in self._executions for token in tokens):
+            return BatchResult(state=BatchState.GONE)
+        if self._held:
+            return BatchResult(state=BatchState.RUNNING)
+        return BatchResult(
+            state=BatchState.FINISHED,
+            executions=tuple(self._executions[token] for token in tokens),
+        )
+
+    def _require_up(self) -> None:
+        if self._down:
+            raise RunnerUnavailableError("runner backend is down")
+
+
 class ScriptedCodeRunner:
     """Answers from `outputs` (stdin -> stdout); code markers force failures.
 
@@ -203,12 +261,37 @@ class ScriptedCodeRunner:
     makes the runner unreachable.
     """
 
-    def __init__(self, outputs: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        outputs: dict[str, str] | None = None,
+        backend: RunnerBackend | None = None,
+    ) -> None:
         self.outputs: dict[str, str] = {}
         if outputs is not None:
             self.outputs.update(outputs)
+        self.backend = RunnerBackend() if backend is None else backend
         self.calls: list[str] = []
         self.batches: list[tuple[str, ...]] = []
+
+    def start(
+        self,
+        *,
+        code: str,
+        language: str,
+        stdins: Sequence[str],
+        time_limit_seconds: float,
+    ) -> tuple[str, ...]:
+        return self.backend.start(
+            lambda: self.run_many(
+                code=code,
+                language=language,
+                stdins=stdins,
+                time_limit_seconds=time_limit_seconds,
+            )
+        )
+
+    def collect(self, tokens: Sequence[str]) -> BatchResult:
+        return self.backend.collect(tokens)
 
     def run_many(
         self,
@@ -266,7 +349,8 @@ class LocalUnsafeRunner:
 
     MEMORY_BYTES = 256 * 1024 * 1024
 
-    def __init__(self) -> None:
+    def __init__(self, backend: RunnerBackend | None = None) -> None:
+        self.backend = RunnerBackend() if backend is None else backend
         if os.environ.get("ENV", "").strip().lower() == "production":
             raise UnsafeRunnerNotAllowedError(
                 "LocalUnsafeRunner runs code unsandboxed; refusing ENV=production"
@@ -301,6 +385,26 @@ class LocalUnsafeRunner:
             )
             for stdin in stdins
         )
+
+    def start(
+        self,
+        *,
+        code: str,
+        language: str,
+        stdins: Sequence[str],
+        time_limit_seconds: float,
+    ) -> tuple[str, ...]:
+        return self.backend.start(
+            lambda: self.run_many(
+                code=code,
+                language=language,
+                stdins=stdins,
+                time_limit_seconds=time_limit_seconds,
+            )
+        )
+
+    def collect(self, tokens: Sequence[str]) -> BatchResult:
+        return self.backend.collect(tokens)
 
     def run(
         self, *, code: str, language: str, stdin: str, time_limit_seconds: float
