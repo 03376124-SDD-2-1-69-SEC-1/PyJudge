@@ -284,7 +284,7 @@ async def test_a_restart_mid_judging_is_recovered_after_the_lease(
 @pytest.mark.anyio
 @pytest.mark.parametrize(
     ("runner_survives", "says"),
-    [(True, "reconnected to the original run"), (False, "judged again after")],
+    [(True, "reconnected to the original run"), (False, "judged again")],
 )
 async def test_the_recovered_banner_is_for_the_instructor_only(
     world: World, runner_survives: bool, says: str
