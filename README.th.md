@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/Questly-logo.png" alt="Questly" width="480">
+</p>
+
 # Questly
 
 <p align="center">
