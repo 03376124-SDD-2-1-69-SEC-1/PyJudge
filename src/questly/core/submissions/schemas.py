@@ -32,7 +32,7 @@ class SubmissionResponse(BaseModel):
     version_number: int
     submitted_at: datetime
     is_late: bool
-    score: int
+    score: int | None = Field(description="Unset until judging is done.")
     max_score: int
     passed: int
     total: int

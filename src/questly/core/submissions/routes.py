@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import NoReturn
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
 
 from questly.core.assignments.models import TestCaseKind
 from questly.core.auth.current import current_actor
@@ -103,13 +103,17 @@ def submission_response(submission: Submission) -> SubmissionResponse:
     status_code=status.HTTP_201_CREATED,
 )
 def submit(
-    request: Request, classroom_id: int, assignment_id: int, body: CodeRequest
+    request: Request,
+    classroom_id: int,
+    assignment_id: int,
+    body: CodeRequest,
+    background_tasks: BackgroundTasks,
 ) -> SubmissionResponse:
     actor = current_actor(request)
+    service = _service(request)
     with domain_errors():
-        submission = _service(request).submit(
-            actor, classroom_id, assignment_id, body.code
-        )
+        submission = service.submit(actor, classroom_id, assignment_id, body.code)
+    background_tasks.add_task(service.judge, submission.id)
     return submission_response(submission)
 
 

@@ -223,7 +223,9 @@ class InstructorTab(StrEnum):
 class StudentSolveView:
     """S-02 for a Member: the problem, their Submissions and what they may do.
 
-    `counted` is the latest Submission, or None before the first one.
+    `counted` is the latest `done` Submission, or None before the first one.
+    `pending` is the Submission being judged (S-02a), else None. `failed` is
+    the latest Submission when judging it failed, else None.
     `update` is the current Version when the counted Submission is on an
     older one (S-02e), else None.
     """
@@ -233,6 +235,8 @@ class StudentSolveView:
     hidden_count: int
     submissions: tuple[Submission, ...]
     counted: Submission | None
+    pending: Submission | None
+    failed: Submission | None
     update: AssignmentVersion | None
     closed: bool
     archived: bool
@@ -252,13 +256,23 @@ class TestFailure:
 
 @dataclass(frozen=True, slots=True)
 class StudentResult:
-    """One Member's row on T-02; `counted` is None if they never submitted."""
+    """One Member's row on T-02.
+
+    `counted` is None until a Submission of theirs is `done`; `pending` says
+    one is being judged.
+    """
 
     student_id: int
     name: str
     student_number: str | None
     counted: Submission | None
+    pending: bool
     attempts: int
+
+    @property
+    def listed(self) -> bool:
+        """Whether the T-02 table shows a row for them."""
+        return self.counted is not None or self.pending
 
 
 @dataclass(frozen=True, slots=True)

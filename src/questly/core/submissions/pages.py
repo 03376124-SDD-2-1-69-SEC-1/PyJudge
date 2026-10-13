@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Form, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from questly.core.auth.csrf import require_csrf
@@ -156,17 +156,20 @@ def run_or_submit(
     request: Request,
     classroom_id: int,
     assignment_id: int,
+    background_tasks: BackgroundTasks,
     csrf_token: Annotated[str, Form()] = "",
     code: Annotated[str, Form()] = "",
     action: Annotated[str, Form()] = "run",
 ) -> HTMLResponse | RedirectResponse:
-    """One form, two buttons (ADR-0007 §5.3): Run renders, Submit redirects."""
+    """One form, two buttons (ADR-0007 §5.3): Run renders, Submit redirects
+    to S-02, which shows S-02a until the background judging is done."""
     require_csrf(request, csrf_token)
     actor = current_actor(request)
     service = _service(request)
     try:
         if action == "submit":
-            service.submit(actor, classroom_id, assignment_id, code)
+            submission = service.submit(actor, classroom_id, assignment_id, code)
+            background_tasks.add_task(service.judge, submission.id)
             return RedirectResponse(
                 f"/classes/{classroom_id}/assignments/{assignment_id}?submitted=1",
                 status_code=status.HTTP_303_SEE_OTHER,

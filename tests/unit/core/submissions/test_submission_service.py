@@ -1,5 +1,7 @@
-"""SubmissionService (Run vs Submit, Late, Closed) and SubmissionPostingStats."""
+"""SubmissionService (Run vs Submit, Late, Closed, background judging and
+recovery) and SubmissionPostingStats."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -21,21 +23,28 @@ from questly.core.auth.models import Actor, PermissionDeniedError, Role
 from questly.core.auth.service import AuthService
 from questly.core.classrooms.service import ClassroomService
 from questly.core.submissions.models import (
+    BatchResult,
+    BatchState,
     ClassroomArchivedError,
     EmptyCodeError,
     Execution,
     ExecutionStatus,
     InstructorResultsView,
     PostingClosedError,
+    Recovery,
     ResubmissionNotAllowedError,
     RunnerUnavailableError,
     StudentSolveView,
     Submission,
     SubmissionNotFoundError,
+    SubmissionPendingError,
+    SubmissionStatus,
     TestResult,
     Verdict,
 )
 from questly.core.submissions.service import (
+    GIVE_UP,
+    LEASE,
     SubmissionService,
     judge,
     outputs_match,
@@ -51,7 +60,11 @@ from tests.fakes.assignments import (
 from tests.fakes.auth import FakeAuthRepository, FakeClock, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
 from tests.fakes.notifications import RecordingMemberNotifier
-from tests.fakes.submissions import FakeSubmissionRepository, ScriptedCodeRunner
+from tests.fakes.submissions import (
+    FakeSubmissionRepository,
+    RunnerBackend,
+    ScriptedCodeRunner,
+)
 
 NOW = datetime(2026, 9, 24, 3, 0, tzinfo=UTC)
 DEADLINE = NOW + timedelta(days=7)
@@ -66,6 +79,13 @@ TESTS = [
 CORRECT = {"1": "one", "2": "two", "3": "three", "": "none"}
 
 
+class CascadingSubmissionRepository(FakeSubmissionRepository):
+    """Can drop a row the way unposting cascades to Submissions in SQL."""
+
+    def drop(self, submission_id: int) -> None:
+        del self._rows[submission_id]
+
+
 class World:
     def __init__(self) -> None:
         self.clock = FakeClock(NOW)
@@ -74,11 +94,12 @@ class World:
         self.classrooms = ClassroomService(
             FakeClassroomRepository(), auth, FakeClassroomStats(), self.clock
         )
-        self.submissions = FakeSubmissionRepository()
+        self.submissions = CascadingSubmissionRepository()
+        self.versions = FakeVersionRepository()
         assignments = FakeAssignmentRepository()
         self.assignments = AssignmentService(
             assignments,
-            FakeVersionRepository(),
+            self.versions,
             FakePostingRepository(),
             self.classrooms,
             SubmissionPostingStats(self.submissions, assignments),
@@ -86,9 +107,7 @@ class World:
             RecordingMemberNotifier(),
         )
         self.runner = ScriptedCodeRunner(CORRECT)
-        self.service = SubmissionService(
-            self.submissions, self.runner, self.assignments, self.classrooms, self.clock
-        )
+        self.service = self.restart(self.runner)
 
         def actor(email: str, name: str, role: Role) -> Actor:
             user = seed_user(users, email=email, full_name=name, role=role)
@@ -124,10 +143,38 @@ class World:
         )
         return published.assignment.id
 
-    def submit(self, aid: int, code: str = "print(answer)", who: Actor | None = None):
+    def restart(self, runner: ScriptedCodeRunner) -> SubmissionService:
+        """A service as a freshly started process builds it, over the same data."""
+        return SubmissionService(
+            self.submissions,
+            runner,
+            runner,
+            self.assignments,
+            self.classrooms,
+            self.versions,
+            self.clock,
+        )
+
+    def receive(
+        self, aid: int, code: str = "print(answer)", who: Actor | None = None
+    ) -> Submission:
+        """Submit only: the Submission is `received` and nobody judged it yet."""
         if who is None:
             who = self.student
         return self.service.submit(who, self.room.id, aid, code)
+
+    def submit(
+        self, aid: int, code: str = "print(answer)", who: Actor | None = None
+    ) -> Submission:
+        """Submit, then the background judging the request schedules."""
+        received = self.receive(aid, code, who)
+        self.service.judge(received.id)
+        return self.stored(received)
+
+    def stored(self, submission: Submission) -> Submission:
+        found = self.submissions.get(submission.id)
+        assert found is not None
+        return found
 
 
 @pytest.fixture()
@@ -209,36 +256,21 @@ def test_after_the_deadline_late_work_is_flagged_not_penalised(world: World) -> 
     assert standing.state is StudentState.LATE
 
 
-def test_a_slow_judge_does_not_make_an_on_time_submit_late(world: World) -> None:
+def test_late_is_decided_at_receive_when_judging_ends_after_the_deadline(
+    world: World,
+) -> None:
     aid = world.publish(allow_late=True)
-    received = DEADLINE - timedelta(minutes=1)
-    world.clock.current = received
+    received_at = DEADLINE - timedelta(minutes=1)
+    world.clock.current = received_at
+    received = world.receive(aid)
+    world.clock.advance(timedelta(minutes=5))
 
-    class SlowRunner(ScriptedCodeRunner):
-        def run(
-            self, *, code: str, language: str, stdin: str, time_limit_seconds: float
-        ) -> Execution:
-            world.clock.advance(timedelta(minutes=5))
-            return super().run(
-                code=code,
-                language=language,
-                stdin=stdin,
-                time_limit_seconds=time_limit_seconds,
-            )
+    world.service.judge(received.id)
 
-    world.service = SubmissionService(
-        world.submissions,
-        SlowRunner(CORRECT),
-        world.assignments,
-        world.classrooms,
-        world.clock,
-    )
-
-    submission = world.submit(aid)
-
+    done = world.stored(received)
     assert world.clock.now() > DEADLINE
-    assert submission.submitted_at == received
-    assert submission.is_late is False
+    assert done.status is SubmissionStatus.DONE and done.score == 10
+    assert done.submitted_at == received_at and done.is_late is False
 
 
 def test_past_the_deadline_without_late_work_the_posting_is_closed(
@@ -273,19 +305,33 @@ def test_resubmission_off_allows_one_submit(world: World) -> None:
     assert not world.service.page(world.student, world.room.id, aid).can_submit
 
 
-def test_an_unreachable_runner_stores_nothing_and_spends_no_attempt(
+def test_an_outage_releases_the_submission_and_recovery_finishes_it_unmarked(
     world: World,
 ) -> None:
     aid = world.publish(allow_resubmission=False)
+    world.runner.backend.down()
 
-    with pytest.raises(RunnerUnavailableError):
-        world.submit(aid, "# judge down")
+    received = world.submit(aid)
+    world.service.recover()
+
+    assert received.status is SubmissionStatus.RECEIVED
+    assert world.stored(received).status is SubmissionStatus.RECEIVED
+    world.runner.backend.resume()
+    world.service.recover()
+    done = world.stored(received)
+    assert done.status is SubmissionStatus.DONE and done.score == 10
+    assert done.recovery is Recovery.NONE and done.attempt == 1
+
+
+def test_a_run_the_runner_cannot_reach_is_unavailable_and_keeps_nothing(
+    world: World,
+) -> None:
+    aid = world.publish()
+
     with pytest.raises(RunnerUnavailableError):
         world.service.run(world.student, world.room.id, aid, "# judge down")
 
     assert world.service.submissions(world.student, world.room.id, aid) == ()
-    assert world.service.page(world.student, world.room.id, aid).can_submit
-    assert world.submit(aid).attempt == 1
 
 
 def test_empty_code_is_refused(world: World) -> None:
@@ -385,6 +431,224 @@ def test_archived_classroom_refuses_run_and_submit(world: World) -> None:
         world.service.run(world.student, world.room.id, aid, "print(1)")
     view = world.service.page(world.student, world.room.id, aid)
     assert view.archived and view.closed and not view.can_submit
+
+
+# ---- Background judging and recovery --------------------------------------
+
+
+class WorkerDied(Exception):
+    """Stands for the process dying while the runner works."""
+
+
+class DyingRunner(ScriptedCodeRunner):
+    """Hands the batch over, then the worker dies before collecting it."""
+
+    def collect(self, tokens: Sequence[str]) -> BatchResult:
+        raise WorkerDied
+
+
+class LosingRunner(ScriptedCodeRunner):
+    """A runner that loses every batch it was given."""
+
+    def collect(self, tokens: Sequence[str]) -> BatchResult:
+        return BatchResult(state=BatchState.GONE)
+
+
+def _start_then_die(world: World, aid: int) -> Submission:
+    """Submit, and the worker dies after the runner took the batch."""
+    world.service = world.restart(DyingRunner(CORRECT, world.runner.backend))
+    received = world.receive(aid)
+    with pytest.raises(WorkerDied):
+        world.service.judge(received.id)
+    assert world.stored(received).status is SubmissionStatus.JUDGING
+    return received
+
+
+def test_submit_receives_a_pending_submission_judged_in_the_background(
+    world: World,
+) -> None:
+    aid = world.publish()
+
+    received = world.receive(aid)
+
+    assert received.status is SubmissionStatus.RECEIVED
+    assert received.score is None and received.results == ()
+    assert (received.attempt, received.max_score, received.version_number) == (1, 10, 1)
+    assert world.runner.batches == []
+    world.service.judge(received.id)
+    world.service.judge(received.id)
+    assert world.runner.batches == [("1", "2", "3", "")]
+    done = world.stored(received)
+    assert done.status is SubmissionStatus.DONE and done.score == 10
+
+
+def test_a_pending_submission_blocks_submit_and_run(world: World) -> None:
+    aid = world.publish(allow_resubmission=True)
+    pending = world.receive(aid)
+
+    with pytest.raises(SubmissionPendingError):
+        world.receive(aid)
+    with pytest.raises(SubmissionPendingError):
+        world.service.run(world.student, world.room.id, aid, "print(1)")
+
+    view = world.service.page(world.student, world.room.id, aid)
+    assert isinstance(view, StudentSolveView)
+    assert view.pending == pending and view.counted is None
+    assert not view.can_submit
+    world.service.judge(pending.id)
+    assert world.service.page(world.student, world.room.id, aid).can_submit
+
+
+def test_a_failed_submission_neither_counts_nor_uses_up_the_one_submit(
+    world: World,
+) -> None:
+    aid = world.publish(allow_resubmission=False)
+    world.service = world.restart(LosingRunner(CORRECT))
+
+    lost = world.submit(aid)
+
+    assert lost.status is SubmissionStatus.FAILED and lost.score is None
+    assert lost.recovery is Recovery.REJUDGED
+    view = world.service.page(world.student, world.room.id, aid)
+    assert view.failed == lost and view.counted is None and view.can_submit
+    summary = world.assignments.problem(world.teacher, world.room.id, aid).summary
+    assert summary.submitted == 0
+    world.service = world.restart(world.runner)
+    again = world.submit(aid)
+    assert (again.status, again.attempt, again.score) == (SubmissionStatus.DONE, 2, 10)
+    view = world.service.page(world.student, world.room.id, aid)
+    assert view.failed is None and not view.can_submit
+
+
+def test_after_a_restart_recovery_reconnects_to_the_runners_batch(
+    world: World,
+) -> None:
+    aid = world.publish()
+    received = _start_then_die(world, aid)
+    world.service = world.restart(ScriptedCodeRunner(CORRECT, world.runner.backend))
+
+    world.service.recover()
+    assert world.stored(received).status is SubmissionStatus.JUDGING
+    world.clock.advance(LEASE + timedelta(seconds=1))
+    world.service.recover()
+
+    done = world.stored(received)
+    assert done.status is SubmissionStatus.DONE and done.score == 10
+    assert done.recovery is Recovery.RECONNECTED
+    assert done.submitted_at == received.submitted_at == NOW
+
+
+def test_a_runner_that_lost_the_batch_rejudges_on_the_received_version(
+    world: World,
+) -> None:
+    aid = world.publish()
+    received = _start_then_die(world, aid)
+    world.assignments.edit(
+        world.teacher,
+        aid,
+        reason="One test only",
+        test_cases=[TestCase(input_data="9", expected_output="nine")],
+    )
+    fresh = ScriptedCodeRunner(CORRECT, RunnerBackend())
+    world.service = world.restart(fresh)
+    world.clock.advance(LEASE + timedelta(seconds=1))
+
+    world.service.recover()
+
+    done = world.stored(received)
+    assert done.status is SubmissionStatus.DONE and done.recovery is Recovery.REJUDGED
+    assert fresh.batches == [("1", "2", "3", "")]
+    assert (done.version_number, len(done.results), done.score) == (1, 4, 10)
+
+
+def test_a_submission_nobody_started_is_rejudged_once_its_lease_expires(
+    world: World,
+) -> None:
+    aid = world.publish()
+    received = world.receive(aid)
+    world.clock.advance(LEASE + timedelta(seconds=1))
+
+    world.service.recover()
+
+    done = world.stored(received)
+    assert done.status is SubmissionStatus.DONE and done.recovery is Recovery.REJUDGED
+
+
+def test_a_submission_pending_past_the_give_up_window_fails(world: World) -> None:
+    aid = world.publish()
+    world.runner.backend.down()
+    received = world.submit(aid)
+    world.runner.backend.resume()
+    world.clock.advance(GIVE_UP)
+
+    world.service.recover()
+
+    assert world.stored(received).status is SubmissionStatus.FAILED
+    assert world.runner.batches == []
+
+
+def test_a_batch_still_running_at_the_give_up_window_fails(world: World) -> None:
+    aid = world.publish()
+
+    class StuckRunner(ScriptedCodeRunner):
+        def collect(self, tokens: Sequence[str]) -> BatchResult:
+            world.clock.advance(timedelta(minutes=1))
+            return super().collect(tokens)
+
+    runner = StuckRunner(CORRECT)
+    runner.backend.hold()
+    world.service = world.restart(runner)
+
+    failed = world.submit(aid)
+
+    assert failed.status is SubmissionStatus.FAILED and failed.score is None
+    assert world.clock.now() - failed.submitted_at == GIVE_UP
+
+
+def test_unposting_mid_judging_stops_the_worker_quietly(world: World) -> None:
+    aid = world.publish()
+    vanished: list[int] = []
+
+    class UnpostingRunner(ScriptedCodeRunner):
+        """The Instructor unposts while the runner works; SQL cascades it."""
+
+        def collect(self, tokens: Sequence[str]) -> BatchResult:
+            world.assignments.unpost(world.teacher, world.room.id, aid)
+            for submission_id in vanished:
+                world.submissions.drop(submission_id)
+            return BatchResult(state=BatchState.RUNNING)
+
+    runner = UnpostingRunner(CORRECT)
+    world.service = world.restart(runner)
+    received = world.receive(aid)
+    vanished.append(received.id)
+
+    world.service.judge(received.id)
+    world.service.recover()
+
+    assert world.submissions.get(received.id) is None
+    assert len(runner.batches) == 1
+
+
+def test_counted_submissions_and_stats_ignore_a_pending_one(world: World) -> None:
+    aid = world.publish()
+    world.submit(aid)
+    world.receive(aid, "# crash")
+    world.receive(aid, who=world.other)
+
+    view = world.service.page(world.teacher, world.room.id, aid)
+
+    assert isinstance(view, InstructorResultsView)
+    assert [(r.counted is not None, r.pending) for r in view.rows] == [
+        (True, True),
+        (False, True),
+    ]
+    assert len(view.submitted) == 1 and view.average_score == 10
+    assert all(row.listed for row in view.rows)
+    summary = world.assignments.problem(world.teacher, world.room.id, aid).summary
+    assert (summary.submitted, summary.avg_score) == (1, 10.0)
+    standing = world.assignments.problem(world.student, world.room.id, aid).standing
+    assert standing.score == 10
 
 
 # ---- PostingStats aggregation, independent of the demo seed ---------------

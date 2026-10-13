@@ -352,7 +352,13 @@ def create_app(
     )
 
     application.state.submission_service = SubmissionService(
-        submission_repository, code_runner, assignment_service, classroom_service, clock
+        submission_repository,
+        code_runner,
+        code_runner,
+        assignment_service,
+        classroom_service,
+        version_repository,
+        clock,
     )
 
     if generation_client is None:

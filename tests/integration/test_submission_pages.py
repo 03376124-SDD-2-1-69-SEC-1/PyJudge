@@ -315,15 +315,14 @@ async def test_toast_reports_a_failing_run(demo: Demo) -> None:
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("action", ["run", "submit"])
-async def test_page_asks_to_try_again_when_the_runner_is_down(
-    demo: Demo, action: str
+async def test_page_asks_to_try_again_when_the_runner_is_down_for_a_run(
+    demo: Demo,
 ) -> None:
     client = await demo.client(demo.seed.students[1].email)
     url = demo.url(BS)
 
     page = await post_form(
-        client, url, {"action": action, "code": "# judge down"}, page=url
+        client, url, {"action": "run", "code": "# judge down"}, page=url
     )
     history = await client.get(url + "?tab=history")
 
@@ -334,14 +333,11 @@ async def test_page_asks_to_try_again_when_the_runner_is_down(
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("endpoint", ["/runs", "/submissions"])
-async def test_api_answers_503_when_the_runner_is_down(
-    demo: Demo, endpoint: str
-) -> None:
+async def test_api_answers_503_when_the_runner_is_down_for_a_run(demo: Demo) -> None:
     client = await demo.client(demo.seed.students[1].email)
     api = "/api/v1/classrooms" + demo.url(BS).removeprefix("/classes")
 
-    response = await client.post(api + endpoint, json={"code": "# judge down"})
+    response = await client.post(api + "/runs", json={"code": "# judge down"})
     listed = await client.get(api + "/submissions")
 
     assert response.status_code == 503
