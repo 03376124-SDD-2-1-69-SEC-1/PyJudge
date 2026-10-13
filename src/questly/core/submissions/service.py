@@ -149,7 +149,7 @@ class SubmissionService:
     ) -> RunReport:
         """Sample Test Cases only; not graded, not stored (ADR-0007 §5.3)."""
         problem = self._student_problem(actor, classroom_id, assignment_id)
-        self._require_open(actor, problem)
+        self._require_open(actor, problem, self._clock.now())
         self._require_code(code)
         samples = [
             test_case
@@ -163,9 +163,14 @@ class SubmissionService:
     def submit(
         self, actor: Actor, classroom_id: int, assignment_id: int, code: str
     ) -> Submission:
-        """Grade against every Test Case and keep it; the latest one counts."""
+        """Grade against every Test Case and keep it; the latest one counts.
+
+        Late is decided at receive time, so a slow judge cannot make an
+        on-time Submit Late.
+        """
+        received_at = self._clock.now()
         problem = self._student_problem(actor, classroom_id, assignment_id)
-        self._require_open(actor, problem)
+        self._require_open(actor, problem, received_at)
         self._require_code(code)
         posting = problem.posting
         previous = self._repository.list_for_student(posting.id, actor.user_id)
@@ -173,7 +178,6 @@ class SubmissionService:
             raise ResubmissionNotAllowedError
         assignment = problem.assignment
         results = self._execute(assignment, assignment.test_cases, code)
-        now = self._clock.now()
         return self._repository.add(
             Submission(
                 posting_id=posting.id,
@@ -183,8 +187,8 @@ class SubmissionService:
                 version_number=assignment.current_version,
                 code=code,
                 language=assignment.settings.language.value,
-                submitted_at=now,
-                is_late=now > posting.schedule.deadline,
+                submitted_at=received_at,
+                is_late=received_at > posting.schedule.deadline,
                 score=score_for(results, posting.schedule.max_score),
                 max_score=posting.schedule.max_score,
                 attempt=len(previous) + 1,
@@ -202,10 +206,12 @@ class SubmissionService:
             raise PermissionDeniedError
         return problem
 
-    def _require_open(self, actor: Actor, problem: StudentProblem) -> None:
+    def _require_open(
+        self, actor: Actor, problem: StudentProblem, now: datetime
+    ) -> None:
         if self._roster.is_archived(actor, problem.posting.classroom_id):
             raise ClassroomArchivedError
-        if problem.posting.is_closed(self._clock.now()):
+        if problem.posting.is_closed(now):
             raise PostingClosedError
 
     @staticmethod

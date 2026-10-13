@@ -207,6 +207,38 @@ def test_after_the_deadline_late_work_is_flagged_not_penalised(world: World) -> 
     assert standing.state is StudentState.LATE
 
 
+def test_a_slow_judge_does_not_make_an_on_time_submit_late(world: World) -> None:
+    aid = world.publish(allow_late=True)
+    received = DEADLINE - timedelta(minutes=1)
+    world.clock.current = received
+
+    class SlowRunner(ScriptedCodeRunner):
+        def run(
+            self, *, code: str, language: str, stdin: str, time_limit_seconds: float
+        ) -> Execution:
+            world.clock.advance(timedelta(minutes=5))
+            return super().run(
+                code=code,
+                language=language,
+                stdin=stdin,
+                time_limit_seconds=time_limit_seconds,
+            )
+
+    world.service = SubmissionService(
+        world.submissions,
+        SlowRunner(CORRECT),
+        world.assignments,
+        world.classrooms,
+        world.clock,
+    )
+
+    submission = world.submit(aid)
+
+    assert world.clock.now() > DEADLINE
+    assert submission.submitted_at == received
+    assert submission.is_late is False
+
+
 def test_past_the_deadline_without_late_work_the_posting_is_closed(
     world: World,
 ) -> None:
