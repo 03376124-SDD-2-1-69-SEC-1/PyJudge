@@ -23,11 +23,10 @@ from sqlmodel import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from questly.ai.app.repository import VectorRepository
-from questly.ai.app.routes import router as vector_router
-from questly.ai.app.schemas import ApplicationErrorResponse
 from questly.ai.app.service import VectorService
 from questly.ai.client import OpenRouterGenerationClient, StubGenerationClient
 from questly.ai.quota import OpenRouterProviderQuota, StubProviderQuota
+from questly.api_errors import ApplicationErrorResponse
 from questly.config import Settings, get_settings
 from questly.core.admin.pages import router as admin_page_router
 from questly.core.admin.ports import AdminRepository, SystemHealthChecker
@@ -405,7 +404,6 @@ def create_app(
     application.include_router(draft_classroom_router)
     application.include_router(generation_page_router)
     application.include_router(upload_router)
-    application.include_router(vector_router)
     application.include_router(notification_router)
     application.include_router(notification_page_router)
     application.include_router(auth_router)
