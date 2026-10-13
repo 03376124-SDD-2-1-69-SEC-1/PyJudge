@@ -15,41 +15,184 @@ import tempfile
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import replace
+from datetime import datetime
 
 from questly.core.submissions.models import (
+    Claim,
     Execution,
     ExecutionStatus,
+    Recovery,
     RunnerUnavailableError,
     Submission,
+    SubmissionPendingError,
+    SubmissionStatus,
+    TestResult,
 )
 
 
 class FakeSubmissionRepository:
+    """Holds the runner tokens and the lease beside each row, as SQL does."""
+
     def __init__(self) -> None:
-        self._rows: list[Submission] = []
+        self._rows: dict[int, Submission] = {}
+        self._tokens: dict[int, tuple[str, ...]] = {}
+        self._leases: dict[int, datetime] = {}
 
     def add(self, submission: Submission) -> Submission:
-        saved = replace(submission, id=len(self._rows) + 1)
-        self._rows.append(saved)
-        return saved
+        return self._rows[self._insert(submission)]
+
+    def receive(self, submission: Submission, lease_until: datetime) -> Submission:
+        for row in self._rows.values():
+            same_student = (row.posting_id, row.student_id) == (
+                submission.posting_id,
+                submission.student_id,
+            )
+            if same_student and (
+                row.status.pending or row.attempt == submission.attempt
+            ):
+                raise SubmissionPendingError
+        submission_id = self._insert(submission)
+        self._leases[submission_id] = lease_until
+        return self._rows[submission_id]
+
+    def claim_due(
+        self, now: datetime, lease_until: datetime, limit: int
+    ) -> tuple[Claim, ...]:
+        due = [
+            (submission_id, row)
+            for submission_id, row in self._ordered_items()
+            if row.status.pending
+            and (
+                submission_id not in self._leases or self._leases[submission_id] <= now
+            )
+        ][:limit]
+        claims = tuple(
+            Claim(
+                submission=row,
+                tokens=self._tokens[submission_id],
+                interrupted=submission_id in self._leases,
+            )
+            for submission_id, row in due
+        )
+        for submission_id, _ in due:
+            self._leases[submission_id] = lease_until
+        return claims
+
+    def started(
+        self,
+        submission_id: int,
+        *,
+        tokens: Sequence[str],
+        lease_until: datetime,
+        recovery: Recovery,
+    ) -> bool:
+        if not self._can_move(submission_id, SubmissionStatus.JUDGING):
+            return False
+        self._set(submission_id, status=SubmissionStatus.JUDGING, recovery=recovery)
+        self._tokens[submission_id] = tuple(tokens)
+        self._leases[submission_id] = lease_until
+        return True
+
+    def renew(self, submission_id: int, *, lease_until: datetime) -> bool:
+        row = self._rows.get(submission_id)
+        if row is None or row.status is not SubmissionStatus.JUDGING:
+            return False
+        self._leases[submission_id] = lease_until
+        return True
+
+    def finished(
+        self,
+        submission_id: int,
+        *,
+        tokens: Sequence[str],
+        score: int,
+        results: Sequence[TestResult],
+        recovery: Recovery,
+    ) -> bool:
+        if not self._can_move(submission_id, SubmissionStatus.DONE):
+            return False
+        if self._tokens[submission_id] != tuple(tokens):
+            return False
+        self._set(
+            submission_id,
+            status=SubmissionStatus.DONE,
+            score=score,
+            results=tuple(results),
+            recovery=recovery,
+        )
+        self._leases.pop(submission_id, None)
+        return True
+
+    def requeued(self, submission_id: int) -> bool:
+        if not self._can_move(submission_id, SubmissionStatus.RECEIVED):
+            return False
+        self._set(submission_id, status=SubmissionStatus.RECEIVED)
+        self._tokens[submission_id] = ()
+        return True
+
+    def released(self, submission_id: int) -> bool:
+        row = self._rows.get(submission_id)
+        if row is None or not row.status.pending or submission_id not in self._leases:
+            return False
+        del self._leases[submission_id]
+        return True
+
+    def failed(self, submission_id: int) -> bool:
+        if not self._can_move(submission_id, SubmissionStatus.FAILED):
+            return False
+        self._set(submission_id, status=SubmissionStatus.FAILED)
+        self._leases.pop(submission_id, None)
+        return True
 
     def get(self, submission_id: int) -> Submission | None:
-        return next((row for row in self._rows if row.id == submission_id), None)
+        return self._rows.get(submission_id)
 
     def list_for_student(
         self, posting_id: int, student_id: int
     ) -> tuple[Submission, ...]:
         return tuple(
             row
-            for row in self._ordered()
+            for _, row in self._ordered_items()
             if row.posting_id == posting_id and row.student_id == student_id
         )
 
     def list_for_posting(self, posting_id: int) -> tuple[Submission, ...]:
-        return tuple(row for row in self._ordered() if row.posting_id == posting_id)
+        return tuple(
+            row for _, row in self._ordered_items() if row.posting_id == posting_id
+        )
 
-    def _ordered(self) -> list[Submission]:
-        return sorted(self._rows, key=lambda row: (row.submitted_at, row.id))
+    def _insert(self, submission: Submission) -> int:
+        submission_id = len(self._rows) + 1
+        self._rows[submission_id] = replace(submission, id=submission_id)
+        self._tokens[submission_id] = ()
+        return submission_id
+
+    def _can_move(self, submission_id: int, target: SubmissionStatus) -> bool:
+        row = self._rows.get(submission_id)
+        return row is not None and row.status.can_move(target)
+
+    def _set(
+        self,
+        submission_id: int,
+        *,
+        status: SubmissionStatus,
+        score: int | None = None,
+        results: tuple[TestResult, ...] = (),
+        recovery: Recovery | None = None,
+    ) -> None:
+        row = self._rows[submission_id]
+        self._rows[submission_id] = replace(
+            row,
+            status=status,
+            score=score,
+            results=results,
+            recovery=row.recovery if recovery is None else recovery,
+        )
+
+    def _ordered_items(self) -> list[tuple[int, Submission]]:
+        return sorted(
+            self._rows.items(), key=lambda item: (item[1].submitted_at, item[0])
+        )
 
 
 class ScriptedCodeRunner:
