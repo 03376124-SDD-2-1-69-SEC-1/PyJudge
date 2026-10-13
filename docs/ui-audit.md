@@ -1,6 +1,6 @@
 # UI audit: Figma Make re-skin (UI-02)
 
-Design source: Figma Make "Questly Classroom Web App (Copy)" (`ft2Fe3c5xrv3NO2zCq21wi`), local copy in `docs/ui-redesign/reference/figma-make/`. Spec: `docs/ui-redesign/PLAN.md`.
+Design source: Figma Make "Questly Classroom Web App (Copy)" (`ft2Fe3c5xrv3NO2zCq21wi`), local copy in `docs/ui-redesign/reference/figma-make/`. Design tokens: `docs/ui-redesign/tokens/theme.css`.
 
 Result key: **matches** = same layout and components as Figma; **adapted** = Figma layout with a documented change; **no mock** = Figma has no screen, styled with the same design system.
 
@@ -29,7 +29,7 @@ Result key: **matches** = same layout and components as Figma; **adapted** = Fig
 | T-04b | `instructor/t04b_published.html` | CreateProblem (published) | matches | |
 | T-05 | `instructor/t05_edit.html` | none | no mock | Fields grouped in cards. |
 | A-01 | `admin/a01_*.html` | Admin | adapted | The admin pages are real now (users, AI, status), so they are restyled with the Figma admin nav and keep all behaviour. No fake data added. |
-| T-06 Documents | none | Documents | not built | Out of scope (CORE-16). |
+| T-06 Documents | none | Documents | not built | Built in FE-08 after CORE-16 and OPS-20. |
 
 ## Cross-cutting deviations
 
@@ -41,5 +41,4 @@ Result key: **matches** = same layout and components as Figma; **adapted** = Fig
 
 ## Open items
 
-- `AGENTS.md` (UI source of truth paragraph) and the UI-02 row in `docs/task-scope.md` are not edited on this branch. Both are locked files; the session that did this work was blocked from changing them. They need a manual edit by พาย.
 - Mobile checks were done by loading each page in 390px and 900px frames and checking for horizontal overflow (none found), not on a physical device.
