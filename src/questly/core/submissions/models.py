@@ -97,10 +97,12 @@ _MOVES: dict[SubmissionStatus, frozenset[SubmissionStatus]] = {
 
 
 class Recovery(StrEnum):
-    """What judging did after the worker that started it vanished.
+    """What judging did after the original run was interrupted.
 
-    `reconnected`: the saved runner tokens were collected. `rejudged`: the
-    code was sent to the runner again. Declared in rank order.
+    Set when the worker that started it vanished (its lease expired) or the
+    runner lost the batch. `reconnected`: the saved runner tokens were
+    collected. `rejudged`: the code was sent to the runner again. Declared in
+    rank order.
     """
 
     NONE = "none"

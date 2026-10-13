@@ -36,8 +36,8 @@ class SubmissionResponse(BaseModel):
         description="received and judging are pending; done and failed are final."
     )
     recovery: Recovery = Field(
-        description="reconnected or rejudged when judging was taken over "
-        "after a server restart."
+        description="reconnected or rejudged when judging was interrupted "
+        "(a server restart, or the runner lost the batch)."
     )
     score: int | None = Field(description="Set once the status is done.")
     max_score: int

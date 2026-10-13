@@ -94,7 +94,7 @@
         {% if panel.counted %}
         {% set sub = panel.counted %}
         {% if sub.recovery.value != "none" %}
-          {% call alert(tone="danger", state="T-02a-recovered") %}<span class="flex-1">Judging attempt {{ sub.attempt }} was interrupted by a server restart. It was submitted {{ sub.submitted_at | local }}; Late is decided from this time. {% if sub.recovery.value == "reconnected" %}The result was reconnected to the original run.{% else %}The code was judged again after the restart.{% endif %}</span>{% endcall %}
+          {% call alert(tone="danger", state="T-02a-recovered") %}<span class="flex-1">Judging attempt {{ sub.attempt }} was interrupted before it finished. It was submitted {{ sub.submitted_at | local }}; Late is decided from this time. {% if sub.recovery.value == "reconnected" %}The result was reconnected to the original run.{% else %}The code was judged again.{% endif %}</span>{% endcall %}
         {% endif %}
         <p class="hint mt-2">attempt {{ sub.attempt }} of {{ panel.attempts }} · {{ sub.submitted_at | local }}{% if sub.is_late %} · late{% endif %}</p>
         <div class="score-line">

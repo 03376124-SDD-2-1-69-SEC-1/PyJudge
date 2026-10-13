@@ -603,7 +603,7 @@ async def test_the_recovered_banner_shows_to_the_instructor_only(
     assert "Late is decided from this time" in panel.text
     expected = {
         Recovery.RECONNECTED: "reconnected to the original run",
-        Recovery.REJUDGED: "judged again after the restart",
+        Recovery.REJUDGED: "The code was judged again.",
     }[recovery]
     assert expected in panel.text
     assert recovered.attempt == 2
