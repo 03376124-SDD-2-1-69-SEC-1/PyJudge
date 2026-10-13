@@ -11,6 +11,7 @@ import pytest
 
 from questly import config, main
 from questly.database import session
+from questly.database.core.notification_repository import SQLNotificationRepository
 from questly.database.rag import vector_repository as postgres_adapter
 from questly.database.storage import r2
 
@@ -69,6 +70,31 @@ def test_settings_are_resolved_once_and_reused(monkeypatch) -> None:
     assert config.get_settings() is config.get_settings()
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, "google/gemini-embedding-001"),
+        ("  ", "google/gemini-embedding-001"),
+        (" other/embedder ", "other/embedder"),
+    ],
+)
+def test_embedding_model_comes_from_the_environment(
+    monkeypatch, raw: str | None, expected: str
+) -> None:
+    monkeypatch.setattr(config, "load_dotenv", lambda: None)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("R2_ENDPOINT_URL", "https://example.r2.cloudflarestorage.com")
+    monkeypatch.setenv("R2_BUCKET_NAME", "test-bucket")
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "test-key")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "test-secret")
+    if raw is None:
+        monkeypatch.delenv("EMBEDDING_MODEL", raising=False)
+    else:
+        monkeypatch.setenv("EMBEDDING_MODEL", raw)
+
+    assert config.get_settings().embedding_model == expected
+
+
 def test_production_composition_wires_the_postgres_vector_repository(
     monkeypatch,
 ) -> None:
@@ -88,6 +114,10 @@ def test_production_composition_wires_the_postgres_vector_repository(
 
     assert application.state.vector_service._repository is repository
     adapter_factory.assert_called_once()
+    assert isinstance(
+        application.state.notification_service._repository,
+        SQLNotificationRepository,
+    )
 
 
 def test_postgres_repository_rejects_non_psycopg_urls() -> None:

@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from questly.ai.app.repository import VectorRepository
 from questly.config import DEFAULT_MAX_UPLOAD_SIZE_BYTES, Settings
+from questly.core.admin.ports import AdminRepository, SystemHealthChecker
 from questly.core.assignments.ports import (
     AssignmentRepository,
     PostingRepository,
@@ -24,12 +25,15 @@ from questly.core.generation.ports import (
     DocumentCatalog,
     DraftRepository,
     GenerationClient,
+    GenerationJobStore,
+    ProviderQuota,
 )
 from questly.core.submissions.ports import CodeRunner, SubmissionRepository
 from questly.core.topics.ports import TopicRepository
 from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from questly.integrations.email import StubEmailSender
 from questly.main import create_app
+from tests.fakes.admin import FakeAdminRepository, FakeSystemHealthChecker
 from tests.fakes.assignments import (
     FakeAssignmentRepository,
     FakePostingRepository,
@@ -37,7 +41,13 @@ from tests.fakes.assignments import (
 )
 from tests.fakes.auth import FakeAuthRepository, FakeClock
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
-from tests.fakes.generation import FakeDocumentCatalog, FakeDraftRepository
+from tests.fakes.generation import (
+    FakeDocumentCatalog,
+    FakeDraftRepository,
+    FakeGenerationJobStore,
+    FakeProviderQuota,
+)
+from tests.fakes.notifications import FakeNotificationRepository
 from tests.fakes.submissions import FakeSubmissionRepository, ScriptedCodeRunner
 from tests.fakes.topics import FakeTopicRepository
 from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
@@ -72,10 +82,15 @@ def build_app(
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
+    provider_quota: ProviderQuota | None = None,
+    generation_job_store: GenerationJobStore | None = None,
     draft_repository: DraftRepository | None = None,
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
+    notification_repository: FakeNotificationRepository | None = None,
+    admin_repository: AdminRepository | None = None,
+    system_health_checker: SystemHealthChecker | None = None,
     verification_mailer: StubEmailSender | None = None,
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
@@ -102,6 +117,10 @@ def build_app(
         knowledge_document_repository = FakeKnowledgeDocumentRepository()
     if object_storage is None:
         object_storage = FakeObjectStorage()
+    if provider_quota is None:
+        provider_quota = FakeProviderQuota()
+    if generation_job_store is None:
+        generation_job_store = FakeGenerationJobStore()
     if draft_repository is None:
         draft_repository = FakeDraftRepository()
     if document_catalog is None:
@@ -110,10 +129,16 @@ def build_app(
         vector_repository = FakeVectorRepository()
     if auth_repository is None:
         auth_repository = FakeAuthRepository()
+    if admin_repository is None:
+        admin_repository = FakeAdminRepository()
+    if system_health_checker is None:
+        system_health_checker = FakeSystemHealthChecker()
     if verification_mailer is None:
         verification_mailer = StubEmailSender()
     if clock is None:
         clock = FakeClock()
+    if notification_repository is None:
+        notification_repository = FakeNotificationRepository()
     if classroom_repository is None:
         classroom_repository = FakeClassroomRepository()
     if classroom_stats is None:
@@ -129,11 +154,16 @@ def build_app(
         knowledge_document_repository=knowledge_document_repository,
         object_storage=object_storage,
         generation_client=generation_client,
+        provider_quota=provider_quota,
+        generation_job_store=generation_job_store,
         draft_repository=draft_repository,
         document_catalog=document_catalog,
         vector_repository=vector_repository,
         auth_repository=auth_repository,
-        verification_mailer=verification_mailer,
+        email_sender=verification_mailer,
+        notification_repository=notification_repository,
+        admin_repository=admin_repository,
+        system_health_checker=system_health_checker,
         clock=clock,
         classroom_repository=classroom_repository,
         classroom_stats=classroom_stats,

@@ -121,8 +121,10 @@ R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 ```
 
-กำหนด `GEMINI_API_KEY` เมื่อต้องพัฒนา Gemini integration ห้าม commit ไฟล์
-`.env` หรือใส่ credentials จริงลงใน `.env.example`
+กำหนด `OPENROUTER_API_KEY` เพื่อเรียก OpenRouter สำหรับ generation และ embedding
+(ADR-0009) ถ้าเว้นว่างแอปจะใช้ stub generation client แทน ส่วน `GENERATION_MODEL`
+และ `EMBEDDING_MODEL` ใช้เลือกโมเดล ค่า default อยู่ใน `src/questly/config.py`
+ห้าม commit ไฟล์ `.env` หรือใส่ credentials จริงลงใน `.env.example`
 
 ### 5. รัน Database Migrations
 
@@ -380,7 +382,7 @@ erDiagram
         JSONB draft "title, statement, test_cases — ไม่มี default"
         JSONB citations "chunk_id, source_id, page, score, text_snapshot"
         TEXT model_provider "nullable"
-        TEXT model_name "nullable, เช่น gemini-2.0-flash"
+        TEXT model_name "nullable, เช่น poolside/laguna-s-2.1:free"
         TEXT review_status "CHECK: pending | applied | discarded"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at

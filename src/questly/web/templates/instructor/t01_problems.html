@@ -1,38 +1,51 @@
 {% extends "base.html" %}
 {% from "_components/forms.html" import link_button with context %}
-{% from "_components/ui.html" import empty_state %}
+{% from "_components/ui.html" import empty_state, difficulty_badge, badge, section_head, stats_strip, stat_cell %}
+{% from "_components/icons.html" import icon %}
 {% block title %}{{ view.classroom.course_name }} · Questly{% endblock %}
 {% block content %}
 <section data-page="T-01" data-tab="problems">
   {% include "instructor/t01_header.html" %}
   {% include "instructor/t01_tabs.html" %}
+  {% call stats_strip() %}
+    {{ stat_cell("Students", summary.student_count, "users") }}
+    {{ stat_cell("Problems", summary.problem_count, "book") }}
+    {{ stat_cell("Avg pass rate", ((summary.avg_pass_rate * 100) | round | int ~ "%") if summary.avg_pass_rate is not none else "—", "chart") }}
+    {{ stat_cell("Never submitted", summary.never_submitted, "clock") }}
+  {% endcall %}
   {% if view.student_count == 0 %}
-  <div class="mx-auto mb-8 flex max-w-lg flex-col items-center gap-3 text-center" data-state="T-01a">
+  <div class="empty mb-6" data-state="T-01a">
     <h2 class="h2">Invite your students</h2>
-    <p class="muted text-xs">Share this join code — nobody has joined yet.</p>
-    <div class="box w-full items-center py-5">
-      <p class="join-code select-all">{{ view.classroom.join_code or "—" }}</p>
-      {% if not view.classroom.join_code %}<p class="hint">Joining is disabled. Regenerate a code in Classroom settings.</p>{% endif %}
-    </div>
+    <p>Share this join code — nobody has joined yet.</p>
+    <p class="join-code select-all">{{ view.classroom.join_code or "—" }}</p>
+    {% if not view.classroom.join_code %}<p class="hint">Joining is disabled. Regenerate a code in Classroom settings.</p>{% endif %}
   </div>
   {% endif %}
 
   {% include "instructor/t01_drafts.html" %}
 
   {% if problems.problems %}
-  <p class="eyebrow mb-2">Published · {{ problems.problems | length }}</p>
+  {% call section_head("โจทย์ที่เผยแพร่ · " ~ (problems.problems | length), "Published · " ~ (problems.problems | length)) %}
+    {{ link_button("/classes/" ~ view.classroom.id ~ "/generate", "เพิ่มโจทย์", variant="primary", icon="plus") }}
+  {% endcall %}
   <div class="table-wrap">
     <table class="table">
-      <thead><tr><th>Problem</th><th>Difficulty</th><th>Deadline</th><th>Submitted</th><th>Avg score</th><th></th></tr></thead>
+      <thead><tr><th>Problem</th><th>Difficulty</th><th>Deadline</th><th>Submitted</th><th>Avg score</th><th>Status</th><th></th></tr></thead>
       <tbody>
         {% for row in problems.problems %}
         <tr>
-          <td>{{ row.number }} · {{ row.assignment.title }}</td>
-          <td>{{ row.assignment.difficulty.value | capitalize }}</td>
-          <td>{{ row.posting.schedule.deadline | local("%-d %b") }}{% if row.posting.closed_at %} · closed{% endif %}</td>
-          <td>{{ row.summary.submitted }}/{{ problems.student_count }}</td>
+          <td><strong class="text-ink">{{ row.assignment.title }}</strong><small>Problem {{ row.number }}</small></td>
+          <td>{{ difficulty_badge(row.assignment.difficulty) }}</td>
+          <td class="whitespace-nowrap">{{ row.posting.schedule.deadline | local("%-d %b") }}</td>
+          <td>
+            <div class="flex items-center gap-2.5">
+              <span>{{ row.summary.submitted }}/{{ problems.student_count }}</span>
+              {% if problems.student_count %}<div class="mini-progress"><i style="width: {{ (row.summary.submitted * 100 / problems.student_count) | round | int }}%"></i></div>{% endif %}
+            </div>
+          </td>
           <td>{% if row.summary.avg_score is not none %}{{ "%.1f" | format(row.summary.avg_score) }}{% else %}—{% endif %}</td>
-          <td class="text-right"><a class="link" href="/classes/{{ view.classroom.id }}/assignments/{{ row.assignment.id }}">Results</a></td>
+          <td>{% if row.posting.closed_at %}{{ badge("closed") }}{% else %}{{ badge("open", tone="ok") }}{% endif %}</td>
+          <td class="text-right"><a class="link whitespace-nowrap" href="/classes/{{ view.classroom.id }}/assignments/{{ row.assignment.id }}">Results</a></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -41,7 +54,7 @@
   {% elif not drafts %}
     {% call empty_state("No problems in this classroom", "Generate one from your uploaded lecture notes, or upload a PDF first.", state="T-01b") %}
       {{ link_button("/documents", "Upload documents") }}
-      {{ link_button("/classes/" ~ view.classroom.id ~ "/generate", "+ Create problem with AI", variant="primary") }}
+      {{ link_button("/classes/" ~ view.classroom.id ~ "/generate", "สร้างโจทย์ด้วย AI", variant="primary", icon="sparkles") }}
     {% endcall %}
   {% endif %}
 </section>

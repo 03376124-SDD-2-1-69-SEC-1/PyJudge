@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import UTC, datetime
 
 from questly.core.generation.models import (
     AssignmentDraft,
@@ -11,6 +14,12 @@ from questly.core.generation.models import (
     DocumentSummary,
     Draft,
     GenerationArtifact,
+    GenerationJob,
+    GenerationStep,
+    JobStatus,
+    ProviderQuotaSnapshot,
+    QuotaKind,
+    StartedJob,
 )
 from questly.core.generation.schemas import GenerationRequest, GenerationResponse
 from questly.database.core.generation_repository import (
@@ -124,6 +133,9 @@ class FakeDraftRepository:
     def count_generations(self, user_id: int, since: datetime) -> int:
         return sum(1 for who, at in self.generations if who == user_id and at >= since)
 
+    def count_all_generations(self, since: datetime) -> int:
+        return sum(1 for _, at in self.generations if at >= since)
+
 
 class FakeDocumentCatalog:
     """Documents per owner, set by a test or the demo seed."""
@@ -140,16 +152,95 @@ class FakeDocumentCatalog:
 class FakeGenerationClient:
     """Returns `response`, or raises when `fail` is set (T-03d)."""
 
-    def __init__(self, response: GenerationResponse) -> None:
+    def __init__(
+        self, response: GenerationResponse, step_delay_seconds: float = 0.0
+    ) -> None:
         self.response = response
+        self.step_delay_seconds = step_delay_seconds
         self.fail = False
+        # Runs after the model "answers", so a test can cancel or age the job
+        # while the work is in flight.
+        self.during_call: Callable[[], None] | None = None
         self.requests: list[GenerationRequest] = []
 
-    def generate(self, request: GenerationRequest) -> GenerationResponse:
+    def generate(
+        self, request: GenerationRequest, on_step: Callable[[GenerationStep], None]
+    ) -> GenerationResponse:
         self.requests.append(request)
+        on_step(GenerationStep.CALLING_MODEL)
+        time.sleep(self.step_delay_seconds)
+        if self.during_call is not None:
+            self.during_call()
         if self.fail:
             raise TimeoutError("the model did not respond")
+        on_step(GenerationStep.VALIDATING)
+        time.sleep(self.step_delay_seconds)
         return self.response
+
+
+class FakeProviderQuota:
+    """A ProviderQuota a test or the demo seed sets by hand."""
+
+    def __init__(self, current: ProviderQuotaSnapshot | None = None) -> None:
+        self.current = current if current is not None else demo_snapshot()
+        self.invalidations = 0
+
+    def snapshot(self) -> ProviderQuotaSnapshot:
+        return self.current
+
+    def invalidate(self) -> None:
+        self.invalidations += 1
+
+
+def demo_snapshot() -> ProviderQuotaSnapshot:
+    """The OpenRouter free quota as the demo shows it: 37 of 50 left."""
+    return ProviderQuotaSnapshot(
+        kind=QuotaKind.EXACT,
+        used=13,
+        limit=50,
+        remaining=37,
+        resets_at=datetime(2026, 10, 13, 0, 0, tzinfo=UTC),
+        note="",
+    )
+
+
+class FakeGenerationJobStore:
+    """Jobs in a dict, with the same contract as the in-process adapter."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._jobs: dict[int, GenerationJob] = {}
+        self._next_id = 1
+
+    def create_unless_running(self, job: GenerationJob) -> StartedJob:
+        with self._lock:
+            running = self.running_for(job.actor.user_id, job.classroom_id)
+            if running is not None:
+                return StartedJob(running, created=False)
+            created = replace(job, id=self._next_id)
+            self._next_id += 1
+            self._jobs[created.id] = created
+            return StartedJob(created, created=True)
+
+    def get(self, job_id: int) -> GenerationJob | None:
+        return self._jobs.get(job_id)
+
+    def update(
+        self, job_id: int, change: Callable[[GenerationJob], GenerationJob]
+    ) -> GenerationJob:
+        with self._lock:
+            self._jobs[job_id] = change(self._jobs[job_id])
+            return self._jobs[job_id]
+
+    def running_for(self, user_id: int, classroom_id: int) -> GenerationJob | None:
+        for job in self._jobs.values():
+            if (
+                job.status is JobStatus.RUNNING
+                and job.actor.user_id == user_id
+                and job.classroom_id == classroom_id
+            ):
+                return job
+        return None
 
 
 def binary_search_response() -> GenerationResponse:

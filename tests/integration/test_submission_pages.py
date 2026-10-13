@@ -5,7 +5,7 @@ from httpx import ASGITransport, AsyncClient
 from scripts.demo import BINARY_SEARCH, UPDATE_REASON, DemoSeed, build_demo_app
 
 from questly.core.auth.models import Actor
-from tests.fakes.auth import DEFAULT_PASSWORD
+from tests.fakes.auth import DEFAULT_PASSWORD, FakeClock
 from tests.fakes.submissions import ScriptedCodeRunner
 from tests.integration.forms import log_in, post_form
 
@@ -14,7 +14,7 @@ SAMPLES = {"5\n1 3 5 7 9\n7": "3", "4\n2 4 6 8\n5": "-1"}
 
 class Demo:
     def __init__(self) -> None:
-        self.seed = DemoSeed()
+        self.seed = DemoSeed(clock=FakeClock())
         self.runner = ScriptedCodeRunner(SAMPLES)
         self.seed.code_runner = self.runner
         self.app = build_demo_app(self.seed)
@@ -113,7 +113,10 @@ async def test_submit_grades_every_test_and_becomes_the_counted_one(
     )
     page = await client.get(url)
 
-    assert response.status_code == 303 and response.headers["location"] == url
+    assert (
+        response.status_code == 303
+        and response.headers["location"] == f"{url}?submitted=1"
+    )
     assert len(demo.runner.calls) == 6
     assert "attempt 4" in page.text
     assert 'data-state="S-02e"' not in page.text
@@ -283,3 +286,29 @@ async def test_archived_classroom_shows_s02f_and_refuses_submit(demo: Demo) -> N
     assert "This classroom is archived" in page.text and "readonly" in page.text
     assert refused.status_code == 409
     assert refused.json()["detail"]["code"] == "classroom_archived"
+
+
+@pytest.mark.anyio
+async def test_toast_reports_pass_and_fail_after_submit(demo: Demo) -> None:
+    url = demo.url(BS)
+    passing = await demo.client(demo.seed.students[1].email)
+    failing = await demo.client(demo.seed.students[3].email)
+
+    passed = await passing.get(url + "?submitted=1")
+    failed = await failing.get(url + "?submitted=1")
+    plain = await passing.get(url)
+
+    assert 'data-state="toast-pass"' in passed.text
+    assert 'data-state="toast-fault"' in failed.text
+    assert "toast-stack" not in plain.text
+
+
+@pytest.mark.anyio
+async def test_toast_reports_a_failing_run(demo: Demo) -> None:
+    client = await demo.client(demo.seed.students[0].email)
+    url = demo.url(BS)
+
+    page = await post_form(client, url, {"action": "run", "code": "# crash"}, page=url)
+
+    assert 'data-state="toast-fault"' in page.text
+    assert 'data-state="toast-pass"' not in page.text

@@ -6,6 +6,7 @@ When you add a rule to AGENTS.md, add its test here in the same PR.
 
 import ast
 import re
+import subprocess
 from pathlib import Path
 
 CORE_ROOT = Path("src/questly/core")
@@ -16,7 +17,7 @@ LEGACY_ASSIGNMENTS_TEST_DIR = TESTS_ROOT / "unit" / "core" / "topics" / "assignm
 
 
 def _parse(path: Path) -> ast.Module:
-    return ast.parse(path.read_text(), filename=str(path))
+    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
 def _is_pytest_filename(path: Path) -> bool:
@@ -159,6 +160,9 @@ def _imports_http_test_client(tree: ast.Module) -> bool:
 # `approved_at` on a draft, once Questly's approval flow needs it -- unlike
 # `created_at`/`updated_at`, that's a business fact, not row bookkeeping.
 ALLOWED_TIMESTAMP_FIELDS: set[str] = {
+    # notifications: list timestamps and determine whether a notification was read.
+    "created_at",
+    "read_at",
     # auth (ADR-0007 §1): verify_email refuses a link after 24 h and
     # resolve_session refuses an expired session.
     "expires_at",
@@ -166,6 +170,8 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "last_active_at",
     # auth: A-01 pending Instructor requests, "Requested" column.
     "requested_at",
+    # auth (ADR-0007 §8): A-01 records when an Instructor request was reviewed.
+    "reviewed_at",
     # classrooms: T-01 Members "Joined" column and its ordering.
     "joined_at",
     # assignments: Posting.is_closed reads closed_at; published_at orders the
@@ -175,6 +181,13 @@ ALLOWED_TIMESTAMP_FIELDS: set[str] = {
     "changed_at",
     # generation: T-01 Drafts "Created" column and T-03a "Generated ...".
     "generated_at",
+    # generation (ADR-0010): T-03c shows elapsed and per-step seconds, and
+    # GenerationJob.is_stale (3 minutes) reads started_at.
+    "started_at",
+    "step_started_at",
+    "finished_at",
+    # generation (ADR-0010): T-03's "resets 07:00" line.
+    "resets_at",
     # submissions (ADR-0007 §5.6): is_late compares submitted_at with the
     # deadline; S-02g and T-02 show it in "Submitted".
     "submitted_at",
@@ -205,6 +218,8 @@ ALLOWED_ID_SUFFIX_FIELDS = {
     # results, PostingStats) -- the Counted Submission is found through it.
     "posting_id",
     "topic_id",
+    # generation (ADR-0010): a done job points T-03c at the Draft to open.
+    "draft_id",
 }
 
 
@@ -251,6 +266,15 @@ def test_domain_models_hold_no_table_only_fields() -> None:
     )
 
 
+# A process-memory adapter that production deliberately wires. Each entry needs
+# an ADR saying why; anything not listed here is still an accident.
+ALLOWED_IN_MEMORY_ADAPTERS = {
+    # ADR-0010: Generate jobs live in this process for the PoC (one user, one
+    # process). The GenerationJobStore port lets a database store replace it.
+    "InMemoryGenerationJobStore",
+}
+
+
 def test_no_in_memory_adapter_ships_inside_src() -> None:
     """Fakes live in tests/fakes/, never in the package.
 
@@ -265,7 +289,10 @@ def test_no_in_memory_adapter_ships_inside_src() -> None:
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
                 continue
-            if node.name.startswith(("InMemory", "Fake")):
+            if (
+                node.name.startswith(("InMemory", "Fake"))
+                and node.name not in ALLOWED_IN_MEMORY_ADAPTERS
+            ):
                 violations.append(f"{source_file}:{node.lineno}: {node.name}")
 
     assert not violations, (
@@ -351,7 +378,6 @@ ACTOR_SLICES = (
     "assignments",
     "generation",
     "submissions",
-    "notifications",
     "admin",
     "documents",
 )
@@ -540,7 +566,9 @@ def test_templates_build_controls_only_through_component_macros() -> None:
         relative = template.relative_to(TEMPLATE_ROOT)
         if relative.parts[0] == COMPONENTS_DIR:
             continue
-        for lineno, line in enumerate(template.read_text().splitlines(), start=1):
+        for lineno, line in enumerate(
+            template.read_text(encoding="utf-8").splitlines(), start=1
+        ):
             match = RAW_CONTROL.search(line)
             if match:
                 violations.append(f"{relative}:{lineno}: <{match.group(1)}>")
@@ -562,9 +590,10 @@ def test_every_post_form_carries_the_csrf_field() -> None:
     """core/auth/csrf.py rejects a form post without its page's token."""
     violations = []
     for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
-        for match in POST_FORM.finditer(template.read_text()):
+        template_text = template.read_text(encoding="utf-8")
+        for match in POST_FORM.finditer(template_text):
             if "csrf_field()" not in match.group(1):
-                line = template.read_text()[: match.start()].count("\n") + 1
+                line = template_text[: match.start()].count("\n") + 1
                 violations.append(f"{template.relative_to(TEMPLATE_ROOT)}:{line}")
 
     assert not violations, (
@@ -577,7 +606,7 @@ def test_forms_macros_are_imported_with_context() -> None:
     """csrf_field() reads `request`, which a context-free import cannot see."""
     violations = []
     for template in sorted(TEMPLATE_ROOT.rglob("*.html")):
-        for match in FORMS_IMPORT.finditer(template.read_text()):
+        for match in FORMS_IMPORT.finditer(template.read_text(encoding="utf-8")):
             if not match.group(1).rstrip().endswith("with context"):
                 violations.append(str(template.relative_to(TEMPLATE_ROOT)))
 
@@ -626,4 +655,45 @@ def test_every_post_page_handler_checks_csrf_first() -> None:
         "Every POST page handler takes `csrf_token` and calls "
         "require_csrf(request, csrf_token) as its first statement. "
         "Violations:\n" + "\n".join(violations)
+    )
+
+
+OLD_PROJECT_NAME = re.compile(r"greader(?!-ci)", re.IGNORECASE)
+OLD_NAME_EXEMPT_PREFIXES = ("docs/handoff/",)
+OLD_NAME_EXEMPT_FILES = {"tests/architecture/test_conventions.py"}
+
+
+def test_old_project_name_is_gone() -> None:
+    """A branch cut before the Questly rename re-adds the old project name.
+
+    `greader-ci` is the real name of the CI R2 bucket and is allowed. Dated
+    handoff docs are snapshots and are left alone.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files"], capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+
+    violations = []
+    for name in tracked:
+        if name in OLD_NAME_EXEMPT_FILES or name.startswith(OLD_NAME_EXEMPT_PREFIXES):
+            continue
+        path = Path(name)
+        if not path.is_file():
+            continue
+        if OLD_PROJECT_NAME.search(name):
+            violations.append(f"{name} (path)")
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            if OLD_PROJECT_NAME.search(line):
+                violations.append(f"{name}:{lineno}")
+
+    assert not violations, (
+        "The project was renamed to Questly (src/questly, `questly.*` imports). "
+        "Your branch predates the rename: `git pull origin dev`, move your code "
+        "under src/questly/, fix the imports, and delete src/<old name>/. "
+        "Found in:\n  " + "\n  ".join(violations)
     )

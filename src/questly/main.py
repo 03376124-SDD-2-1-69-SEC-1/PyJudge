@@ -15,17 +15,24 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from openrouter import OpenRouter
 from sqlmodel import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from questly.ai.app.repository import VectorRepository
-from questly.ai.app.routes import router as vector_router
-from questly.ai.app.schemas import ApplicationErrorResponse
 from questly.ai.app.service import VectorService
-from questly.ai.client import StubGenerationClient
+from questly.ai.client import OpenRouterGenerationClient, StubGenerationClient
+from questly.ai.quota import OpenRouterProviderQuota, StubProviderQuota
+from questly.api_errors import ApplicationErrorResponse
 from questly.config import Settings, get_settings
+from questly.core.admin.pages import router as admin_page_router
+from questly.core.admin.ports import AdminRepository, SystemHealthChecker
+from questly.core.admin.routes import router as admin_router
+from questly.core.admin.service import AdminService
+from questly.core.assignments.pages import router as assignment_page_router
 from questly.core.assignments.ports import (
     AssignmentRepository,
     PostingRepository,
@@ -44,9 +51,9 @@ from questly.core.auth.models import (
     NotAuthenticatedError,
     PermissionDeniedError,
 )
-from questly.core.auth.pages import DemoAccount
+from questly.core.auth.pages import DemoAccount, error_page
 from questly.core.auth.pages import router as auth_page_router
-from questly.core.auth.ports import AuthRepository, Clock, VerificationMailer
+from questly.core.auth.ports import AuthRepository, Clock
 from questly.core.auth.routes import router as auth_router
 from questly.core.auth.service import AuthService
 from questly.core.classrooms.pages import router as classroom_page_router
@@ -59,10 +66,17 @@ from questly.core.generation.ports import (
     DocumentCatalog,
     DraftRepository,
     GenerationClient,
+    GenerationJobStore,
+    ProviderQuota,
 )
 from questly.core.generation.routes import classroom_router as draft_classroom_router
 from questly.core.generation.routes import router as draft_router
 from questly.core.generation.service import GenerationService
+from questly.core.notifications.pages import header_notifications
+from questly.core.notifications.pages import router as notification_page_router
+from questly.core.notifications.ports import EmailSender, NotificationRepository
+from questly.core.notifications.routes import router as notification_router
+from questly.core.notifications.service import DueSoonService, NotificationService
 from questly.core.submissions.pages import router as submission_page_router
 from questly.core.submissions.ports import CodeRunner, SubmissionRepository
 from questly.core.submissions.routes import (
@@ -77,6 +91,7 @@ from questly.core.topics.service import TopicService
 from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from questly.core.uploads.routes import router as upload_router
 from questly.core.uploads.service import UploadService
+from questly.database.core.admin_repository import SQLAdminRepository
 from questly.database.core.assignment_repository import SQLAssignmentRepository
 from questly.database.core.auth_repository import SQLAuthRepository
 from questly.database.core.classroom_repository import SQLClassroomRepository
@@ -85,11 +100,14 @@ from questly.database.core.draft_repository import SQLDraftRepository
 from questly.database.core.knowledge_document_repository import (
     SQLKnowledgeDocumentRepository,
 )
+from questly.database.core.notification_repository import (
+    SQLNotificationRepository,
+)
 from questly.database.core.posting_repository import SQLPostingRepository
 from questly.database.core.submission_repository import SQLSubmissionRepository
 from questly.database.core.topic_repository import SQLTopicRepository
 from questly.database.core.version_repository import SQLVersionRepository
-from questly.database.health import check_db
+from questly.database.health import SQLSystemHealthChecker, check_db
 from questly.database.rag.vector_repository import PostgresVectorRepository
 from questly.database.session import (
     SessionFactory,
@@ -100,12 +118,15 @@ from questly.database.session import (
 from questly.database.storage.r2 import R2ObjectStorage, build_r2_client, check_r2
 from questly.integrations.clock import SystemClock
 from questly.integrations.email import StubEmailSender
+from questly.integrations.generation_jobs import InMemoryGenerationJobStore
 from questly.integrations.judge0 import StubCodeRunner
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _WEB_DIR = _PACKAGE_DIR / "web"
 _TEMPLATE_DIR = _WEB_DIR / "templates"
 _STATIC_DIR = _WEB_DIR / "static"
+# The quota line is on every T-03 and T-03c load: give up on OpenRouter fast.
+_QUOTA_TIMEOUT_MS = 5_000
 
 
 DISPLAY_ZONE = ZoneInfo("Asia/Bangkok")
@@ -113,7 +134,12 @@ DISPLAY_ZONE = ZoneInfo("Asia/Bangkok")
 
 def local_time(value: datetime, pattern: str = "%-d %b, %H:%M") -> str:
     """Render a stored UTC time in Bangkok time for templates (`|local`)."""
-    return value.astimezone(DISPLAY_ZONE).strftime(pattern)
+    local_value = value.astimezone(DISPLAY_ZONE)
+    day_placeholder = "\x00LOCAL_TIME_DAY\x00"
+    portable_pattern = pattern.replace("%-d", day_placeholder)
+    return local_value.strftime(portable_pattern).replace(
+        day_placeholder, str(local_value.day)
+    )
 
 
 def asset_url(path: str) -> str:
@@ -139,11 +165,16 @@ def create_app(
     knowledge_document_repository: KnowledgeDocumentRepository | None = None,
     object_storage: ObjectStorage | None = None,
     generation_client: GenerationClient | None = None,
+    provider_quota: ProviderQuota | None = None,
+    generation_job_store: GenerationJobStore | None = None,
     draft_repository: DraftRepository | None = None,
     document_catalog: DocumentCatalog | None = None,
     vector_repository: VectorRepository | None = None,
     auth_repository: AuthRepository | None = None,
-    verification_mailer: VerificationMailer | None = None,
+    email_sender: EmailSender | None = None,
+    notification_repository: NotificationRepository | None = None,
+    admin_repository: AdminRepository | None = None,
+    system_health_checker: SystemHealthChecker | None = None,
     clock: Clock | None = None,
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
@@ -181,6 +212,7 @@ def create_app(
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
     templates.env.globals["asset_url"] = asset_url
     templates.env.globals["csrf_token"] = csrf_token
+    templates.env.globals["header_notifications"] = header_notifications
     templates.env.filters["local"] = local_time
     application.state.templates = templates
     # The "log in as" list on G-01 exists only when scripts/demo.py passes it.
@@ -225,10 +257,66 @@ def create_app(
             clock,
         )
 
-    if verification_mailer is None:
-        verification_mailer = StubEmailSender()
-    auth_service = AuthService(auth_repository, verification_mailer, clock)
+    if email_sender is None:
+        email_sender = StubEmailSender()
+
+    if notification_repository is None:
+        notification_repository = SQLNotificationRepository(use_session_factory())
+
+    notification_service = NotificationService(
+        notification_repository,
+        email_sender,
+        clock,
+        classroom_repository,
+        auth_repository,
+    )
+    application.state.notification_service = notification_service
+
+    if admin_repository is None:
+        admin_repository = SQLAdminRepository(use_session_factory())
+    if system_health_checker is None:
+        system_health_checker = SQLSystemHealthChecker(
+            use_session_factory(),
+            generation_available=(
+                bool(use_settings().openrouter_api_key)
+                or (
+                    generation_client is not None
+                    and not isinstance(generation_client, StubGenerationClient)
+                )
+            ),
+            sandbox_available=(
+                code_runner is not None and not isinstance(code_runner, StubCodeRunner)
+            ),
+            email_available=(not isinstance(email_sender, StubEmailSender)),
+        )
+    if provider_quota is None:
+        if use_settings().openrouter_api_key:
+            provider_quota = OpenRouterProviderQuota(
+                OpenRouter(
+                    api_key=use_settings().openrouter_api_key,
+                    timeout_ms=_QUOTA_TIMEOUT_MS,
+                ),
+                model=lambda: admin_repository.get_ai_settings().model,
+                generations_since=draft_repository.count_all_generations,
+                clock=clock,
+            )
+        else:
+            provider_quota = StubProviderQuota(clock)
+    auth_service = AuthService(auth_repository, notification_service, clock)
     application.state.auth_service = auth_service
+    admin_service = AdminService(
+        admin_repository,
+        auth_repository,
+        system_health_checker,
+        generation_usage=draft_repository,
+        provider_quota=provider_quota,
+        clock=clock,
+        allowed_models=use_settings().generation_model_allowlist,
+    )
+    application.state.admin_service = admin_service
+
+    def get_daily_quota() -> int:
+        return admin_repository.get_ai_settings().daily_quota
 
     classroom_service = ClassroomService(
         classroom_repository, auth_service, classroom_stats, clock
@@ -248,8 +336,12 @@ def create_app(
         classroom_service,
         posting_stats,
         clock,
+        notification_service,
     )
     application.state.assignment_service = assignment_service
+    application.state.due_soon_service = DueSoonService(
+        classroom_service, assignment_service, clock
+    )
 
     if code_runner is None:
         code_runner = StubCodeRunner()
@@ -258,7 +350,16 @@ def create_app(
     )
 
     if generation_client is None:
-        generation_client = StubGenerationClient()
+        if use_settings().openrouter_api_key:
+            generation_client = OpenRouterGenerationClient(
+                api_key=use_settings().openrouter_api_key,
+                model=lambda: admin_repository.get_ai_settings().model,
+                code_runner=code_runner,
+            )
+        else:
+            generation_client = StubGenerationClient()
+    if generation_job_store is None:
+        generation_job_store = InMemoryGenerationJobStore()
     application.state.generation_service = GenerationService(
         draft_repository,
         generation_client,
@@ -266,6 +367,9 @@ def create_app(
         classroom_service,
         assignment_service,
         clock,
+        daily_quota=get_daily_quota,
+        jobs=generation_job_store,
+        provider_quota=provider_quota,
     )
 
     if topic_repository is None:
@@ -295,13 +399,17 @@ def create_app(
     application.include_router(assignment_router)
     application.include_router(assignment_classroom_router)
     application.include_router(test_case_router)
+    application.include_router(assignment_page_router)
     application.include_router(draft_router)
     application.include_router(draft_classroom_router)
     application.include_router(generation_page_router)
     application.include_router(upload_router)
-    application.include_router(vector_router)
+    application.include_router(notification_router)
+    application.include_router(notification_page_router)
     application.include_router(auth_router)
     application.include_router(auth_page_router)
+    application.include_router(admin_router)
+    application.include_router(admin_page_router)
     application.include_router(classroom_router)
     application.include_router(classroom_page_router)
     application.include_router(submission_router)
@@ -328,15 +436,40 @@ def create_app(
                 status_code=403,
                 content={"detail": {"code": "forbidden", "message": "Not allowed"}},
             )
-        return HTMLResponse("<h1>403 · Not allowed</h1>", status_code=403)
+        return error_page(request, 403)
 
     @application.exception_handler(CsrfTokenError)
     def csrf_rejected(request: Request, error: CsrfTokenError) -> Response:
         """A form posted without its page's token (core/auth/csrf.py)."""
-        return HTMLResponse(
-            "<h1>403 · This form expired</h1><p>Go back, reload and try again.</p>",
-            status_code=403,
+        return error_page(
+            request,
+            403,
+            title="ฟอร์มนี้หมดอายุแล้ว",
+            message="กลับไปที่หน้าเดิม โหลดหน้าใหม่ แล้วลองส่งอีกครั้ง",
         )
+
+    @application.exception_handler(StarletteHTTPException)
+    def http_error(request: Request, error: StarletteHTTPException) -> Response:
+        """Browsers get G-05; `/api/`, `/health` and `/static` keep the JSON body."""
+        if request.url.path.startswith(("/api/", "/health", "/static/")):
+            return JSONResponse(
+                status_code=error.status_code,
+                content={"detail": error.detail},
+                headers=error.headers,
+            )
+        return error_page(request, error.status_code)
+
+    @application.exception_handler(Exception)
+    def server_error(request: Request, error: Exception) -> Response:
+        """An unhandled bug: a 500 page for browsers, the usual envelope for the API."""
+        if request.url.path.startswith(("/api/", "/health")):
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "detail": {"code": "internal_error", "message": "Server error"}
+                },
+            )
+        return error_page(request, 500)
 
     @application.exception_handler(RequestValidationError)
     def request_validation_error(

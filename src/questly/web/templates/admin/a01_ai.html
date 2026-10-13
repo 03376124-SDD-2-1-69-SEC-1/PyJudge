@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import csrf_field, field, select_field, checkbox, button with context %}
+{% from "_components/ui.html" import alert, stat_box %}
+{% from "admin/a01_tabs.html" import admin_shell %}
+{% block title %}AI · Admin settings · Questly{% endblock %}
+{% block content %}
+<section data-page="A-01" data-tab="ai">
+  {% call admin_shell("ai") %}
+  {% if error %}{% call alert(tone="danger") %}{{ error }}{% endcall %}{% endif %}
+  {% if saved %}{% call alert() %}AI settings saved. They apply to all new generations.{% endcall %}{% endif %}
+  <div class="grid gap-5 lg:grid-cols-[2fr_1fr]">
+    <form method="post" action="/admin/settings/ai" class="card gap-4">
+      {{ csrf_field() }}
+      {{ select_field("model", "Generation model", models, selected=form.model, hint="Applies to all new generations.") }}
+      {{ field("daily_quota", "Daily generation quota per instructor", type="number", value=form.daily_quota, min=1, required=true) }}
+      {{ field("max_pages", "Max pages read per generation", type="number", value=form.max_pages, min=1, required=true) }}
+      {{ checkbox("require_citations", "Require citations in every generated problem", checked=form.require_citations) }}
+      <div class="form-actions">
+        {{ button("Save", variant="primary") }}
+      </div>
+    </form>
+    <div class="flex flex-col gap-4 self-start">
+      {{ stat_box("Usage this month", usage_this_month ~ " generations") }}
+      <div class="box" data-quota>
+        <p class="eyebrow">OpenRouter</p>
+        {% if provider.kind.value == "exact" %}
+          <p>OpenRouter free quota: {{ provider.remaining }} of {{ provider.limit }} left today · resets {{ provider_resets }}</p>
+        {% else %}
+          <p>{{ provider.note }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endcall %}
+</section>
+{% endblock %}

@@ -1,99 +1,175 @@
 {% extends "base.html" %}
 {% from "_components/forms.html" import link_button with context %}
 {% from "_components/ui.html" import badge %}
-{% block title %}Questly · programming assignments for KMITL classrooms{% endblock %}
+{% from "_components/auth.html" import logo %}
+{% from "_components/icons.html" import icon %}
+{% block title %}Questly · ห้องเรียนเขียนโปรแกรมพร้อมระบบตรวจโค้ดอัตโนมัติ{% endblock %}
 {% block main %}
-<main class="page flex flex-col gap-6" data-page="G-00">
-  <header class="flex flex-wrap items-center justify-between gap-4">
-    <p class="logo text-[20px]">Questly</p>
-    <nav class="flex flex-wrap gap-2.5" aria-label="Account">
-      {{ link_button("/login", "Log in", size="sm") }}
-      {{ link_button("/signup", "Sign up", variant="primary", size="sm") }}
-    </nav>
-  </header>
+<main class="landing" data-page="G-00">
+  <section class="landing-hero" aria-labelledby="hero-title">
+    <header class="landing-wrap landing-nav">
+      <a href="/" class="no-underline" aria-label="Questly หน้าแรก">{{ logo(true) }}</a>
+      <nav class="landing-nav-links" aria-label="ส่วนของหน้า">
+        <a href="#features">ฟีเจอร์</a>
+        <a href="#how">วิธีใช้งาน</a>
+        <a href="#problems">ตัวอย่างโจทย์</a>
+      </nav>
+      <nav class="landing-nav-account" aria-label="บัญชี">
+        {{ link_button("/login", "เข้าสู่ระบบ", variant="ghost") }}
+        {{ link_button("/signup", "สมัครสมาชิก", variant="primary") }}
+      </nav>
+    </header>
 
-  <section class="flex max-w-2xl flex-col gap-4" aria-labelledby="hero-title">
-    <p class="eyebrow">KMITL · programming courses</p>
-    <h1 class="h1" id="hero-title">Programming assignments for KMITL classrooms</h1>
-    <p class="text-mid">Instructors turn their lecture PDFs into problems with tests. Students write code in the browser and get graded on sample and hidden tests.</p>
-    <div class="flex flex-wrap gap-2.5">
-      {{ link_button("/login", "Log in", variant="primary") }}
-      {{ link_button("/signup", "Sign up with your @kmitl.ac.th email") }}
-    </div>
-  </section>
-
-  <section class="flex flex-col gap-4" aria-labelledby="how-title">
-    <h2 class="h2" id="how-title">How it works</h2>
-    <ol class="grid gap-4 lg:grid-cols-3">
-      <li class="box">
-        <p class="eyebrow">Step 1</p>
-        <p class="font-semibold">Create a classroom and share the code</p>
-        <p class="muted">Each section gets a six-character join code. Students enter it to join.</p>
-      </li>
-      <li class="box">
-        <p class="eyebrow">Step 2</p>
-        <p class="font-semibold">Generate a problem from your PDFs</p>
-        <p class="muted">The draft cites the pages it came from. Review it, edit it, then publish.</p>
-      </li>
-      <li class="box">
-        <p class="eyebrow">Step 3</p>
-        <p class="font-semibold">Students submit and are graded</p>
-        <p class="muted">Every submission runs against the sample and hidden tests. The score shows right away.</p>
-      </li>
-    </ol>
-  </section>
-
-  <section class="grid gap-4 lg:grid-cols-2" aria-label="Who it is for">
-    <div class="card gap-3">
-      <h2 class="h2">For instructors</h2>
-      <ul class="flex flex-col gap-2 text-mid">
-        <li>Keep your lecture PDFs in one library.</li>
-        <li>Draft problems with tests, each citing its source pages.</li>
-        <li>Publish one problem to several classrooms, each with its own deadline.</li>
-        <li>See who passed, who is late and which test fails most.</li>
-      </ul>
-    </div>
-    <div class="card gap-3">
-      <h2 class="h2">For students</h2>
-      <ul class="flex flex-col gap-2 text-mid">
-        <li>Join a classroom with the code your instructor shares.</li>
-        <li>Run your code on the sample tests before you submit.</li>
-        <li>See your score and which tests passed as soon as you submit.</li>
-        <li>Get told when a problem changes and you need to resubmit.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="flex flex-col gap-4" aria-labelledby="preview-title">
-    <h2 class="h2" id="preview-title">What a draft looks like</h2>
-    <div class="card max-w-3xl gap-4" data-preview="draft">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div><p class="eyebrow">Title</p><p class="h2">Binary search</p></div>
-        {{ badge("Draft", tone="accent") }}
+    <div class="landing-wrap landing-hero-body">
+      <div class="landing-hero-copy">
+        <p class="landing-pill"><span aria-hidden="true"></span>ห้องเรียนเขียนโปรแกรมพร้อมระบบตรวจโค้ดอัตโนมัติ</p>
+        <h1 id="hero-title">Learn. Code. Grow.</h1>
+        <p class="landing-lead">พื้นที่เรียนรู้การเขียนโปรแกรม ที่เติบโตไปพร้อมกับคุณ — อาจารย์สร้างโจทย์ได้ในไม่กี่นาที นักศึกษาส่งโค้ดแล้วรู้ผลทันที</p>
+        <div class="landing-actions">
+          {{ link_button("/signup", "สมัครด้วยอีเมล @kmitl.ac.th", variant="primary") }}
+          {{ link_button("#how", "ดูวิธีใช้งาน") }}
+        </div>
       </div>
-      <p class="whitespace-pre-line">Given a sorted list and a target, print the index of the target, or -1 if it is not in the list.</p>
-      <hr class="hr">
-      <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>Input</th><th>Expected</th><th>Type</th></tr></thead>
-          <tbody>
-            <tr><td class="code-cell">1 3 5 7 9<br>7</td><td class="code-cell">3</td><td>sample</td></tr>
-            <tr><td class="code-cell">2 4 6<br>5</td><td class="code-cell">-1</td><td>hidden</td></tr>
-            <tr><td class="code-cell">(empty)<br>1</td><td class="code-cell">-1</td><td>edge</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="text-xs"><span class="eyebrow">Citations</span> Week 4 · Searching.pdf · p. 12 · p. 14</p>
+
+      <figure class="landing-code" aria-label="ตัวอย่างโค้ดและผลการตรวจ">
+        <div class="landing-code-head">
+          <span class="landing-code-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>grow.py</span>
+        </div>
+        <pre>def grow(skill):
+    return skill + practice
+
+print(grow(skill))<span class="landing-caret" aria-hidden="true"></span></pre>
+        <figcaption class="landing-result">
+          <span class="landing-result-head"><strong>ผลการตรวจ</strong>{{ badge("ผ่านทุก Test Case", tone="ok") }}</span>
+          <span class="landing-result-cases">
+            <span>{{ icon("check", 14) }}ตัวอย่าง 1</span>
+            <span>{{ icon("check", 14) }}ตัวอย่าง 2</span>
+            <span>{{ icon("check", 14) }}ซ่อน</span>
+            <span>{{ icon("check", 14) }}กรณีขอบ</span>
+          </span>
+        </figcaption>
+      </figure>
     </div>
   </section>
 
-  <hr class="hr">
-  <footer class="-mt-2 flex flex-wrap items-center justify-between gap-4 text-xs text-soft">
-    <p>Questly · KMITL programming courses</p>
-    <nav class="flex gap-4" aria-label="Footer">
-      <a class="link" href="/login">Log in</a>
-      <a class="link" href="/signup">Sign up</a>
-    </nav>
+  <section class="landing-wrap landing-strip" aria-label="จุดเด่น">
+    <div><span class="icon-well">{{ icon("users", 22) }}</span><p><strong>ห้องเรียน</strong>เข้าร่วมด้วยรหัสเข้าร่วมเดียว</p></div>
+    <div><span class="icon-well">{{ icon("sparkles", 22) }}</span><p><strong>AI ร่างโจทย์</strong>จากเอกสารประกอบการสอน</p></div>
+    <div><span class="icon-well">{{ icon("code", 22) }}</span><p><strong>ตรวจโค้ดอัตโนมัติ</strong>รู้ผลทุก Test Case ทันที</p></div>
+    <div><span class="icon-well">{{ icon("chart", 22) }}</span><p><strong>ติดตามผล</strong>ภาพรวมการส่งงานของทั้งห้อง</p></div>
+  </section>
+
+  <section id="features" class="landing-wrap landing-section" aria-labelledby="features-title">
+    <div class="landing-head landing-head-center">
+      <p class="eyebrow">ทำไมต้อง Questly</p>
+      <h2 id="features-title">ทุกอย่างที่วิชาเขียนโปรแกรมต้องใช้ อยู่ในที่เดียว</h2>
+      <p>ตั้งแต่สร้างโจทย์ แจกให้ห้องเรียน ไปจนถึงตรวจคำตอบและดูผล — ไม่ต้องสลับหลายเครื่องมือ</p>
+    </div>
+    <div class="landing-grid">
+      <article class="landing-card">
+        <span class="icon-well icon-well-solid">{{ icon("file", 26) }}</span>
+        <h3>อัปโหลดเอกสาร ได้โจทย์ฉบับร่าง</h3>
+        <p>อาจารย์อัปโหลดเอกสารประกอบการสอน แล้วให้ AI ร่างโจทย์พร้อม Test Case ตามหัวข้อที่เลือก แต่ละโจทย์อ้างอิงหน้าที่มา ตรวจทานและแก้ไขก่อนเผยแพร่ได้เสมอ</p>
+      </article>
+      <article class="landing-card">
+        <span class="icon-well icon-well-solid">{{ icon("play", 26) }}</span>
+        <h3>Run ลองก่อน Submit จริง</h3>
+        <p>นักศึกษากด Run เพื่อทดสอบกับ Test Case ตัวอย่างได้ก่อน เมื่อมั่นใจจึง Submit ให้ระบบตรวจกับ Test Case ที่ซ่อนอยู่</p>
+      </article>
+      <article class="landing-card">
+        <span class="icon-well icon-well-solid">{{ icon("clock", 26) }}</span>
+        <h3>กำหนดส่งและงานส่งช้า</h3>
+        <p>เผยแพร่โจทย์เดียวให้หลายห้องเรียน แต่ละห้องมีกำหนดส่งของตัวเอง ระบบแยกงานที่ส่งช้าให้อัตโนมัติ และแจ้งเตือนเมื่อมีโจทย์ใหม่</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="how" class="landing-band" aria-labelledby="how-title">
+    <div class="landing-wrap landing-section">
+      <div class="landing-head landing-head-center">
+        <p class="eyebrow">วิธีใช้งาน</p>
+        <h2 id="how-title">เริ่มได้ในสามขั้นตอน</h2>
+      </div>
+      <div class="landing-roles">
+        <div class="landing-role">
+          <h3>{{ icon("book", 20) }}สำหรับอาจารย์</h3>
+          <ol class="landing-steps">
+            <li><span>1</span><p><strong>สร้างห้องเรียน</strong>ตั้งชื่อห้องเรียน แล้วแชร์รหัสเข้าร่วมให้นักศึกษา</p></li>
+            <li><span>2</span><p><strong>ร่างโจทย์ด้วย AI</strong>อัปโหลดเอกสารประกอบการสอน เลือกหัวข้อ แล้วตรวจทานโจทย์และ Test Case ที่ได้</p></li>
+            <li><span>3</span><p><strong>เผยแพร่และติดตามผล</strong>เผยแพร่โจทย์ไปยังห้องเรียนพร้อมกำหนดส่ง แล้วดูผลการส่งงานของทั้งห้อง</p></li>
+          </ol>
+        </div>
+        <div class="landing-role">
+          <h3>{{ icon("code", 20) }}สำหรับนักศึกษา</h3>
+          <ol class="landing-steps">
+            <li><span>1</span><p><strong>เข้าร่วมห้องเรียน</strong>สมัครด้วยอีเมลสถาบัน แล้วกรอกรหัสเข้าร่วมที่ได้จากอาจารย์</p></li>
+            <li><span>2</span><p><strong>เขียนโค้ดและกด Run</strong>ลองโค้ดกับ Test Case ตัวอย่างในหน้าทำโจทย์ได้ทันทีบนเบราว์เซอร์</p></li>
+            <li><span>3</span><p><strong>Submit และดูผล</strong>ส่งคำตอบให้ระบบตรวจกับ Test Case ทั้งหมด แล้วดูผลรายข้อได้ทันที</p></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="problems" class="landing-wrap landing-section" aria-labelledby="problems-title">
+    <div class="landing-head">
+      <p class="eyebrow">ตัวอย่างโจทย์</p>
+      <h2 id="problems-title">โจทย์แยกตามหัวข้อ เลือกระดับได้</h2>
+    </div>
+    <div class="landing-grid">
+      <article class="landing-problem">
+        <div class="landing-problem-cover landing-cover-pink" aria-hidden="true">for i in range(n):</div>
+        <div class="landing-problem-body">
+          <p class="landing-tags">{{ badge("Loop") }}{{ badge("ง่าย", tone="ok") }}</p>
+          <h3>ผลรวมเลขคู่</h3>
+          <p>รับจำนวนเต็ม n ตัว แล้วหาผลรวมเฉพาะเลขคู่</p>
+        </div>
+      </article>
+      <article class="landing-problem">
+        <div class="landing-problem-cover landing-cover-amber" aria-hidden="true">arr.sort()</div>
+        <div class="landing-problem-body">
+          <p class="landing-tags">{{ badge("Array") }}{{ badge("ปานกลาง", tone="warn") }}</p>
+          <h3>ค่ามัธยฐานของคะแนน</h3>
+          <p>เรียงคะแนนสอบของทั้งห้องแล้วหาค่ากลาง</p>
+        </div>
+      </article>
+      <article class="landing-problem">
+        <div class="landing-problem-cover landing-cover-blue" aria-hidden="true">def f(n): f(n-1)</div>
+        <div class="landing-problem-body">
+          <p class="landing-tags">{{ badge("Recursion") }}{{ badge("ยาก", tone="danger") }}</p>
+          <h3>หอคอยฮานอย</h3>
+          <p>พิมพ์ลำดับการย้ายจานทั้งหมดด้วยการเรียกตัวเอง</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="landing-wrap landing-section landing-section-tight" aria-labelledby="cta-title">
+    <div class="landing-cta">
+      <div>
+        <h2 id="cta-title">พร้อมเปิดห้องเรียนแรกแล้วหรือยัง?</h2>
+        <p>สมัครด้วยอีเมลสถาบัน แล้วเข้าร่วมห้องเรียนด้วยรหัสเข้าร่วมจากอาจารย์ หรือขอสิทธิ์อาจารย์เพื่อสร้างห้องของคุณเอง</p>
+      </div>
+      <div class="landing-actions">
+        {{ link_button("/signup", "สมัครสมาชิก", variant="primary") }}
+        {{ link_button("/login", "เข้าสู่ระบบ") }}
+      </div>
+    </div>
+  </section>
+
+  <footer class="landing-footer">
+    <div class="landing-wrap landing-footer-body">
+      <div>
+        {{ logo(true) }}
+        <p>พื้นที่เรียนรู้การเขียนโปรแกรม ที่เติบโตไปพร้อมกับคุณ</p>
+      </div>
+      <nav class="landing-footer-links" aria-label="ลิงก์ท้ายหน้า">
+        <div><strong>ผลิตภัณฑ์</strong><a href="#features">ฟีเจอร์</a><a href="#how">วิธีใช้งาน</a><a href="#problems">ตัวอย่างโจทย์</a></div>
+        <div><strong>บัญชี</strong><a href="/login">เข้าสู่ระบบ</a><a href="/signup">สมัครสมาชิก</a></div>
+      </nav>
+    </div>
+    <p class="landing-wrap landing-footer-note">Made by <a href="https://github.com/Doonminus2" rel="noopener" target="_blank">Doonminus2</a></p>
   </footer>
 </main>
 {% endblock %}

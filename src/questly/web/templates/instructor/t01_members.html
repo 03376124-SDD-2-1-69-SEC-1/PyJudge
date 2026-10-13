@@ -1,25 +1,27 @@
 {% extends "base.html" %}
 {% from "_components/forms.html" import action_form with context %}
-{% from "_components/ui.html" import empty_state %}
+{% from "_components/ui.html" import empty_state, avatar, badge %}
 {% block title %}Members · {{ view.classroom.course_name }} · Questly{% endblock %}
 {% block content %}
 <section data-page="T-01" data-tab="members">
+  {% include "instructor/t01_header.html" %}
   {% include "instructor/t01_tabs.html" %}
-  <div class="mb-4 flex items-center justify-end">
-    <span class="text-xxs text-soft">{{ members | length }} students</span>
-  </div>
   {% if members %}
-  <div class="table-wrap">
+  <div class="table-wrap mt-6">
+    <div class="table-toolbar">
+      <div><h2>สมาชิกในห้องเรียน</h2><p>{{ members | length }} students</p></div>
+    </div>
     <table class="table">
-      <thead><tr><th>Name</th><th>Student ID</th><th>Email</th><th>Joined</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Student ID</th><th>Email</th><th>Role</th><th>Joined</th><th></th></tr></thead>
       <tbody>
         {% for member in members %}
         <tr>
-          <td>{{ member.full_name }}</td>
+          <td><div class="cell-person">{{ avatar(member.full_name, "sm") }}<strong class="text-ink">{{ member.full_name }}</strong></div></td>
           <td>{{ member.student_number or "—" }}</td>
           <td>{{ member.email }}</td>
-          <td>{{ member.joined_at.strftime("%-d %b") }}</td>
-          <td class="text-right">{{ action_form("/classes/" ~ view.classroom.id ~ "/members/" ~ member.user_id ~ "/remove", "Remove", variant="ghost", size="sm") }}</td>
+          <td>{{ badge("Student", tone="info") }}</td>
+          <td class="whitespace-nowrap">{{ member.joined_at | local("%-d %b") }}</td>
+          <td class="text-right">{{ action_form("/classes/" ~ view.classroom.id ~ "/members/" ~ member.user_id ~ "/remove", "Remove", variant="danger", size="sm") }}</td>
         </tr>
         {% endfor %}
       </tbody>

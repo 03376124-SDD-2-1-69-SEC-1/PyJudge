@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Form, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -23,14 +23,24 @@ from questly.core.auth.csrf import require_csrf
 from questly.core.auth.current import current_actor
 from questly.core.auth.models import Actor
 from questly.core.classrooms.service import ClassroomNotFoundError
-from questly.core.generation.models import Draft, DraftPart, DraftSettings
+from questly.core.generation.models import (
+    Draft,
+    DraftPart,
+    DraftSettings,
+    GenerationForm,
+    JobError,
+    JobProgress,
+    JobStatus,
+)
 from questly.core.generation.service import (
     ClassroomNotVisibleError,
     DocumentNotAllowedError,
     DraftNotFoundError,
     GenerationFailedError,
+    GenerationJobGoneError,
     GenerationService,
     MissingFieldsError,
+    ProviderQuotaExceededError,
     QuotaExceededError,
 )
 from questly.core.topics.models import Topic
@@ -74,6 +84,25 @@ def _topic_options(request: Request) -> list[tuple[int, str]]:
 # ---- T-03 -------------------------------------------------------------------
 
 
+def _quota_context(service: GenerationService, actor: Actor) -> dict[str, object]:
+    """The two quota lines T-03 and T-03c both print."""
+    provider = service.provider_quota(actor)
+    return {
+        "quota": service.quota(actor),
+        "provider": provider,
+        "provider_resets": provider.resets_at.astimezone(LOCAL_ZONE).strftime("%H:%M"),
+    }
+
+
+def _form_of(form: GenerationForm) -> dict[str, object]:
+    return {
+        "prompt": form.prompt,
+        "difficulty": form.difficulty.value,
+        "topic_id": str(form.topic_id) if form.topic_id is not None else "",
+        "document_ids": form.document_ids,
+    }
+
+
 def _generate_page(
     request: Request,
     actor: Actor,
@@ -100,7 +129,7 @@ def _generate_page(
             "breadcrumb": _classroom_label(request, actor, classroom_id)
             + " / New problem",
             "documents": service.documents(actor),
-            "quota": service.quota(actor),
+            **_quota_context(service, actor),
             "topic_options": _topic_options(request),
             "difficulties": [d.value for d in Difficulty],
             "error": error,
@@ -138,19 +167,25 @@ def generate_page(
     )
 
 
+def _job_url(classroom_id: int, job_id: int) -> str:
+    return f"/classes/{classroom_id}/generate/jobs/{job_id}"
+
+
 @router.post("/classes/{classroom_id}/generate", response_model=None)
 def generate_submit(
     request: Request,
     classroom_id: int,
+    background_tasks: BackgroundTasks,
     prompt: Annotated[str, Form()],
     difficulty: Annotated[Difficulty, Form()] = Difficulty.MEDIUM,
     topic_id: Annotated[str, Form()] = "",
     document_ids: Annotated[list[int], Form()] = [],  # noqa: B006 -- FastAPI copies it
     csrf_token: Annotated[str, Form()] = "",
 ) -> HTMLResponse | RedirectResponse:
-    """T-03 submit; T-03d when the model fails (no quota used)."""
+    """T-03 submit: start a job and show T-03c. The model runs in the background."""
     require_csrf(request, csrf_token)
     actor = current_actor(request)
+    service = _service(request)
     form = {
         "prompt": prompt,
         "difficulty": difficulty.value,
@@ -158,7 +193,7 @@ def generate_submit(
         "document_ids": document_ids,
     }
     try:
-        draft = _service(request).generate(
+        started = service.start_job(
             actor,
             classroom_id,
             prompt=prompt,
@@ -168,19 +203,103 @@ def generate_submit(
         )
     except ClassroomNotVisibleError:
         raise HTTPException(status_code=404) from None
-    except GenerationFailedError:
-        return _generate_page(
-            request, actor, classroom_id, error="failed", form=form, status_code=502
-        )
     except QuotaExceededError:
         return _generate_page(
             request, actor, classroom_id, error="quota", form=form, status_code=429
+        )
+    except ProviderQuotaExceededError:
+        return _generate_page(
+            request,
+            actor,
+            classroom_id,
+            error="provider_quota",
+            form=form,
+            status_code=429,
         )
     except (ValueError, DocumentNotAllowedError):
         return _generate_page(
             request, actor, classroom_id, error="invalid", form=form, status_code=422
         )
-    return _see_other(f"/classes/{classroom_id}/generate?draft={draft.id}")
+    if started.created:
+        background_tasks.add_task(service.run_job, actor, classroom_id, started.job.id)
+    return _see_other(_job_url(classroom_id, started.job.id))
+
+
+@router.get(
+    "/classes/{classroom_id}/generate/jobs/{job_id}",
+    response_class=HTMLResponse,
+    response_model=None,
+)
+def job_page(
+    request: Request, classroom_id: int, job_id: int
+) -> HTMLResponse | RedirectResponse:
+    """T-03c while running; the Draft when done; T-03 or T-03d when it ended."""
+    actor = current_actor(request)
+    service = _service(request)
+    try:
+        progress = service.job(actor, classroom_id, job_id)
+    except ClassroomNotVisibleError:
+        raise HTTPException(status_code=404) from None
+    except GenerationJobGoneError:
+        return _job_page(request, actor, classroom_id, gone=True)
+    job = progress.job
+    if job.status is JobStatus.DONE:
+        return _see_other(f"/classes/{classroom_id}/generate?draft={job.draft_id}")
+    if job.status is JobStatus.CANCELLED:
+        return _generate_page(request, actor, classroom_id, form=_form_of(job.form))
+    if job.status is JobStatus.FAILED:
+        return _generate_page(
+            request,
+            actor,
+            classroom_id,
+            error=(job.error if job.error is not None else JobError.FAILED).value,
+            form=_form_of(job.form),
+        )
+    return _job_page(request, actor, classroom_id, progress=progress)
+
+
+def _job_page(
+    request: Request,
+    actor: Actor,
+    classroom_id: int,
+    *,
+    progress: JobProgress | None = None,
+    gone: bool = False,
+) -> HTMLResponse:
+    """T-03c: the running job, or `gone` for one this server no longer has."""
+    return _templates(request).TemplateResponse(
+        request,
+        "instructor/t03c_generating.html",
+        {
+            "actor": actor,
+            "classroom_id": classroom_id,
+            "breadcrumb": _classroom_label(request, actor, classroom_id)
+            + " / New problem",
+            "progress": progress,
+            "gone": gone,
+            **_quota_context(_service(request), actor),
+        },
+    )
+
+
+@router.post(
+    "/classes/{classroom_id}/generate/jobs/{job_id}/cancel", response_model=None
+)
+def job_cancel(
+    request: Request,
+    classroom_id: int,
+    job_id: int,
+    csrf_token: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    """T-03c "Cancel": stop waiting, back to T-03 with the form refilled."""
+    require_csrf(request, csrf_token)
+    try:
+        _service(request).cancel_job(current_actor(request), classroom_id, job_id)
+    except ClassroomNotVisibleError:
+        raise HTTPException(status_code=404) from None
+    except GenerationJobGoneError:
+        pass  # nothing to cancel; the job page explains
+    return _see_other(_job_url(classroom_id, job_id))
 
 
 @router.post(

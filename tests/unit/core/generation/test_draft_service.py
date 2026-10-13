@@ -1,109 +1,25 @@
 """GenerationService: generate, quota, stepper saves, publish."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import pytest
 
 from questly.core.assignments.models import Difficulty, TestCase
-from questly.core.assignments.service import AssignmentService
-from questly.core.auth.models import Actor, PermissionDeniedError, Role
-from questly.core.auth.service import AuthService
-from questly.core.classrooms.service import ClassroomService
-from questly.core.generation.models import DocumentSummary, DraftPart, DraftSettings
+from questly.core.auth.models import PermissionDeniedError
+from questly.core.generation.models import (
+    DraftPart,
+    DraftSettings,
+    GenerationStep,
+)
 from questly.core.generation.service import (
     ClassroomNotVisibleError,
     DocumentNotAllowedError,
     DraftNotFoundError,
     GenerationFailedError,
-    GenerationService,
     MissingFieldsError,
     QuotaExceededError,
 )
-from questly.integrations.email import StubEmailSender
-from tests.fakes.assignments import (
-    FakeAssignmentRepository,
-    FakePostingRepository,
-    FakePostingStats,
-    FakeVersionRepository,
-)
-from tests.fakes.auth import FakeAuthRepository, FakeClock, seed_user
-from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
-from tests.fakes.generation import (
-    FakeDocumentCatalog,
-    FakeDraftRepository,
-    FakeGenerationClient,
-    binary_search_response,
-)
-
-DEADLINE = datetime(2026, 10, 15, 16, 59, tzinfo=UTC)
-
-
-class World:
-    def __init__(self, quota: int = 20) -> None:
-        self.clock = FakeClock()
-        users = FakeAuthRepository()
-        auth = AuthService(users, StubEmailSender(), self.clock)
-        self.classrooms = ClassroomService(
-            FakeClassroomRepository(), auth, FakeClassroomStats(), self.clock
-        )
-        self.postings = FakePostingRepository()
-        assignments = AssignmentService(
-            FakeAssignmentRepository(),
-            FakeVersionRepository(),
-            self.postings,
-            self.classrooms,
-            FakePostingStats(),
-            self.clock,
-        )
-        self.drafts = FakeDraftRepository()
-        self.client = FakeGenerationClient(binary_search_response())
-        self.catalog = FakeDocumentCatalog()
-        self.service = GenerationService(
-            self.drafts,
-            self.client,
-            self.catalog,
-            self.classrooms,
-            assignments,
-            self.clock,
-            daily_quota=quota,
-        )
-
-        def actor(email: str, role: Role) -> Actor:
-            user = seed_user(users, email=email, full_name=email, role=role)
-            return Actor(user_id=user.id, role=role, full_name=email, email=email)
-
-        self.teacher = actor("somchai.p@kmitl.ac.th", Role.INSTRUCTOR)
-        self.other = actor("warunee.k@kmitl.ac.th", Role.INSTRUCTOR)
-        self.student = actor("66010001@kmitl.ac.th", Role.STUDENT)
-        self.catalog.by_owner[self.teacher.user_id] = [
-            DocumentSummary(id=1, filename="lecture-06-searching.pdf", pages=24)
-        ]
-        self.sec1 = self._classroom("1")
-        self.sec2 = self._classroom("2")
-        self.classrooms.join(self.student, self.sec1.join_code)
-
-    def _classroom(self, section: str):
-        return self.classrooms.create(
-            self.teacher,
-            course_code="01076001",
-            course_name="Programming I",
-            section=section,
-            semester="1/2569",
-        )
-
-    def generate(self):
-        return self.service.generate(
-            self.teacher,
-            self.sec1.id,
-            prompt="Binary search",
-            difficulty=Difficulty.MEDIUM,
-            document_ids=[1],
-        )
-
-
-@pytest.fixture()
-def world() -> World:
-    return World()
+from tests.unit.core.generation.world import DEADLINE, World
 
 
 def test_generate_creates_a_draft_and_charges_one_quota(world: World) -> None:
@@ -118,6 +34,24 @@ def test_generate_creates_a_draft_and_charges_one_quota(world: World) -> None:
     assert draft.classroom_ids == [world.sec1.id]
     assert world.service.quota(world.teacher).used == 1
     assert world.client.requests[0].document_ids == [1]
+
+
+def test_generate_reports_each_step_in_order(world: World) -> None:
+    steps: list[GenerationStep] = []
+
+    world.service.generate(
+        world.teacher,
+        world.sec1.id,
+        prompt="Binary search",
+        difficulty=Difficulty.MEDIUM,
+        on_step=steps.append,
+    )
+
+    assert steps == [
+        GenerationStep.CALLING_MODEL,
+        GenerationStep.VALIDATING,
+        GenerationStep.SAVING,
+    ]
 
 
 def test_a_failed_generation_saves_nothing_and_costs_nothing(world: World) -> None:

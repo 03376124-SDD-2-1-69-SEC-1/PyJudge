@@ -1,47 +1,64 @@
 {% extends "base.html" %}
-{% from "_components/forms.html" import csrf_field, textarea_field, value_select, radio_seg, checkbox, button, link_button with context %}
+{% from "_components/forms.html" import csrf_field, textarea_field, value_select, radio_seg, check_card, button, link_button with context %}
 {% from "_components/ui.html" import page_header, alert, empty_state %}
+{% from "_components/icons.html" import icon %}
 {% block title %}Create a problem with AI · Questly{% endblock %}
 {% block content %}
 <section data-page="T-03">
-  {{ page_header("Create a problem with AI") }}
+  {{ page_header("สร้างโจทย์ด้วย AI", "อธิบายโจทย์ที่ต้องการ แล้วให้ Questly ช่วยสร้างร่างแรก", eyebrow="AI PROBLEM CREATOR", back_href="/classes/" ~ classroom_id) }}
   {% if error == "failed" %}
     {% call alert(tone="danger", state="T-03d") %}
-      <span><strong>Generation failed — the model did not respond.</strong> Nothing was saved and no quota was used. Try again, or narrow the prompt to fewer documents.</span>
+      {{ icon("x", 18) }}<span><strong>Generation failed — the model did not respond.</strong> Nothing was saved and no quota was used. Try again, or narrow the prompt to fewer documents.</span>
+    {% endcall %}
+  {% elif error == "timeout" %}
+    {% call alert(tone="danger", state="T-03d") %}
+      {{ icon("x", 18) }}<span><strong>Generation took too long and was stopped.</strong> Nothing was saved and no quota was used. Try again, or narrow the prompt to fewer documents.</span>
     {% endcall %}
   {% elif error == "quota" %}
-    {% call alert(tone="danger") %}You have used all {{ quota.limit }} generations for today. The quota resets at midnight.{% endcall %}
+    {% call alert(tone="danger") %}{{ icon("x", 18) }}You have used all {{ quota.limit }} generations for today. The quota resets at midnight.{% endcall %}
   {% elif error == "invalid" %}
-    {% call alert(tone="danger") %}Describe the problem and choose documents from your library.{% endcall %}
+    {% call alert(tone="danger") %}{{ icon("x", 18) }}Describe the problem and choose documents from your library.{% endcall %}
   {% endif %}
-  <form method="post" action="/classes/{{ classroom_id }}/generate" class="mt-4 grid gap-6 lg:grid-cols-[2fr_1fr]">
+  {% if provider.is_spent %}
+    {% call alert(tone="danger", state="T-03-provider-quota") %}{{ icon("x", 18) }}OpenRouter's free-model quota is spent for today. Generate works again when it resets at {{ provider_resets }} (Bangkok time).{% endcall %}
+  {% endif %}
+  <form method="post" action="/classes/{{ classroom_id }}/generate" class="ai-layout mt-4">
     {{ csrf_field() }}
-    <div class="flex flex-col gap-3">
-      {{ textarea_field("prompt", "What should the problem be about?", value=form.prompt, required=true, rows=5, placeholder="Write a problem about binary search on a sorted list of integers…") }}
-      <div class="flex items-center gap-3">
-        {{ button("Try again" if error == "failed" else "Generate", variant="primary", disabled=quota.remaining == 0) }}
-        <span class="text-xxs text-mid">Uses 1 of your {{ quota.limit }} daily generations · {{ quota.remaining }} left today.</span>
+    <div class="card gap-5">
+      {{ textarea_field("prompt", "อยากสร้างโจทย์เกี่ยวกับอะไร?", value=form.prompt, required=true, rows=6, placeholder="เช่น สร้างโจทย์เรื่อง binary search บนลิสต์ของจำนวนเต็มที่เรียงแล้ว สำหรับนักศึกษาปี 1…") }}
+      <div class="two-col">
+        {{ value_select("topic_id", "หัวข้อ (Topic)", topic_options, selected=form.topic_id, blank="—") }}
+        {{ radio_seg("difficulty", "ระดับความยาก", [("easy", "Easy"), ("medium", "Medium"), ("hard", "Hard")], form.difficulty) }}
       </div>
-    </div>
-    <div class="flex flex-col gap-4">
-      {{ value_select("topic_id", "Topic", topic_options, selected=form.topic_id, blank="—") }}
-      {{ radio_seg("difficulty", "Difficulty", [("easy", "Easy"), ("medium", "Medium"), ("hard", "Hard")], form.difficulty) }}
       <div class="field">
-        <span class="label">Source documents</span>
+        <span class="label">ใช้เอกสารอ้างอิง</span>
         {% if documents %}
-        <div class="box gap-2">
+        <div class="flex flex-col gap-2">
           {% for document in documents %}
-            {{ checkbox("document_ids", document.filename, checked=document.id in form.document_ids, note="· " ~ document.pages ~ " p.", value=document.id) }}
+            {{ check_card("document_ids", document.id, document.filename, note=document.pages ~ " p.", checked=document.id in form.document_ids, icon_name="file") }}
           {% endfor %}
-          <a class="link text-xxs" href="/documents">Manage in My documents</a>
         </div>
+        <a class="link text-xxs" href="/documents">Manage in My documents</a>
         {% else %}
           {% call empty_state("No documents yet", "Upload your lecture notes so the AI can cite them.", art="PDF", state="T-03b") %}
             {{ link_button("/documents", "Go to My documents") }}
           {% endcall %}
         {% endif %}
       </div>
+      <div class="form-actions items-center justify-between">
+        {% include "instructor/t03_quota.html" %}
+        {{ button("Try again" if error in ("failed", "timeout") else "สร้างร่างโจทย์", variant="primary", icon="sparkles", disabled=quota.remaining == 0 or provider.is_spent) }}
+      </div>
     </div>
+    <aside class="ai-tip">
+      <span class="icon-well icon-well-solid" style="width: 42px; height: 42px; border-radius: 12px">{{ icon("sparkles") }}</span>
+      <h3>เขียน prompt อย่างไรให้ได้ผลดี?</h3>
+      <ul>
+        <li>ระบุหัวข้อและระดับผู้เรียน</li>
+        <li>บอกแนวคิดที่ต้องการทดสอบ</li>
+        <li>กำหนดรูปแบบ input/output</li>
+      </ul>
+    </aside>
   </form>
 </section>
 {% endblock %}

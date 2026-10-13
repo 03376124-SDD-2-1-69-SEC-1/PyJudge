@@ -266,7 +266,7 @@ class GenerationArtifact(SQLModel, table=True):
         # แต่ละ item: {chunk_id, source_id, page, score, text_snapshot}
     )
     model_provider: str | None = Field(default=None)
-    model_name: str | None = Field(default=None)  # เช่น "gemini-2.0-flash"
+    model_name: str | None = Field(default=None)  # เช่น "poolside/laguna-s-2.1:free"
     review_status: str = Field(nullable=False, default="pending")
     created_at: datetime = _created_at()
     updated_at: datetime = _updated_at()

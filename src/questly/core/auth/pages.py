@@ -52,6 +52,76 @@ FACULTIES = (
 
 
 @dataclass(frozen=True, slots=True)
+class ErrorCopy:
+    """What G-05 says for one HTTP status: icon, Thai title and message."""
+
+    icon: str
+    title: str
+    message: str
+
+
+ERROR_COPY = {
+    400: ErrorCopy("x", "คำขอไม่ถูกต้อง", "ระบบอ่านคำขอนี้ไม่ได้ ลองกลับไปแล้วทำรายการใหม่"),
+    401: ErrorCopy("shield", "กรุณาเข้าสู่ระบบ", "หน้านี้ต้องเข้าสู่ระบบก่อนจึงจะใช้งานได้"),
+    403: ErrorCopy("shield", "คุณไม่มีสิทธิ์เข้าถึงหน้านี้", "บัญชีของคุณไม่ได้รับอนุญาตให้ทำรายการนี้"),
+    404: ErrorCopy("search", "ไม่พบหน้าที่คุณต้องการ", "ลิงก์อาจผิดหรือหน้านี้ถูกย้ายหรือลบไปแล้ว"),
+    405: ErrorCopy("x", "ไม่รองรับการดำเนินการนี้", "หน้านี้ไม่รับคำขอแบบที่ส่งมา"),
+    408: ErrorCopy("clock", "หมดเวลาการเชื่อมต่อ", "เซิร์ฟเวอร์รอคำขอนานเกินไป ลองใหม่อีกครั้ง"),
+    410: ErrorCopy("file", "หน้านี้ถูกนำออกแล้ว", "เนื้อหานี้ไม่มีให้เข้าถึงอีกต่อไป"),
+    413: ErrorCopy("upload", "ไฟล์ใหญ่เกินไป", "ลดขนาดไฟล์แล้วอัปโหลดอีกครั้ง"),
+    429: ErrorCopy("clock", "ส่งคำขอถี่เกินไป", "รอสักครู่แล้วลองใหม่อีกครั้ง"),
+    500: ErrorCopy(
+        "settings",
+        "เซิร์ฟเวอร์ขัดข้อง",
+        "มีบางอย่างผิดพลาดที่ฝั่งเรา ทีมงานจะรีบแก้ไข ลองใหม่อีกครั้งภายหลัง",
+    ),
+    502: ErrorCopy(
+        "settings", "เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง", "บริการที่เกี่ยวข้องตอบกลับผิดปกติ ลองใหม่อีกครั้ง"
+    ),
+    503: ErrorCopy(
+        "settings",
+        "ระบบยังไม่พร้อมให้บริการ",
+        "ระบบกำลังปิดปรับปรุงหรือมีผู้ใช้งานหนาแน่น ลองใหม่อีกครั้งภายหลัง",
+    ),
+    504: ErrorCopy(
+        "clock", "เซิร์ฟเวอร์ตอบกลับช้าเกินไป", "บริการที่เกี่ยวข้องใช้เวลานานเกินไป ลองใหม่อีกครั้ง"
+    ),
+    505: ErrorCopy(
+        "x", "ไม่รองรับ HTTP เวอร์ชันนี้", "เบราว์เซอร์ใช้ HTTP เวอร์ชันที่เซิร์ฟเวอร์ไม่รองรับ"
+    ),
+}
+DEFAULT_ERROR_COPY = ErrorCopy(
+    "x", "เกิดข้อผิดพลาดบางอย่าง", "มีบางอย่างไม่เป็นไปตามที่คาดไว้ ลองใหม่อีกครั้งหรือกลับหน้าแรก"
+)
+
+
+def error_page(
+    request: Request, status_code: int, *, title: str = "", message: str = ""
+) -> HTMLResponse:
+    """G-05: the branded page for any HTTP error a browser can land on.
+
+    `title` and `message` override the copy for a status whose cause the
+    caller knows better, such as an expired form on a 403.
+    """
+    copy = ERROR_COPY.get(status_code, DEFAULT_ERROR_COPY)
+    retry_url = (
+        request.url.path if status_code >= 500 and request.method == "GET" else ""
+    )
+    return _templates(request).TemplateResponse(
+        request,
+        "shared/g05_error.html",
+        {
+            "status_code": status_code,
+            "icon_name": copy.icon,
+            "title": title or copy.title,
+            "message": message or copy.message,
+            "retry_url": retry_url,
+        },
+        status_code=status_code,
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class DemoAccount:
     """A seeded account listed under "log in as" on G-01 in demo mode only."""
 
@@ -127,16 +197,6 @@ def root(request: Request) -> HTMLResponse | RedirectResponse:
     landing = auth_service(request).landing_for(actor)
     return RedirectResponse(
         LANDING_URLS[landing], status_code=status.HTTP_303_SEE_OTHER
-    )
-
-
-@router.get("/admin/settings", response_class=HTMLResponse)
-def admin_settings_placeholder(request: Request) -> HTMLResponse:
-    """Where an Admin lands until A-01 exists, so the landing is never a 404."""
-    actor = current_actor(request)
-    auth_service(request).admin_home(actor)
-    return _templates(request).TemplateResponse(
-        request, "admin/a01_placeholder.html", {"actor": actor}
     )
 
 

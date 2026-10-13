@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import link_button with context %}
+{% from "_components/auth.html" import logo, brand_panel %}
+{% from "_components/icons.html" import icon %}
+{% block title %}{{ status_code }} · Questly{% endblock %}
+{% block main %}
+<main class="auth-page" data-page="G-05" data-status="{{ status_code }}">
+  {{ brand_panel(compact=true) }}
+  <section class="auth-card verify-card">
+    <div class="mobile-logo">{{ logo() }}</div>
+    <span class="icon-well icon-well-lg">{{ icon(icon_name, 32) }}</span>
+    <p class="error-code" aria-label="HTTP {{ status_code }}">{{ status_code }}</p>
+    <h1>{{ title }}</h1>
+    <p class="text-mid">{{ message }}</p>
+    <div class="flex flex-wrap justify-center gap-3">
+      {{ link_button("/", "กลับหน้าแรก", variant="primary") }}
+      {% if retry_url %}
+        {{ link_button(retry_url, "ลองอีกครั้ง") }}
+      {% elif status_code == 401 %}
+        {{ link_button("/login", "เข้าสู่ระบบ") }}
+      {% endif %}
+    </div>
+  </section>
+</main>
+{% endblock %}

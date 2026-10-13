@@ -105,12 +105,15 @@ class SubmissionService:
     # ---- Pages --------------------------------------------------------------
 
     def page(
-        self, actor: Actor, classroom_id: int, assignment_id: int
+        self, actor: Actor, classroom_id: int, assignment_id: int, query: str = ""
     ) -> StudentSolveView | InstructorResultsView:
-        """S-02 for a Member, T-02 for the owning Instructor."""
+        """S-02 for a Member, T-02 for the owning Instructor.
+
+        `query` is the T-02 search; a Member's page ignores it.
+        """
         problem = self._problems.problem(actor, classroom_id, assignment_id)
         if isinstance(problem, InstructorProblem):
-            return self._results(actor, classroom_id, problem)
+            return self._results(actor, classroom_id, problem, query.strip())
         return self._solve(actor, classroom_id, problem)
 
     def submissions(
@@ -270,21 +273,26 @@ class SubmissionService:
         )
 
     def _results(
-        self, actor: Actor, classroom_id: int, problem: InstructorProblem
+        self,
+        actor: Actor,
+        classroom_id: int,
+        problem: InstructorProblem,
+        query: str,
     ) -> InstructorResultsView:
         by_student: dict[int, list[Submission]] = {}
         for submission in self._repository.list_for_posting(problem.posting.id):
             by_student.setdefault(submission.student_id, []).append(submission)
         rows = tuple(
             StudentResult(
-                student_id=student_id,
-                name=name,
-                counted=by_student[student_id][-1]
-                if student_id in by_student
+                student_id=member.user_id,
+                name=member.full_name,
+                student_number=member.student_number,
+                counted=by_student[member.user_id][-1]
+                if member.user_id in by_student
                 else None,
-                attempts=len(by_student.get(student_id, [])),
+                attempts=len(by_student.get(member.user_id, [])),
             )
-            for student_id, name in self._roster.member_names(actor, classroom_id)
+            for member in self._roster.members(actor, classroom_id)
         )
         counted = [row.counted for row in rows if row.counted is not None]
         test_cases = problem.assignment.test_cases
@@ -306,7 +314,18 @@ class SubmissionService:
             failures=failures,
             versions=tuple(self._problems.versions(actor, problem.assignment.id)),
             closed=problem.posting.is_closed(self._clock.now()),
+            shown=tuple(row for row in rows if _matches_query(row, query)),
+            query=query,
         )
+
+
+def _matches_query(row: StudentResult, query: str) -> bool:
+    """T-02 search: part of the name (any case) or of the student number."""
+    if not query:
+        return True
+    if query.casefold() in row.name.casefold():
+        return True
+    return row.student_number is not None and query in row.student_number
 
 
 def _failing_share(counted: list[Submission], position: int) -> float | None:

@@ -1,0 +1,9 @@
+{#- The two quota lines under Generate (T-03) and on the progress page (T-03c). -#}
+<div class="flex flex-col gap-0.5 text-xxs text-mid" data-quota>
+  <span>Uses 1 of your {{ quota.limit }} daily generations · {{ quota.remaining }} left today.</span>
+  {% if provider.kind.value == "exact" %}
+    <span>OpenRouter free quota: {{ provider.remaining }} of {{ provider.limit }} left today · resets {{ provider_resets }}</span>
+  {% else %}
+    <span>{{ provider.note }}</span>
+  {% endif %}
+</div>

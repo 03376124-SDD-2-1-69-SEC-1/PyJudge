@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_components/ui.html" import badge, alert %}
+{% from "admin/a01_tabs.html" import admin_shell %}
+{% block head %}<meta http-equiv="refresh" content="60">{% endblock %}
+{% block title %}System status · Admin settings · Questly{% endblock %}
+{% block content %}
+<section data-page="A-01" data-tab="status">
+  {% call admin_shell("status") %}
+  {% for service in down %}
+    {% call alert(tone="danger", state="A-01a") %}<span><strong>{{ service.name[0] | upper }}{{ service.name[1:] }}</strong> is not responding.{% if service.details %} {{ service.details }}{% endif %}</span>{% endcall %}
+  {% endfor %}
+  <div class="table-wrap mt-4">
+    <table class="table">
+      <thead><tr><th>Service</th><th>Status</th><th>Details</th></tr></thead>
+      <tbody>
+        {% for service in services %}
+        <tr{% if service.status.value == "unhealthy" %} data-state="A-01a"{% endif %}>
+          <td>{{ service.name[0] | upper }}{{ service.name[1:] }}</td>
+          <td>{% if service.status.value == "healthy" %}{{ badge("Operational", tone="ok") }}{% else %}{{ badge("Down", tone="danger") }}{% endif %}</td>
+          <td>{{ service.details or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint mt-3">Refreshes every 60 seconds.</p>
+  {% endcall %}
+</section>
+{% endblock %}

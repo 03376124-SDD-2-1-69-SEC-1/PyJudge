@@ -1,17 +1,20 @@
 {# T-01 "Drafts · n": the Instructor's unpublished Drafts in this Classroom. #}
 {% from "_components/forms.html" import link_button with context %}
+{% from "_components/citations.html" import citation_chips %}
 {% if drafts %}
-<p class="eyebrow mb-2">Drafts · {{ drafts | length }}</p>
 <div class="table-wrap mb-6">
+  <div class="table-toolbar">
+    <div><h2>Drafts · {{ drafts | length }}</h2><p>ร่างโจทย์จาก AI ที่ยังไม่ได้เผยแพร่</p></div>
+  </div>
   <table class="table">
     <thead><tr><th>Title</th><th>Source</th><th>Created</th><th></th></tr></thead>
     <tbody>
       {% for draft in drafts %}
       <tr>
-        <td>{{ draft.content.title }}</td>
-        <td class="text-soft">{% for c in draft.citations %}{{ draft_sources.get(c.source_id, "source " ~ c.source_id) }}{% if c.page %} · p. {{ c.page }}{% endif %}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</td>
-        <td>{{ draft.generated_at | local }}</td>
-        <td class="text-right">{{ link_button("/classes/" ~ view.classroom.id ~ "/drafts/" ~ draft.id ~ "?step=1", "Continue review", size="sm") }}</td>
+        <td><strong class="text-ink">{{ draft.content.title }}</strong></td>
+        <td>{{ citation_chips(draft.citations, draft_sources) }}</td>
+        <td class="whitespace-nowrap">{{ draft.generated_at | local }}</td>
+        <td class="text-right">{{ link_button("/classes/" ~ view.classroom.id ~ "/drafts/" ~ draft.id ~ "?step=1", "Continue review", size="sm", variant="soft") }}</td>
       </tr>
       {% endfor %}
     </tbody>

@@ -13,6 +13,7 @@ adapter later (OPS-04). Nothing in `core/` may import an adapter; only
 `main.py` wires them in.
 """
 
+from collections.abc import Callable
 from datetime import datetime
 from typing import Protocol
 
@@ -29,6 +30,10 @@ from questly.core.generation.models import (
     DocumentSummary,
     Draft,
     GenerationArtifact,
+    GenerationJob,
+    GenerationStep,
+    ProviderQuotaSnapshot,
+    StartedJob,
 )
 from questly.core.generation.schemas import GenerationRequest, GenerationResponse
 
@@ -36,8 +41,14 @@ from questly.core.generation.schemas import GenerationRequest, GenerationRespons
 class GenerationClient(Protocol):
     """Boundary to whatever produces an Assignment draft from a prompt."""
 
-    def generate(self, request: GenerationRequest) -> GenerationResponse:
-        """Return a draft and its supporting citations."""
+    def generate(
+        self, request: GenerationRequest, on_step: Callable[[GenerationStep], None]
+    ) -> GenerationResponse:
+        """Return a draft and its supporting citations.
+
+        Calls `on_step` as each real stage starts. `on_step` may raise to stop
+        the work (the job was cancelled); the client lets that propagate.
+        """
         ...
 
 
@@ -94,6 +105,10 @@ class DraftRepository(Protocol):
 
     def count_generations(self, user_id: int, since: datetime) -> int: ...
 
+    def count_all_generations(self, since: datetime) -> int:
+        """Every user's generations at or after `since` (A-01 usage)."""
+        ...
+
 
 class DocumentCatalog(Protocol):
     """The Instructor's Document library, owned by the documents slice."""
@@ -126,3 +141,42 @@ class AssignmentPublisher(Protocol):
 
 class Clock(Protocol):
     def now(self) -> datetime: ...
+
+
+class ProviderQuota(Protocol):
+    """What the model provider still allows today (T-03, A-01).
+
+    `snapshot` never raises: when the provider cannot be asked, the snapshot
+    says so (`QuotaKind.UNKNOWN`). `invalidate` drops any cached answer; the
+    service calls it after a generation succeeds so the number drops at once.
+    """
+
+    def snapshot(self) -> ProviderQuotaSnapshot: ...
+
+    def invalidate(self) -> None: ...
+
+
+class GenerationJobStore(Protocol):
+    """Running and recent Generate jobs (ADR-0010).
+
+    `create_unless_running` is the only operation that assigns a job its id.
+    It returns the user's job already RUNNING in that Classroom instead of
+    making another, and does so atomically: two clicks at once make one job.
+    `update`
+    applies `change` to the stored job as one step no other writer can
+    interleave with, stores the result and returns it; if `change` raises,
+    the stored job is left as it was and the error propagates. An unknown id
+    raises KeyError.
+    """
+
+    def create_unless_running(self, job: GenerationJob) -> StartedJob: ...
+
+    def get(self, job_id: int) -> GenerationJob | None: ...
+
+    def update(
+        self, job_id: int, change: Callable[[GenerationJob], GenerationJob]
+    ) -> GenerationJob: ...
+
+    def running_for(self, user_id: int, classroom_id: int) -> GenerationJob | None:
+        """This user's job still RUNNING in this Classroom, if any."""
+        ...

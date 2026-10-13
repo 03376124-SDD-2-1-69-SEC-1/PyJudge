@@ -1,0 +1,30 @@
+{#
+  Pieces shared by the auth pages (G-01, G-03, G-04):
+
+    {% from "_components/auth.html" import logo, brand_panel %}
+#}
+{% from "_components/icons.html" import icon %}
+
+{% macro logo(light=false) -%}
+<span class="logo{% if light %} logo-light{% endif %}"><span class="logo-mark">{{ icon("book", 22) }}</span>Questly</span>
+{%- endmacro %}
+
+{#- The pink panel left of the form. Hidden under 900px, where .mobile-logo takes over. -#}
+{% macro brand_panel(compact=false) -%}
+<div class="auth-brand">
+  {{ logo(true) }}
+  {% if compact %}
+  <p>เปลี่ยนทุกโจทย์ให้เป็นก้าวต่อไปของคุณ</p>
+  {% else %}
+  <div>
+    <h2>Learn. Code. Grow.</h2>
+    <p>พื้นที่เรียนรู้การเขียนโปรแกรม<br>ที่เติบโตไปพร้อมกับคุณ</p>
+  </div>
+  <div class="code-art" aria-hidden="true">
+    <span>function grow(skill) {</span>
+    <span>&nbsp;&nbsp;return skill + practice;</span>
+    <span>}</span>
+  </div>
+  {% endif %}
+</div>
+{%- endmacro %}

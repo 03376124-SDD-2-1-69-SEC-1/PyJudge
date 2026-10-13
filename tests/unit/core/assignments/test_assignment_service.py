@@ -29,6 +29,7 @@ from questly.core.assignments.service import (
 from questly.core.auth.models import Actor, PermissionDeniedError, Role
 from questly.core.auth.service import AuthService
 from questly.core.classrooms.service import ClassroomService
+from questly.core.notifications.models import NotificationKind
 from questly.integrations.email import StubEmailSender
 from tests.fakes.assignments import (
     FakeAssignmentRepository,
@@ -38,13 +39,15 @@ from tests.fakes.assignments import (
 )
 from tests.fakes.auth import FakeAuthRepository, FakeClock, seed_user
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
+from tests.fakes.notifications import RecordingMemberNotifier
 
 DEADLINE = datetime(2026, 10, 15, 16, 59, tzinfo=UTC)
+TITLE = "Binary search on sorted input"
 
 
 def content(**overrides) -> AssignmentContent:
     fields = {
-        "title": "Binary search on sorted input",
+        "title": TITLE,
         "problem_statement": "Print the index of x, or -1.",
         "difficulty": Difficulty.MEDIUM,
         "test_cases": [
@@ -72,6 +75,7 @@ class World:
         self.stats = FakePostingStats()
         self.versions = FakeVersionRepository()
         self.postings = FakePostingRepository()
+        self.notifier = RecordingMemberNotifier()
         self.service = AssignmentService(
             FakeAssignmentRepository(),
             self.versions,
@@ -79,6 +83,7 @@ class World:
             self.classrooms,
             self.stats,
             self.clock,
+            self.notifier,
         )
 
         def actor(email: str, name: str, role: Role) -> Actor:
@@ -286,6 +291,77 @@ def test_edit_requires_a_reason_and_own_postings(world: World) -> None:
         world.service.edit(
             world.somchai, aid, reason="r", extend_deadlines={999: DEADLINE}
         )
+
+
+def test_publish_notifies_the_members_of_each_classroom(world: World) -> None:
+    published = world.publish([world.sec1.id, world.sec2.id])
+    aid = published.assignment.id
+
+    assert world.notifier.calls == [
+        (
+            world.sec1.id,
+            NotificationKind.ASSIGNMENT_PUBLISHED,
+            {"classroom_id": world.sec1.id, "assignment_id": aid, "title": TITLE},
+        ),
+        (
+            world.sec2.id,
+            NotificationKind.ASSIGNMENT_PUBLISHED,
+            {"classroom_id": world.sec2.id, "assignment_id": aid, "title": TITLE},
+        ),
+    ]
+
+
+def test_edit_notifies_every_posted_classroom_with_the_reason(world: World) -> None:
+    aid = world.publish([world.sec1.id, world.sec2.id]).assignment.id
+    world.notifier.calls.clear()
+
+    world.service.edit(world.somchai, aid, reason="  Fixed test 3 ", title="Fixed")
+
+    assert world.notifier.calls == [
+        (
+            classroom_id,
+            NotificationKind.ASSIGNMENT_UPDATED,
+            {
+                "classroom_id": classroom_id,
+                "assignment_id": aid,
+                "title": "Fixed",
+                "reason": "Fixed test 3",
+            },
+        )
+        for classroom_id in (world.sec1.id, world.sec2.id)
+    ]
+
+
+def test_a_rejected_edit_notifies_nobody(world: World) -> None:
+    aid = world.publish().assignment.id
+    world.notifier.calls.clear()
+
+    with pytest.raises(ValueError):
+        world.service.edit(world.somchai, aid, reason=" ", title="New")
+
+    assert world.notifier.calls == []
+
+
+def test_notify_students_is_for_the_classrooms_instructor_only(world: World) -> None:
+    aid = world.publish([world.sec1.id]).assignment.id
+    world.notifier.calls.clear()
+
+    world.service.notify_students(world.somchai, world.sec1.id, aid)
+
+    assert world.notifier.calls == [
+        (
+            world.sec1.id,
+            NotificationKind.ASSIGNMENT_NOTIFIED,
+            {"classroom_id": world.sec1.id, "assignment_id": aid, "title": TITLE},
+        )
+    ]
+    with pytest.raises(PermissionDeniedError):
+        world.service.notify_students(world.nattapong, world.sec1.id, aid)
+    with pytest.raises(ClassroomNotVisibleError):
+        world.service.notify_students(world.warunee, world.sec1.id, aid)
+    with pytest.raises(PostingNotFoundError):
+        world.service.notify_students(world.somchai, world.sec2.id, aid)
+    assert len(world.notifier.calls) == 1
 
 
 def test_test_case_writes_are_versions(world: World) -> None:

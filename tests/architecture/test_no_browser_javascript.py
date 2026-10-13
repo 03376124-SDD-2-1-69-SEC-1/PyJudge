@@ -12,4 +12,4 @@ def test_project_templates_do_not_contain_browser_javascript() -> None:
 
     assert templates, "expected project-authored templates"
     for template in templates:
-        assert FORBIDDEN.search(template.read_text()) is None, template
+        assert FORBIDDEN.search(template.read_text(encoding="utf-8")) is None, template

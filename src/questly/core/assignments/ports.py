@@ -3,7 +3,8 @@
 `tests/fakes/assignments.py` provides in-memory adapters for all three
 repositories and PostingStats; production wires the SQL adapters in
 `database/core/` (OPS-15). main.py fills ClassroomAccess with ClassroomService,
-and PostingStats with the submissions slice's `SubmissionPostingStats`.
+PostingStats with the submissions slice's `SubmissionPostingStats`, and
+MemberNotifier with NotificationService.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from questly.core.assignments.models import (
 )
 from questly.core.auth.models import Actor
 from questly.core.classrooms.models import ClassroomRole
+from questly.core.notifications.models import NotificationKind, NotificationPayload
 
 
 class AssignmentRepository(Protocol):
@@ -88,6 +90,17 @@ class PostingStats(Protocol):
     def score(self, posting_id: int, student_id: int) -> float | None: ...
 
     def fail_rate(self, posting_id: int) -> float | None: ...
+
+
+class MemberNotifier(Protocol):
+    """Notifies every Member of a Classroom about an Assignment (ADR-0007 §6)."""
+
+    def notify_members(
+        self,
+        classroom_id: int,
+        kind: NotificationKind,
+        payload: NotificationPayload,
+    ) -> None: ...
 
 
 class Clock(Protocol):

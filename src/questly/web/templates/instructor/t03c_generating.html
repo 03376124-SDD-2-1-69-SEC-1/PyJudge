@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_components/forms.html" import action_form, link_button with context %}
+{% from "_components/ui.html" import page_header, alert %}
+{% block head %}{% if not gone %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
+{% block title %}Generating · Questly{% endblock %}
+{% block content %}
+<section data-page="T-03c">
+  {% if gone %}
+    {% call alert(tone="danger", state="T-03c-gone") %}This generation is no longer available, try again{% endcall %}
+    <div class="mt-4">{{ link_button("/classes/" ~ classroom_id ~ "/generate", "Back to prompt", variant="primary") }}</div>
+  {% else %}
+    {% set labels = {
+      "calling_model": "Asking the model to draft the problem",
+      "validating": "Checking the draft",
+      "running_solution": "Running the reference solution for expected outputs",
+      "saving": "Saving the draft",
+    } %}
+    {{ page_header("กำลังสร้างโจทย์…", "รอสักครู่ หน้านี้จะรีเฟรชเอง", eyebrow="AI PROBLEM CREATOR") }}
+    <div class="card narrow mt-4 gap-4">
+      <progress class="progress" value="{{ progress.done_count }}" max="{{ progress.steps|length }}">{{ progress.done_count }} of {{ progress.steps|length }} steps done</progress>
+      <ul class="flex flex-col gap-1 text-xxs" aria-live="polite">
+        {% for row in progress.steps %}
+          {% if row.state.value == "done" %}
+            <li data-step="{{ row.step.value }}" data-state="done">✓ {{ labels[row.step.value] }} · {{ row.seconds }} s</li>
+          {% elif row.state.value == "active" %}
+            <li data-step="{{ row.step.value }}" data-state="active"><strong>· {{ labels[row.step.value] }}</strong> — In progress</li>
+          {% else %}
+            <li class="muted" data-step="{{ row.step.value }}" data-state="pending">· {{ labels[row.step.value] }}</li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+      <p class="text-xxs text-mid">Elapsed: {{ progress.elapsed_seconds }} s</p>
+      {% include "instructor/t03_quota.html" %}
+      <div>{{ action_form("/classes/" ~ classroom_id ~ "/generate/jobs/" ~ progress.job.id ~ "/cancel", "Cancel", size="sm") }}</div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

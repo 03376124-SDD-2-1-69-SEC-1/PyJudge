@@ -6,16 +6,20 @@ from httpx import ASGITransport, AsyncClient
 from questly.core.auth.models import Actor, Role
 from questly.core.generation.models import DocumentSummary
 from tests.fakes.app import build_app
-from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, seed_user
+from tests.fakes.auth import DEFAULT_PASSWORD, FakeAuthRepository, FakeClock, seed_user
 from tests.fakes.generation import (
     FakeDocumentCatalog,
     FakeGenerationClient,
+    FakeGenerationJobStore,
+    FakeProviderQuota,
     binary_search_response,
 )
 from tests.integration.forms import csrf_token, log_in, post_form
 
 TEACHER = "somchai.p@kmitl.ac.th"
+OTHER_TEACHER = "warunee.k@kmitl.ac.th"
 STUDENT = "66010001@kmitl.ac.th"
+OUTSIDER = "66010002@kmitl.ac.th"
 
 
 class Campus:
@@ -25,15 +29,23 @@ class Campus:
             users, email=TEACHER, full_name="Somchai", role=Role.INSTRUCTOR
         )
         student = seed_user(users, email=STUDENT, full_name="Nattapong")
+        seed_user(users, email=OTHER_TEACHER, full_name="Warunee", role=Role.INSTRUCTOR)
+        seed_user(users, email=OUTSIDER, full_name="Outsider")
         catalog = FakeDocumentCatalog()
         catalog.by_owner[teacher.id] = [
             DocumentSummary(id=1, filename="lecture-06-searching.pdf", pages=24)
         ]
         self.client_stub = FakeGenerationClient(binary_search_response())
+        self.provider_quota = FakeProviderQuota()
+        self.job_store = FakeGenerationJobStore()
+        self.clock = FakeClock()
         self.app = build_app(
             auth_repository=users,
             document_catalog=catalog,
             generation_client=self.client_stub,
+            provider_quota=self.provider_quota,
+            generation_job_store=self.job_store,
+            clock=self.clock,
         )
         classrooms = self.app.state.classroom_service
         owner = Actor(
@@ -111,20 +123,31 @@ async def test_api_failures_and_roles() -> None:
 
 
 @pytest.mark.anyio
+async def generate_draft(client: AsyncClient, cid: int, prompt: str = "x") -> str:
+    """Generate through the job flow and return the Draft's page URL."""
+    submitted = await post_form(
+        client,
+        f"/classes/{cid}/generate",
+        {"prompt": prompt, "difficulty": "medium", "document_ids": "1"},
+        page=f"/classes/{cid}/generate",
+    )
+    assert submitted.status_code == 303
+    assert "/generate/jobs/" in submitted.headers["location"]
+    finished = await client.get(submitted.headers["location"])
+    assert finished.status_code == 303
+    return finished.headers["location"]
+
+
+@pytest.mark.anyio
 async def test_pages_generate_review_and_publish() -> None:
     campus = Campus()
     teacher = await campus.client_for(TEACHER)
     cid = campus.classroom.id
 
     t03 = await teacher.get(f"/classes/{cid}/generate")
-    generated = await post_form(
-        teacher,
-        f"/classes/{cid}/generate",
-        {"prompt": "Binary search", "difficulty": "medium", "document_ids": "1"},
-        page=f"/classes/{cid}/generate",
-    )
-    t03a = await teacher.get(generated.headers["location"])
-    draft_id = generated.headers["location"].split("draft=")[1]
+    draft_url = await generate_draft(teacher, cid, "Binary search")
+    t03a = await teacher.get(draft_url)
+    draft_id = draft_url.split("draft=")[1]
     base = f"/classes/{cid}/drafts/{draft_id}"
     token = await csrf_token(teacher, f"{base}?step=1")
 
@@ -179,9 +202,9 @@ async def test_pages_generate_review_and_publish() -> None:
     assert step2.headers["location"] == f"{base}?step=3"
     assert blocked.status_code == 422 and 'data-state="T-04a"' in blocked.text
     assert step3.headers["location"] == f"{base}?step=4"
-    assert "Approve and publish" in step4_page.text
+    assert "เผยแพร่โจทย์" in step4_page.text
     assert 'data-state="T-04b"' in t04b.text
-    assert "1 · Binary search" in t01.text
+    assert "Binary search" in t01.text and "Problem 1" in t01.text
 
 
 @pytest.mark.anyio
@@ -193,15 +216,18 @@ async def test_page_shows_t03d_when_the_model_fails_and_t03b_without_documents()
     cid = campus.classroom.id
     campus.client_stub.fail = True
 
-    failed = await post_form(
+    submitted = await post_form(
         teacher,
         f"/classes/{cid}/generate",
         {"prompt": "x"},
         page=f"/classes/{cid}/generate",
     )
+    failed = await teacher.get(submitted.headers["location"])
 
-    assert failed.status_code == 502
+    assert submitted.status_code == 303
+    assert failed.status_code == 200
     assert 'data-state="T-03d"' in failed.text
+    assert "no quota was used" in failed.text
 
 
 @pytest.mark.anyio
@@ -220,13 +246,7 @@ async def test_step2_keeps_multi_line_test_input() -> None:
     campus = Campus()
     teacher = await campus.client_for(TEACHER)
     cid = campus.classroom.id
-    generated = await post_form(
-        teacher,
-        f"/classes/{cid}/generate",
-        {"prompt": "x"},
-        page=f"/classes/{cid}/generate",
-    )
-    draft_id = int(generated.headers["location"].split("draft=")[1])
+    draft_id = int((await generate_draft(teacher, cid)).split("draft=")[1])
     page = await teacher.get(f"/classes/{cid}/drafts/{draft_id}?step=2")
     token = await csrf_token(teacher, f"/classes/{cid}/drafts/{draft_id}?step=2")
 
