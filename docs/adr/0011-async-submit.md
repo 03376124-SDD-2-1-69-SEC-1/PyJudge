@@ -33,8 +33,8 @@ paragraph in ADR-0008 "A Submission keeps its own max score" that defers
 | (none) | `received` | the request thread, in `SubmissionService.submit` |
 | `received` | `judging` | the worker, once Judge0 accepted the batch and returned tokens |
 | `judging` | `done` | the worker, once every token finished |
-| `judging` | `received` | the worker, when Judge0 no longer knows the tokens (once) |
-| `received` or `judging` | `failed` | the worker, past the give-up window or after a second loss |
+| `judging` | `received` | the worker, when the batch is `gone` (once per worker) |
+| `received` or `judging` | `failed` | the worker, past the give-up window, after a second loss in its pass, or when the Version is gone |
 
 `done` and `failed` are terminal. The transition table lives in
 `core/submissions/models.py` (`SubmissionStatus.can_move`). The repository has
@@ -92,9 +92,18 @@ It judges against the Version the Submission was received on, not the current
 one.
 
 When Judge0 cannot be reached, the worker releases the lease and returns. No
-thread sleeps through an outage. When Judge0 no longer knows the tokens, the
-worker sends the row back to `received` and judges it again. A second loss,
-or a Submission received more than 15 minutes ago, ends as `failed`.
+thread sleeps through an outage. When the batch is `gone`, the worker sends
+the row back to `received`, sets `recovery` to `rejudged` and judges the code
+again at once. The Judge0 adapter reads a batch as `gone` when Judge0 no
+longer knows a token, or reports a status that is neither finished nor still
+running (Internal Error, for example). A second `gone` in the same worker's
+pass ends as `failed`. When one worker sees a loss and the worker that takes
+the row over sees another, each counts once, so neither fails the row.
+
+Before each start and each poll the worker checks the receive time. A
+Submission received 15 minutes ago or more ends as `failed` without a call to
+Judge0. A Submission whose Version can no longer be read ends as `failed` at
+once.
 
 ### The lease decides who may judge a row
 
@@ -104,25 +113,46 @@ receives or claims a row and moves it forward after every poll. `finished`
 and `failed` clear it. `released` clears it on purpose so the row is due at
 once.
 
-A sweeper thread calls `SubmissionService.recover()` every 15 seconds. It
-claims due rows oldest-submitted first with one statement:
-`UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED) RETURNING …`. Two
-processes never claim the same row, and a worker that stalled past its lease
-loses its next compare-and-set to the worker that took the row over. After a
-restart, recovery starts within one lease, 90 seconds at most.
+The lease is 90 seconds. `receive`, `claim_due` and `started` set it to now
+plus 90 seconds, and the worker renews it after every poll that finds the
+batch still running. One poll of the Judge0 adapter waits at most 20 seconds,
+so a live worker renews well inside its lease.
 
-### `recovery` records that a worker vanished
+A sweeper thread calls `SubmissionService.recover()`, waits 15 seconds after
+the pass ends, and calls it again. `production_app` starts that thread and
+`create_app` never does. A pass claims one due row at a time, oldest
+submitted first, with one statement:
+`UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED) RETURNING …`. It
+judges that row to `done` or `failed` before it claims the next. A pass ends
+when no row is due, or as soon as Judge0 is unreachable. In that case the
+pass releases the row it holds, and every other due row waits for the next
+pass. Two processes never claim the same row, and a worker that stalled past
+its lease loses its next compare-and-set to the worker that took the row
+over. After a restart, a row is claimed by the first pass after its lease
+expired: up to 90 seconds plus one 15-second wait, or later while the pass
+is still judging an older row.
 
-`recovery` is set only when a worker takes over a row whose lease **expired**,
-meaning the previous worker died or stalled without releasing it.
+### `recovery` records that the first run did not finish normally
 
-- `reconnected`: the saved tokens were collected from Judge0.
-- `rejudged`: the code was sent to Judge0 again, because no tokens had been
-  saved or Judge0 had lost them.
+`recovery` says that the original run was lost or its worker vanished. Two
+events set it:
 
-A released row (Judge0 unreachable) is retried without a marker. The marker
-only moves up (`none` < `reconnected` < `rejudged`). T-02 shows the
-Instructor a red "Recovered" badge and says which of the two happened.
+1. A worker claims a row whose lease **expired**, meaning the previous worker
+   died or stalled without releasing it. A `judging` row gets `reconnected`
+   and its saved tokens are collected. A `received` row gets `rejudged`,
+   because no tokens were saved and the code is sent to Judge0 again.
+2. Any worker, the background task included, finds its batch `gone`. The row
+   gets `rejudged` and the code is sent to Judge0 again. No restart has to
+   happen for this.
+
+A released row (Judge0 unreachable) is claimed again without a marker. The
+marker only moves up (`none` < `reconnected` < `rejudged`), so a reconnected
+row whose batch then turns out `gone` ends `rejudged`. The marker is written
+with the next `started` or `finished`. A `failed` row keeps the marker it had
+before. T-02 shows the Instructor a red "Recovered" badge on a `done` row with
+a marker, and T-02a says whether the result was reconnected or the code
+judged again. The T-02a copy says a server restart interrupted judging, which
+is not true for the second event.
 
 ### Rejudging touches unfinished Submissions only
 
@@ -162,7 +192,18 @@ pending and refreshes itself every 2 seconds with `<meta http-equiv="refresh">`.
 - The downgrade deletes every Submission that is not `done`, then restores
   `score NOT NULL`. A pending Submission cannot be expressed in the old
   schema.
-- A stuck Judge0 can hold one thread-pool thread for up to 15 minutes.
+- Open risk: a stuck Judge0 holds one thread-pool thread for up to 15
+  minutes per Submission. The background task polls a batch that stays
+  running until the give-up window ends, and that thread pool also serves the
+  synchronous route handlers. The sweeper judges one row at a time on its own
+  thread, so the same stuck batch delays every other due row by up to 15
+  minutes.
+- Open risk: a background task that starts after its 90-second lease expired
+  can orphan one Judge0 batch. `judge` checks only that the row is still
+  `received`, not that it still holds the lease. If a sweeper claimed the row
+  in the meantime, both send the code to Judge0. The first `started` wins,
+  the other worker stops, and its batch is never collected. When the sweeper
+  wins, the row is marked `rejudged` although no worker vanished.
 - A crash after Judge0 accepted a batch but before `started` saved its tokens
   judges the code a second time on recovery and marks it `rejudged`. The first
   batch is orphaned.
