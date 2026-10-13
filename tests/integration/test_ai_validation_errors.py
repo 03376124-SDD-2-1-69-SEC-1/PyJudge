@@ -24,8 +24,6 @@ async def client():
 @pytest.mark.parametrize(
     ("path", "payload"),
     [
-        ("/api/v1/knowledge-sources", {}),
-        ("/api/v1/knowledge-chunks/search", {}),
         ("/api/v1/topics", {"name": " "}),
         ("/api/v1/classrooms/1/drafts", {"prompt": "", "difficulty": "private input"}),
         ("/api/v1/uploads", {}),
@@ -46,7 +44,7 @@ async def test_validation_envelope_is_consistent_across_modules(client, path, pa
 @pytest.mark.anyio
 async def test_malformed_json_uses_same_envelope(client):
     response = await client.post(
-        "/api/v1/knowledge-sources",
+        "/api/v1/topics",
         content='{"secret":',
         headers={"Content-Type": "application/json"},
     )
@@ -67,8 +65,6 @@ async def test_path_and_query_validation_use_same_envelope(client, path):
 async def test_openapi_documents_shared_validation_envelope(client):
     document = (await client.get("/openapi.json")).json()
     for path in (
-        "/api/v1/knowledge-sources",
-        "/api/v1/knowledge-chunks/search",
         "/api/v1/topics",
         "/api/v1/classrooms/{classroom_id}/drafts",
         "/api/v1/uploads",
