@@ -57,6 +57,7 @@ from tests.fakes.generation import (
 )
 from tests.fakes.notifications import FakeNotificationRepository
 from tests.fakes.submissions import FakeSubmissionRepository, LocalUnsafeRunner
+from tests.fakes.uploads import FakeDocumentIngestor
 
 BANGKOK = ZoneInfo("Asia/Bangkok")
 
@@ -218,6 +219,8 @@ class DemoSeed:
         self.code_runner: CodeRunner = StubCodeRunner()
         self.drafts = FakeDraftRepository()
         self.documents = FakeDocumentCatalog()
+        # An upload in the demo reaches `ready` without calling OpenRouter.
+        self.document_ingestor = FakeDocumentIngestor()
         # Filled as the seed publishes: one row per Member of each Classroom.
         self.notifications = FakeNotificationRepository()
         # Every T-03 "Generate" answers with the prototype's binary-search draft.
@@ -559,6 +562,7 @@ def _build(seed: DemoSeed) -> FastAPI:
         code_runner=seed.code_runner,
         draft_repository=seed.drafts,
         document_catalog=seed.documents,
+        document_ingestor=seed.document_ingestor,
         generation_client=seed.generation_client,
         notification_repository=seed.notifications,
         demo_accounts=tuple(seed.accounts),

@@ -9,7 +9,7 @@ from scripts.demo import DemoSeed, build_demo_app
 
 from questly.core.auth.models import Actor
 from questly.core.notifications.models import NotificationKind
-from tests.fakes.auth import DEFAULT_NOW, FakeClock
+from tests.fakes.auth import DEFAULT_NOW, DEFAULT_PASSWORD, FakeClock
 from tests.integration.forms import post_form
 
 
@@ -34,6 +34,30 @@ async def test_every_verified_demo_account_logs_in_and_lands() -> None:
         assert login.status_code == 303, account.label
         if login.headers["location"] == "/classes":
             assert landing.status_code == 200, account.label
+
+
+@pytest.mark.anyio
+async def test_an_instructor_upload_in_the_demo_reaches_ready() -> None:
+    seed = DemoSeed()
+    app = build_demo_app(seed)
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        await post_form(
+            client,
+            "/login",
+            {"email": "somchai.p@kmitl.ac.th", "password": DEFAULT_PASSWORD},
+            page="/login",
+        )
+        created = await client.post(
+            "/api/v1/uploads",
+            files={"file": ("week1.pdf", b"%PDF-1.4 demo", "application/pdf")},
+        )
+        document = await client.get(f"/api/v1/uploads/{created.json()['id']}")
+
+    assert created.status_code == 201
+    assert document.json()["status"] == "ready"
+    assert len(seed.document_ingestor.ingested) == 1
 
 
 @pytest.mark.anyio
