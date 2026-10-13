@@ -28,11 +28,11 @@ from questly.core.generation.ports import (
     GenerationJobStore,
     ProviderQuota,
 )
-from questly.core.submissions.ports import CodeRunner, SubmissionRepository
+from questly.core.submissions.ports import SubmissionRepository
 from questly.core.topics.ports import TopicRepository
 from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from questly.integrations.email import StubEmailSender
-from questly.main import create_app
+from questly.main import Runner, create_app
 from tests.fakes.admin import FakeAdminRepository, FakeSystemHealthChecker
 from tests.fakes.assignments import (
     FakeAssignmentRepository,
@@ -96,7 +96,7 @@ def build_app(
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
     submission_repository: SubmissionRepository | None = None,
-    code_runner: CodeRunner | None = None,
+    code_runner: Runner | None = None,
     demo_accounts: tuple[DemoAccount, ...] | None = None,
     max_upload_size_bytes: int = DEFAULT_MAX_UPLOAD_SIZE_BYTES,
 ) -> FastAPI:
