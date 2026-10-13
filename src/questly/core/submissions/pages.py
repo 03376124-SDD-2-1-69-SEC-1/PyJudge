@@ -18,6 +18,7 @@ from questly.core.submissions.models import (
     RunReport,
     StudentSolveView,
     StudentTab,
+    SubmissionPendingError,
 )
 from questly.core.submissions.service import NOT_VISIBLE, SubmissionService
 
@@ -35,6 +36,10 @@ _REFUSALS: dict[type[Exception], tuple[str, int]] = {
     ),
     ResubmissionNotAllowedError: (
         "This problem allows one submission only.",
+        status.HTTP_409_CONFLICT,
+    ),
+    SubmissionPendingError: (
+        "Your last submission is still being judged.",
         status.HTTP_409_CONFLICT,
     ),
     RunnerUnavailableError: (

@@ -1,10 +1,15 @@
 """S-02 solve and T-02 results on the seeded demo, plus the submissions API."""
 
+from collections.abc import Sequence
+from dataclasses import replace
+from datetime import timedelta
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from scripts.demo import BINARY_SEARCH, UPDATE_REASON, DemoSeed, build_demo_app
 
 from questly.core.auth.models import Actor
+from questly.core.submissions.models import BatchResult, BatchState, Recovery
 from tests.fakes.auth import DEFAULT_PASSWORD, FakeClock
 from tests.fakes.submissions import ScriptedCodeRunner
 from tests.integration.forms import log_in, post_form
@@ -12,10 +17,17 @@ from tests.integration.forms import log_in, post_form
 SAMPLES = {"5\n1 3 5 7 9\n7": "3", "4\n2 4 6 8\n5": "-1"}
 
 
+class LosingRunner(ScriptedCodeRunner):
+    """Loses every batch it was given, so judging ends `failed`."""
+
+    def collect(self, tokens: Sequence[str]) -> BatchResult:
+        return BatchResult(state=BatchState.GONE)
+
+
 class Demo:
-    def __init__(self) -> None:
+    def __init__(self, runner: ScriptedCodeRunner | None = None) -> None:
         self.seed = DemoSeed(clock=FakeClock())
-        self.runner = ScriptedCodeRunner(SAMPLES)
+        self.runner = ScriptedCodeRunner(SAMPLES) if runner is None else runner
         self.seed.code_runner = self.runner
         self.app = build_demo_app(self.seed)
         self.sec1 = self.seed.programming_1.id
@@ -448,3 +460,152 @@ async def test_page_authorizes_before_reaching_the_runner(
     )
 
     assert response.status_code == status
+
+
+# ---- S-02a and the async states on S-02, S-02g and T-02 --------------------
+
+
+PENDING_CODE = "print(3)  # waiting for the judge"
+
+
+async def _submit_during_an_outage(demo: Demo) -> AsyncClient:
+    """Students[1] submits while the runner is down: the Submission stays
+    pending until a sweep finds the runner back."""
+    client = await demo.client(demo.seed.students[1].email)
+    url = demo.url(BS)
+    demo.runner.backend.down()
+    response = await post_form(
+        client, url, {"action": "submit", "code": PENDING_CODE}, page=url
+    )
+    assert response.status_code == 303
+    return client
+
+
+@pytest.mark.anyio
+async def test_s02a_refreshes_read_only_while_the_submission_is_judged(
+    demo: Demo,
+) -> None:
+    client = await _submit_during_an_outage(demo)
+    url = demo.url(BS)
+
+    page = await client.get(url + "?submitted=1")
+    history = await client.get(url + "?tab=history")
+    refused = await post_form(
+        client, url, {"action": "run", "code": "print(3)"}, page=url
+    )
+
+    assert page.status_code == 200 and 'data-state="S-02a"' in page.text
+    assert '<meta http-equiv="refresh" content="2">' in page.text
+    assert "Judging attempt 2, 6 tests" in page.text
+    assert "readonly" in page.text and PENDING_CODE in page.text
+    assert 'value="submit"' not in page.text and 'value="run"' not in page.text
+    assert "toast-stack" not in page.text
+    assert "Judging" in history.text and history.text.count("View code") == 2
+    assert refused.status_code == 409 and "still being judged" in refused.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("who", "status"), [("classmate", 200), ("sec2_student", 404)])
+async def test_s02a_is_only_the_submitting_students_page(
+    demo: Demo, who: str, status: int
+) -> None:
+    await _submit_during_an_outage(demo)
+    email = {
+        "classmate": demo.seed.students[3].email,
+        "sec2_student": demo.seed.students[7].email,
+    }[who]
+    client = await demo.client(email)
+
+    page = await client.get(demo.url(BS))
+
+    assert page.status_code == status
+    assert 'data-state="S-02a"' not in page.text
+    assert "refresh" not in page.text
+
+
+@pytest.mark.anyio
+async def test_s02a_turns_into_the_result_toast_once_judged(demo: Demo) -> None:
+    client = await _submit_during_an_outage(demo)
+    url = demo.url(BS)
+    demo.runner.backend.resume()
+
+    demo.app.state.submission_service.recover()
+    page = await client.get(url + "?submitted=1")
+
+    assert 'data-state="S-02a"' not in page.text and "refresh" not in page.text
+    assert "toast-stack" in page.text and "attempt 2" in page.text
+
+
+@pytest.mark.anyio
+async def test_a_failed_submission_shows_an_alert_and_submit_works_again() -> None:
+    demo = Demo(LosingRunner(SAMPLES))
+    client = await demo.client(demo.seed.students[1].email)
+    url = demo.url(BS)
+
+    await post_form(client, url, {"action": "submit", "code": "print(3)"}, page=url)
+    page = await client.get(url + "?submitted=1")
+    history = await client.get(url + "?tab=history")
+
+    assert 'data-state="S-02-failed"' in page.text
+    assert "Attempt 2 could not be judged" in page.text
+    assert 'value="submit"' in page.text and "refresh" not in page.text
+    assert "toast-stack" not in page.text
+    assert "Not judged" in history.text
+
+
+@pytest.mark.anyio
+async def test_t02_shows_a_judging_badge_for_a_pending_submission(
+    demo: Demo,
+) -> None:
+    await _submit_during_an_outage(demo)
+    teacher = await demo.client(demo.seed.somchai.email)
+    student = demo.seed.students[1]
+
+    page = await teacher.get(demo.url(BS))
+    panel = await teacher.get(demo.url(BS) + f"?student={student.id}")
+
+    assert page.status_code == 200 and "Judging" in page.text
+    assert "An attempt is being judged" in panel.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("recovery", [Recovery.RECONNECTED, Recovery.REJUDGED])
+async def test_the_recovered_banner_shows_to_the_instructor_only(
+    demo: Demo, recovery: Recovery
+) -> None:
+    student = demo.seed.students[1]
+    url = demo.url(BS)
+    teacher_client = await demo.client(demo.seed.somchai.email)
+    student_client = await demo.client(student.email)
+    posting_id = demo.app.state.assignment_service.problem(
+        Actor(student.id, student.role, student.full_name, student.email),
+        demo.sec1,
+        int(url.rsplit("/", 1)[1]),
+    ).posting.id
+    (last,) = demo.seed.submissions.list_for_student(posting_id, student.id)
+    recovered = demo.seed.submissions.add(
+        replace(
+            last,
+            id=None,
+            attempt=last.attempt + 1,
+            submitted_at=last.submitted_at + timedelta(hours=1),
+            recovery=recovery,
+        )
+    )
+
+    results = await teacher_client.get(url)
+    panel = await teacher_client.get(url + f"?student={student.id}")
+    own = await student_client.get(url)
+    history = await student_client.get(url + "?tab=history")
+
+    assert "Recovered" in results.text
+    assert 'data-state="T-02a-recovered"' in panel.text
+    assert "Late is decided from this time" in panel.text
+    expected = {
+        Recovery.RECONNECTED: "reconnected to the original run",
+        Recovery.REJUDGED: "judged again after the restart",
+    }[recovery]
+    assert expected in panel.text
+    assert recovered.attempt == 2
+    for page in (own, history):
+        assert "Recovered" not in page.text and "server restart" not in page.text
