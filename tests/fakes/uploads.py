@@ -49,3 +49,10 @@ class FakeKnowledgeDocumentRepository:
             if document.content_hash == content_hash:
                 return document
         return None
+
+    def update(self, document: KnowledgeDocument) -> KnowledgeDocument:
+        """Replace the stored document; KeyError when the id is unknown."""
+        if document.id not in self._items:
+            raise KeyError(document.id)
+        self._items[document.id] = document
+        return document

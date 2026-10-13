@@ -36,11 +36,15 @@ class KnowledgeDocument:
 
     `id` is `None` only before the repository has persisted the document — see
     KnowledgeDocumentRepository.create(). Anything a repository returns has a
-    non-None id.
+    non-None id. `uploaded_by` is `None` only for rows that predate it (the
+    seed corpus, ADR-0008); `page_count` stays `None` until ingestion has read
+    the PDF.
     """
 
     filename: str
     object_key: str
     content_hash: str
     status: DocumentStatus = DocumentStatus.UPLOADED
+    uploaded_by: int | None = None
+    page_count: int | None = None
     id: int | None = None

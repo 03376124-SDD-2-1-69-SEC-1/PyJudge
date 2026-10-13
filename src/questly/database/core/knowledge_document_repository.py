@@ -21,6 +21,8 @@ def _to_domain(row: KnowledgeDocumentRow) -> KnowledgeDocument:
         object_key=row.r2_object_key,
         content_hash=row.content_hash,
         status=DocumentStatus(row.status),
+        uploaded_by=row.uploaded_by,
+        page_count=row.page_count,
     )
 
 
@@ -43,6 +45,8 @@ class SQLKnowledgeDocumentRepository:
                 filename=document.filename,
                 content_hash=document.content_hash,
                 status=document.status.value,
+                uploaded_by=document.uploaded_by,
+                page_count=document.page_count,
             )
             session.add(row)
             session.commit()
@@ -67,4 +71,20 @@ class SQLKnowledgeDocumentRepository:
             ).first()
             if row is None:
                 return None
+            return _to_domain(row)
+
+    def update(self, document: KnowledgeDocument) -> KnowledgeDocument:
+        """Replace an existing document; KeyError when the id is unknown."""
+        with self._session_factory() as session:
+            row = session.get(KnowledgeDocumentRow, document.id)
+            if row is None:
+                raise KeyError(document.id)
+            row.filename = document.filename
+            row.r2_object_key = document.object_key
+            row.content_hash = document.content_hash
+            row.status = document.status.value
+            row.uploaded_by = document.uploaded_by
+            row.page_count = document.page_count
+            session.commit()
+            session.refresh(row)
             return _to_domain(row)
