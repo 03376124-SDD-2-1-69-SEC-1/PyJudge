@@ -13,10 +13,15 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 
-from questly.core.submissions.models import Execution, ExecutionStatus, Submission
+from questly.core.submissions.models import (
+    Execution,
+    ExecutionStatus,
+    RunnerUnavailableError,
+    Submission,
+)
 
 
 class FakeSubmissionRepository:
@@ -51,7 +56,8 @@ class ScriptedCodeRunner:
     """Answers from `outputs` (stdin -> stdout); code markers force failures.
 
     A line `# tle` in the code times out and `# crash` raises a runtime
-    error, so a test can reach S-02d without running anything.
+    error, so a test can reach S-02d without running anything. `# judge down`
+    makes the runner unreachable.
     """
 
     def __init__(self, outputs: dict[str, str] | None = None) -> None:
@@ -59,10 +65,32 @@ class ScriptedCodeRunner:
         if outputs is not None:
             self.outputs.update(outputs)
         self.calls: list[str] = []
+        self.batches: list[tuple[str, ...]] = []
+
+    def run_many(
+        self,
+        *,
+        code: str,
+        language: str,
+        stdins: Sequence[str],
+        time_limit_seconds: float,
+    ) -> tuple[Execution, ...]:
+        self.batches.append(tuple(stdins))
+        return tuple(
+            self.run(
+                code=code,
+                language=language,
+                stdin=stdin,
+                time_limit_seconds=time_limit_seconds,
+            )
+            for stdin in stdins
+        )
 
     def run(
         self, *, code: str, language: str, stdin: str, time_limit_seconds: float
     ) -> Execution:
+        if "# judge down" in code:
+            raise RunnerUnavailableError("scripted outage")
         self.calls.append(stdin)
         if "# tle" in code:
             return Execution(ExecutionStatus.TIME_LIMIT, "", "", time_limit_seconds)
@@ -112,6 +140,24 @@ class LocalUnsafeRunner:
                 RuntimeWarning,
                 stacklevel=2,
             )
+
+    def run_many(
+        self,
+        *,
+        code: str,
+        language: str,
+        stdins: Sequence[str],
+        time_limit_seconds: float,
+    ) -> tuple[Execution, ...]:
+        return tuple(
+            self.run(
+                code=code,
+                language=language,
+                stdin=stdin,
+                time_limit_seconds=time_limit_seconds,
+            )
+            for stdin in stdins
+        )
 
     def run(
         self, *, code: str, language: str, stdin: str, time_limit_seconds: float

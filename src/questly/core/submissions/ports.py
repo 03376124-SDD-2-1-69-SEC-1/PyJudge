@@ -1,5 +1,6 @@
 """Ports the submissions slice depends on."""
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from questly.core.assignments.models import (
@@ -14,11 +15,28 @@ from questly.core.submissions.models import Execution, Submission
 
 
 class CodeRunner(Protocol):
-    """Runs one program on one input, synchronously (Judge0 CE in prod)."""
+    """Runs a program synchronously (Judge0 CE in prod).
+
+    Both methods raise RunnerUnavailableError when the code could not be
+    judged at all.
+    """
 
     def run(
         self, *, code: str, language: str, stdin: str, time_limit_seconds: float
-    ) -> Execution: ...
+    ) -> Execution:
+        """One input."""
+        ...
+
+    def run_many(
+        self,
+        *,
+        code: str,
+        language: str,
+        stdins: Sequence[str],
+        time_limit_seconds: float,
+    ) -> tuple[Execution, ...]:
+        """One batch: an Execution per input, in the order of `stdins`."""
+        ...
 
 
 class SubmissionRepository(Protocol):

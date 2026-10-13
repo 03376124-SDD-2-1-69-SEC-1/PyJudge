@@ -216,3 +216,11 @@ class ResubmissionNotAllowedError(Exception):
 
 class EmptyCodeError(ValueError):
     pass
+
+
+class RunnerUnavailableError(Exception):
+    """The CodeRunner could not judge the code; nothing was graded or kept."""
+
+
+class UnsupportedLanguageError(ValueError):
+    """The CodeRunner has no runtime for this language."""

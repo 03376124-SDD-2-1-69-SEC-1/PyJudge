@@ -28,6 +28,7 @@ from questly.core.submissions.models import (
     InstructorResultsView,
     PostingClosedError,
     ResubmissionNotAllowedError,
+    RunnerUnavailableError,
     StudentSolveView,
     Submission,
     SubmissionNotFoundError,
@@ -166,7 +167,7 @@ def test_run_executes_sample_tests_only_and_keeps_nothing(world: World) -> None:
     report = world.service.run(world.student, world.room.id, aid, "print(x)")
 
     assert [r.kind for r in report.results] == [TestCaseKind.SAMPLE] * 2
-    assert world.runner.calls == ["1", "2"]
+    assert world.runner.batches == [("1", "2")]
     assert world.service.submissions(world.student, world.room.id, aid) == ()
 
 
@@ -176,6 +177,7 @@ def test_submit_grades_every_test_and_counts_attempts(world: World) -> None:
     first = world.submit(aid, "# crash")
     second = world.submit(aid)
 
+    assert world.runner.batches == [("1", "2", "3", "")] * 2
     assert first.results[0].verdict is Verdict.RUNTIME_ERROR
     assert (first.attempt, first.score) == (1, 0)
     assert (second.attempt, second.score, second.all_passed) == (2, 10, True)
@@ -205,6 +207,38 @@ def test_after_the_deadline_late_work_is_flagged_not_penalised(world: World) -> 
     assert submission.is_late and submission.score == 10
     standing = world.assignments.problem(world.student, world.room.id, aid).standing
     assert standing.state is StudentState.LATE
+
+
+def test_a_slow_judge_does_not_make_an_on_time_submit_late(world: World) -> None:
+    aid = world.publish(allow_late=True)
+    received = DEADLINE - timedelta(minutes=1)
+    world.clock.current = received
+
+    class SlowRunner(ScriptedCodeRunner):
+        def run(
+            self, *, code: str, language: str, stdin: str, time_limit_seconds: float
+        ) -> Execution:
+            world.clock.advance(timedelta(minutes=5))
+            return super().run(
+                code=code,
+                language=language,
+                stdin=stdin,
+                time_limit_seconds=time_limit_seconds,
+            )
+
+    world.service = SubmissionService(
+        world.submissions,
+        SlowRunner(CORRECT),
+        world.assignments,
+        world.classrooms,
+        world.clock,
+    )
+
+    submission = world.submit(aid)
+
+    assert world.clock.now() > DEADLINE
+    assert submission.submitted_at == received
+    assert submission.is_late is False
 
 
 def test_past_the_deadline_without_late_work_the_posting_is_closed(
@@ -237,6 +271,21 @@ def test_resubmission_off_allows_one_submit(world: World) -> None:
     with pytest.raises(ResubmissionNotAllowedError):
         world.submit(aid)
     assert not world.service.page(world.student, world.room.id, aid).can_submit
+
+
+def test_an_unreachable_runner_stores_nothing_and_spends_no_attempt(
+    world: World,
+) -> None:
+    aid = world.publish(allow_resubmission=False)
+
+    with pytest.raises(RunnerUnavailableError):
+        world.submit(aid, "# judge down")
+    with pytest.raises(RunnerUnavailableError):
+        world.service.run(world.student, world.room.id, aid, "# judge down")
+
+    assert world.service.submissions(world.student, world.room.id, aid) == ()
+    assert world.service.page(world.student, world.room.id, aid).can_submit
+    assert world.submit(aid).attempt == 1
 
 
 def test_empty_code_is_refused(world: World) -> None:

@@ -13,6 +13,7 @@ from questly.core.submissions.models import (
     EmptyCodeError,
     PostingClosedError,
     ResubmissionNotAllowedError,
+    RunnerUnavailableError,
     Submission,
     TestResult,
 )
@@ -56,6 +57,12 @@ def domain_errors() -> Iterator[None]:
         )
     except EmptyCodeError:
         _fail(422, "empty_code", "Code is empty")
+    except RunnerUnavailableError:
+        _fail(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "runner_unavailable",
+            "The code runner is unavailable; nothing was saved. Try again shortly.",
+        )
 
 
 def result_response(result: TestResult, *, full: bool) -> TestResultResponse:

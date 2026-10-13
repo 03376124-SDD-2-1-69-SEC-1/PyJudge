@@ -1,4 +1,4 @@
-"""GENERATION_MODEL_ALLOWLIST parsing in get_settings()."""
+"""GENERATION_MODEL_ALLOWLIST and JUDGE0_* parsing in get_settings()."""
 
 from collections.abc import Generator
 
@@ -34,3 +34,24 @@ def test_allowlist_is_comma_separated_and_trimmed(
     monkeypatch.setenv("GENERATION_MODEL_ALLOWLIST", " a/one , b/two:free,, ")
 
     assert config.get_settings().generation_model_allowlist == ("a/one", "b/two:free")
+
+
+def test_judge0_is_off_when_its_url_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("JUDGE0_URL", "  ")
+    monkeypatch.setenv("JUDGE0_AUTH_TOKEN", "")
+
+    settings = config.get_settings()
+
+    assert (settings.judge0_url, settings.judge0_auth_token) == ("", "")
+
+
+def test_judge0_url_and_token_are_trimmed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("JUDGE0_URL", " http://judge0:2358 ")
+    monkeypatch.setenv("JUDGE0_AUTH_TOKEN", " token ")
+
+    settings = config.get_settings()
+
+    assert (settings.judge0_url, settings.judge0_auth_token) == (
+        "http://judge0:2358",
+        "token",
+    )

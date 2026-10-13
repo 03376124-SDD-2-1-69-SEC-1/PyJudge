@@ -312,3 +312,77 @@ async def test_toast_reports_a_failing_run(demo: Demo) -> None:
 
     assert 'data-state="toast-fault"' in page.text
     assert 'data-state="toast-pass"' not in page.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("action", ["run", "submit"])
+async def test_page_asks_to_try_again_when_the_runner_is_down(
+    demo: Demo, action: str
+) -> None:
+    client = await demo.client(demo.seed.students[1].email)
+    url = demo.url(BS)
+
+    page = await post_form(
+        client, url, {"action": action, "code": "# judge down"}, page=url
+    )
+    history = await client.get(url + "?tab=history")
+
+    assert page.status_code == 503
+    assert 'data-page="S-02"' in page.text
+    assert "try again" in page.text and "# judge down" in page.text
+    assert history.text.count("View code") == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("endpoint", ["/runs", "/submissions"])
+async def test_api_answers_503_when_the_runner_is_down(
+    demo: Demo, endpoint: str
+) -> None:
+    client = await demo.client(demo.seed.students[1].email)
+    api = "/api/v1/classrooms" + demo.url(BS).removeprefix("/classes")
+
+    response = await client.post(api + endpoint, json={"code": "# judge down"})
+    listed = await client.get(api + "/submissions")
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "runner_unavailable"
+    assert [s["attempt"] for s in listed.json()] == [1]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("endpoint", ["/runs", "/submissions"])
+@pytest.mark.parametrize(("who", "status"), [("teacher", 403), ("sec2_student", 404)])
+async def test_api_authorizes_before_reaching_the_runner(
+    demo: Demo, endpoint: str, who: str, status: int
+) -> None:
+    email = {
+        "teacher": demo.seed.somchai.email,
+        "sec2_student": demo.seed.students[7].email,
+    }[who]
+    client = await demo.client(email)
+    api = "/api/v1/classrooms" + demo.url(BS).removeprefix("/classes")
+
+    response = await client.post(api + endpoint, json={"code": "# judge down"})
+
+    assert response.status_code == status
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("action", ["run", "submit"])
+@pytest.mark.parametrize(("who", "status"), [("teacher", 403), ("sec2_student", 404)])
+async def test_page_authorizes_before_reaching_the_runner(
+    demo: Demo, action: str, who: str, status: int
+) -> None:
+    email = {
+        "teacher": demo.seed.somchai.email,
+        "sec2_student": demo.seed.students[7].email,
+    }[who]
+    client = await demo.client(email)
+    url = demo.url(BS)
+    form_page = url + "?student=0" if who == "teacher" else "/classes"
+
+    response = await post_form(
+        client, url, {"action": action, "code": "# judge down"}, page=form_page
+    )
+
+    assert response.status_code == status
