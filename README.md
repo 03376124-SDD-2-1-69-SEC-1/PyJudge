@@ -1,22 +1,47 @@
+<p align="center">
+  <img src="docs/Questly-logo.png" alt="Questly" width="480">
+</p>
+
 # Questly
+
+<p align="center">
+  <img src="https://img.shields.io/badge/PYTHON-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/FASTAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/JINJA2-B41717?style=for-the-badge&logo=jinja&logoColor=white" alt="Jinja2">
+  <img src="https://img.shields.io/badge/UVICORN-499848?style=for-the-badge&logo=uvicorn&logoColor=white" alt="Uvicorn">
+  <img src="https://img.shields.io/badge/UV-DE5FE9?style=for-the-badge&logo=uv&logoColor=white" alt="uv"><br>
+  <img src="https://img.shields.io/badge/SQLMODEL-7E56C2?style=for-the-badge" alt="SQLModel">
+  <img src="https://img.shields.io/badge/SQLALCHEMY-2.x-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white" alt="SQLAlchemy">
+  <img src="https://img.shields.io/badge/PSYCOPG-3-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="psycopg">
+  <img src="https://img.shields.io/badge/POSTGRESQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/NEON-00E599?style=for-the-badge&logo=neon&logoColor=black" alt="Neon">
+  <img src="https://img.shields.io/badge/PGVECTOR-768%20dims-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="pgvector"><br>
+  <img src="https://img.shields.io/badge/ALEMBIC-6BA81E?style=for-the-badge&logo=sqlalchemy&logoColor=white" alt="Alembic">
+  <img src="https://img.shields.io/badge/PYMUPDF-0A66C2?style=for-the-badge" alt="PyMuPDF">
+  <img src="https://img.shields.io/badge/OPENROUTER-6467F2?style=for-the-badge&logo=openrouter&logoColor=white" alt="OpenRouter">
+  <img src="https://img.shields.io/badge/CLOUDFLARE%20R2-F38020?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Cloudflare R2"><br>
+  <img src="https://img.shields.io/badge/TAILWIND%20CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
+  <img src="https://img.shields.io/badge/PYTEST-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white" alt="Pytest">
+  <img src="https://img.shields.io/badge/RUFF-D7FF64?style=for-the-badge&logo=ruff&logoColor=black" alt="Ruff">
+  <img src="https://img.shields.io/badge/GITHUB%20ACTIONS-2088FF?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions">
+</p>
 
 **Language:** English | [ภาษาไทย](README.th.md)
 
-> **Superseded by ADR-0007 (architecture).** Older passages in this README
-> describe Core and AI as two services that talk over HTTP. That design is
-> replaced: Questly is one FastAPI app in one repo, with one Neon project and
-> the schemas `core` and `rag`. `core/` and `ai/` are modules of it and call
-> each other through Python interfaces. Read `AGENTS.md` and
-> `docs/adr/0007-classroom-centric-flow.md` for the current rules.
+Questly is a FastAPI + Jinja2 application for programming courses.
+Instructors draft Assignments and their Test Cases with AI help from their own
+lecture PDFs, publish them to Classrooms, and Students submit code that is
+judged.
 
-Questly is a FastAPI application that helps instructors prepare programming
-assignments, test cases, and related learning materials. It is organized as a
-modular monolith so each team can develop its area without tightly coupling it
-to the rest of the application.
-
-The project is currently under development. The Topics API is the reference
-feature, while the Assignment and AI modules are still being built. Topic data
-is stored in memory and is cleared whenever the server restarts.
+**Architecture.** One FastAPI app in one repo — a modular monolith. `core/` and
+`ai/` are modules of that app and call each other through Python interfaces
+(`typing.Protocol`); there is no network call between them and `ai/` has no
+routes of its own. Data lives in one Neon Postgres project with two schemas,
+`core` and `rag` (pgvector, no foreign key across them), and uploaded PDFs live
+in Cloudflare R2. Embeddings and generation go through OpenRouter (ADR-0009).
+The rules are in `AGENTS.md`, the flow and its decisions in
+`docs/adr/0007-classroom-centric-flow.md`, and what each area can do today in
+the Status table of `AGENTS.md`.
 
 ## Quick Start
 
@@ -256,16 +281,20 @@ uv run --env-file .env alembic revision --autogenerate -m "describe the change"
 
 ```text
 src/questly/
-├── main.py             # FastAPI application composition
-├── core/
-│   ├── topics/         # Reference Topics CRUD feature
-│   └── assignments/    # Assignment module
-├── ai/                 # AI integration area
-├── database/           # Neon, SQLModel, Alembic, and R2 adapters
+├── main.py             # composition root: builds adapters and services, mounts routers
+├── config.py           # settings read from the environment
+├── api_errors.py       # the JSON error envelope shared by every route
+├── core/               # slices: topics (reference), auth, classrooms, assignments,
+│                       #   generation, submissions, uploads, notifications, admin
+├── ai/                 # AI module, no routes of its own: vector storage (app/),
+│                       #   ingestion/, embeddings/, retrieval/, client.py
+├── integrations/       # adapters for outside services (Judge0, email, generation jobs)
+├── database/           # SQL adapters (core/, rag/), R2 storage (storage/), health checks
 └── web/                # Jinja templates and static assets
 
-alembic/                # Database migrations
-tests/                  # Unit, integration, and architecture tests
+alembic/                # one migration history for both schemas
+scripts/                # demo mode, seeding, integration-test runner, task scope
+tests/                  # unit, integration, architecture, contracts, fakes, db, r2
 ```
 
 ## Data Model Reference
@@ -319,33 +348,27 @@ connection string, the driver must be `postgresql+psycopg://`, not the plain
 
 ```text
 src/questly/
-├── core/                        ← Core Service (must not import an ORM)
-│   ├── topics/                  ✅ reference slice
+├── core/                        ← modules of the app; never import an ORM or `ai`
+│   ├── topics/                  ✅ reference slice — copy its shape
 │   │   ├── models.py            dataclass(frozen=True, slots=True)
-│   │   ├── repository.py        typing.Protocol + in-memory impl
-│   │   ├── service.py           pure sync, receives repo via constructor
-│   │   └── routes.py            sync def, pulls service from app.state
-│   └── assignments/              ✅ complete slice — SQL adapter in database/core/
-│       ├── models.py            plain dataclasses
-│       ├── ports.py             typing.Protocol
-│       ├── service.py
-│       ├── routes.py
-│       └── testcase_routes.py
+│   │   ├── ports.py             typing.Protocol
+│   │   ├── service.py           pure sync, receives the repo via constructor
+│   │   └── routes.py            sync def, pulls the service from app.state
+│   └── assignments/ …           same shape; its SQL adapter lives in database/core/
 │
-├── database/                    ← tech lead only; the only place allowed to import an ORM
+├── database/                    ← พาย only; the only place allowed to import an ORM
 │   │                              (see AGENTS.md § "Who may change database and locked files")
-│   ├── __init__.py              imports tables from both sides (matters for alembic)
-│   ├── session.py               engine + get_session (sync)
-│   ├── README.md
+│   ├── __init__.py              imports tables from both schemas (matters for alembic)
+│   ├── session.py               engine + session factory (sync)
 │   ├── core/
-│   │   ├── __init__.py
-│   │   ├── tables.py            ✅ SQLModel — schema `core`
-│   │   └── assignment_repository.py   ✅ implements core/assignments/ports.py
-│   └── rag/
-│       ├── __init__.py
-│       └── tables.py            ✅ SQLModel — schema `rag`
+│   │   ├── tables.py            SQLModel — schema `core`
+│   │   └── *_repository.py      one SQL adapter per core port
+│   ├── rag/
+│   │   ├── tables.py            SQLModel — schema `rag`
+│   │   └── vector_repository.py SQL adapter for ai/app/repository.py
+│   └── storage/r2.py            object storage adapter
 │
-├── ai/                          ← AI module of the same app (vector storage works; ingestion not started)
+├── ai/                          ← AI module of the same app; reached through ports, no routes
 └── web/                         ← Jinja2 templates
 
 alembic/                         ← at repo root, by convention
@@ -384,6 +407,9 @@ that genuinely exists in the DB. **Always open and review the migration file
 before running it.**
 
 ### 3. ERD
+
+> This diagram predates the classroom schema of ADR-0007 and ADR-0008.
+> The source of truth is `database/core/tables.py` and `database/rag/tables.py`.
 
 ```mermaid
 erDiagram
@@ -552,22 +578,22 @@ aren't discussed beforehand:
    collisions become frequent, giving the teammate their own branch takes
    minutes — no need to decide now.
 
-Since we've agreed on "single node, not split," this should be recorded as an
-ADR after `0003-`, so future readers know it was a deliberate choice, not a
-forgotten split.
+Both choices are recorded: one Alembic history in ADR-0004, one repo and one
+app in ADR-0005.
 
 ### 6. Still open
 
 | Topic | Status |
 |---|---|
-| Real embedding model | `VECTOR(768)` is a one-way door — changing dimensions later means migrating the whole table |
+| Embedding model | Decided: `google/gemini-embedding-001` through OpenRouter at 768 dimensions (ADR-0009). `VECTOR(768)` is still a one-way door — changing dimensions means migrating the table and re-embedding every chunk |
 
 ## Technology Stack
 
 - Python 3.12+
 - FastAPI and Uvicorn
 - SQLModel, SQLAlchemy, and Alembic
-- Neon PostgreSQL
+- Neon PostgreSQL with pgvector
+- OpenRouter (`openrouter` SDK) for embeddings and generation
 - Cloudflare R2 with Boto3
 - Jinja2
 - Pytest and Ruff

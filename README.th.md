@@ -1,20 +1,45 @@
+<p align="center">
+  <img src="docs/Questly-logo.png" alt="Questly" width="480">
+</p>
+
 # Questly
+
+<p align="center">
+  <img src="https://img.shields.io/badge/PYTHON-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/FASTAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/JINJA2-B41717?style=for-the-badge&logo=jinja&logoColor=white" alt="Jinja2">
+  <img src="https://img.shields.io/badge/UVICORN-499848?style=for-the-badge&logo=uvicorn&logoColor=white" alt="Uvicorn">
+  <img src="https://img.shields.io/badge/UV-DE5FE9?style=for-the-badge&logo=uv&logoColor=white" alt="uv"><br>
+  <img src="https://img.shields.io/badge/SQLMODEL-7E56C2?style=for-the-badge" alt="SQLModel">
+  <img src="https://img.shields.io/badge/SQLALCHEMY-2.x-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white" alt="SQLAlchemy">
+  <img src="https://img.shields.io/badge/PSYCOPG-3-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="psycopg">
+  <img src="https://img.shields.io/badge/POSTGRESQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/NEON-00E599?style=for-the-badge&logo=neon&logoColor=black" alt="Neon">
+  <img src="https://img.shields.io/badge/PGVECTOR-768%20dims-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="pgvector"><br>
+  <img src="https://img.shields.io/badge/ALEMBIC-6BA81E?style=for-the-badge&logo=sqlalchemy&logoColor=white" alt="Alembic">
+  <img src="https://img.shields.io/badge/PYMUPDF-0A66C2?style=for-the-badge" alt="PyMuPDF">
+  <img src="https://img.shields.io/badge/OPENROUTER-6467F2?style=for-the-badge&logo=openrouter&logoColor=white" alt="OpenRouter">
+  <img src="https://img.shields.io/badge/CLOUDFLARE%20R2-F38020?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Cloudflare R2"><br>
+  <img src="https://img.shields.io/badge/TAILWIND%20CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
+  <img src="https://img.shields.io/badge/PYTEST-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white" alt="Pytest">
+  <img src="https://img.shields.io/badge/RUFF-D7FF64?style=for-the-badge&logo=ruff&logoColor=black" alt="Ruff">
+  <img src="https://img.shields.io/badge/GITHUB%20ACTIONS-2088FF?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions">
+</p>
 
 **ภาษา:** [English](README.md) | ภาษาไทย
 
-> **ถูกแทนที่โดย ADR-0007 (ส่วนสถาปัตยกรรม)** ข้อความเก่าใน README นี้บางตอน
-> เล่าว่า Core กับ AI เป็นสอง service คุยกันผ่าน HTTP แบบนั้นเลิกใช้แล้ว
-> Questly คือแอป FastAPI ตัวเดียวใน repo เดียว ใช้ Neon project เดียวแยก schema
-> `core` กับ `rag` โดย `core/` และ `ai/` เป็นโมดูลของแอปนี้ เรียกกันผ่าน Python
-> interface อ่านกฎปัจจุบันที่ `AGENTS.md` และ `docs/adr/0007-classroom-centric-flow.md`
+Questly คือแอป FastAPI + Jinja2 สำหรับวิชาเขียนโปรแกรม ผู้สอนร่างโจทย์และ
+ชุดทดสอบโดยมี AI ช่วยจาก PDF เอกสารประกอบการสอนของตัวเอง แล้ว publish
+ไปยัง Classroom และนักศึกษาส่งโค้ดเพื่อให้ระบบตรวจ
 
-Questly คือแอปพลิเคชัน FastAPI ที่ช่วยผู้สอนเตรียมโจทย์เขียนโปรแกรม ชุดทดสอบ
-และสื่อการเรียนที่เกี่ยวข้อง โปรเจกต์ใช้สถาปัตยกรรมแบบ modular monolith
-เพื่อให้แต่ละทีมพัฒนาส่วนที่รับผิดชอบได้โดยไม่ผูกกับส่วนอื่นมากเกินไป
-
-ขณะนี้โปรเจกต์ยังอยู่ระหว่างการพัฒนา Topics API เป็นฟีเจอร์อ้างอิง
-ส่วนโมดูล Assignment และ AI ยังอยู่ระหว่างการพัฒนา ข้อมูล Topic
-ถูกเก็บไว้ในหน่วยความจำและจะหายเมื่อรีสตาร์ตเซิร์ฟเวอร์
+**สถาปัตยกรรม** แอป FastAPI ตัวเดียวใน repo เดียว (modular monolith) โดย
+`core/` และ `ai/` เป็นโมดูลของแอปนี้ เรียกกันผ่าน Python interface
+(`typing.Protocol`) ไม่มีการเรียกผ่านเครือข่ายระหว่างกัน และ `ai/` ไม่มี route
+ของตัวเอง ข้อมูลอยู่ใน Neon Postgres project เดียว แยก schema `core` กับ `rag`
+(pgvector, ไม่มี foreign key ข้าม schema) ส่วนไฟล์ PDF อยู่ใน Cloudflare R2
+embedding และ generation เรียกผ่าน OpenRouter (ADR-0009) กฎอยู่ใน `AGENTS.md`
+flow และการตัดสินใจอยู่ใน `docs/adr/0007-classroom-centric-flow.md` และสถานะ
+ปัจจุบันของแต่ละส่วนอยู่ในตาราง Status ของ `AGENTS.md`
 
 ## เริ่มต้นใช้งาน
 
@@ -175,51 +200,21 @@ uv run --env-file .env alembic revision --autogenerate -m "describe the change"
 ## โครงสร้างโปรเจกต์
 
 ```text
-squestly/
-├── README.md
-├── pyproject.toml
-├── uv.lock
-├── Dockerfile
-│
-├── docs/
-│
-│
-├── src/questly/
-│   ├── main.py
-│   ├── ai/
-│   │   └── README.md
-│   │
-│   ├── core/
-│   │   ├── topics/
-│   │   │   ├── models.py
-│   │   │   ├── schemas.py
-│   │   │   ├── repository.py
-│   │   │   ├── service.py
-│   │   │   └── routes.py
-│   │   │
-│   │   └── assignments/
-│   │       ├── README.md
-│   │       ├── models.py
-│   │       ├── schemas.py
-│   │       ├── repository.py
-│   │       ├── service.py
-│   │       └── routes.py
-│   │
-│   ├── database/
-│   │   └── README.md
-│   │
-│   └── web/
-│       ├── templates/
-│       │   ├── base.html
-│       │   └── home.html
-│       └── static/css/
-│           ├── input.css
-│           └── app.css
-│
-└── tests/
-    ├── architecture/
-    ├── integration/
-    └── unit/     # Unit, integration และ architecture tests
+src/questly/
+├── main.py             # composition root: สร้าง adapter กับ service แล้ว mount router
+├── config.py           # ค่าตั้งที่อ่านจาก environment
+├── api_errors.py       # รูปแบบ error JSON ที่ทุก route ใช้ร่วมกัน
+├── core/               # slice: topics (ตัวอ้างอิง), auth, classrooms, assignments,
+│                       #   generation, submissions, uploads, notifications, admin
+├── ai/                 # โมดูล AI ไม่มี route ของตัวเอง: vector storage (app/),
+│                       #   ingestion/, embeddings/, retrieval/, client.py
+├── integrations/       # adapter ของบริการภายนอก (Judge0, email, generation jobs)
+├── database/           # SQL adapter (core/, rag/), R2 (storage/), health check
+└── web/                # Jinja templates และ static assets
+
+alembic/                # migration history เดียวสำหรับทั้งสอง schema
+scripts/                # demo mode, seed, ตัวรัน integration test, task scope
+tests/                  # unit, integration, architecture, contracts, fakes, db, r2
 ```
 
 ## เอกสารอ้างอิงโครงสร้างข้อมูล
@@ -273,33 +268,27 @@ from pgvector.sqlalchemy import Vector                   # ชนิดจาก
 
 ```text
 src/questly/
-├── core/                        ← Core Service (ห้าม import ORM)
-│   ├── topics/                  ✅ reference slice
+├── core/                        ← โมดูลของแอป ห้าม import ORM และห้าม import `ai`
+│   ├── topics/                  ✅ reference slice — ทำตามรูปนี้
 │   │   ├── models.py            dataclass(frozen=True, slots=True)
-│   │   ├── repository.py        typing.Protocol + InMemory impl
+│   │   ├── ports.py             typing.Protocol
 │   │   ├── service.py           sync ล้วน รับ repo ผ่าน constructor
 │   │   └── routes.py            sync def, ดึง service จาก app.state
-│   └── assignments/             ✅ slice ที่สมบูรณ์แล้ว — มี SQL adapter ใน database/core/
-│       ├── models.py            dataclass ล้วน
-│       ├── ports.py             typing.Protocol
-│       ├── service.py
-│       ├── routes.py
-│       └── testcase_routes.py
+│   └── assignments/ …           รูปเดียวกัน SQL adapter อยู่ใน database/core/
 │
-├── database/                    ← ของ tech lead คนเดียว ที่เดียวที่ import ORM ได้
+├── database/                    ← ของพายคนเดียว ที่เดียวที่ import ORM ได้
 │   │                              (ดู AGENTS.md หัวข้อ "Who may change database and locked files")
-│   ├── __init__.py              import tables ทั้ง 2 ฝั่ง (สำคัญกับ alembic)
-│   ├── session.py               engine + get_session (sync)
-│   ├── README.md
+│   ├── __init__.py              import tables ทั้ง 2 schema (สำคัญกับ alembic)
+│   ├── session.py               engine + session factory (sync)
 │   ├── core/
-│   │   ├── __init__.py
-│   │   ├── tables.py            ✅ SQLModel — schema `core`
-│   │   └── assignment_repository.py   ✅ implement core/assignments/ports.py
-│   └── rag/
-│       ├── __init__.py
-│       └── tables.py            ✅ SQLModel — schema `rag`
+│   │   ├── tables.py            SQLModel — schema `core`
+│   │   └── *_repository.py      SQL adapter หนึ่งตัวต่อหนึ่ง port ของ core
+│   ├── rag/
+│   │   ├── tables.py            SQLModel — schema `rag`
+│   │   └── vector_repository.py SQL adapter ของ ai/app/repository.py
+│   └── storage/r2.py            adapter ของ object storage
 │
-├── ai/                          ← โมดูล AI ในแอปเดียวกัน (vector storage ใช้ได้แล้ว ส่วน ingestion ยังไม่เริ่ม)
+├── ai/                          ← โมดูล AI ในแอปเดียวกัน เรียกผ่าน port ไม่มี route
 └── web/                         ← Jinja2 templates
 
 alembic/                         ← root ตาม convention
@@ -337,6 +326,9 @@ from questly.database.rag import tables as rag_tables    # noqa: F401
 ตรวจทุกครั้งก่อนรัน**
 
 ### 3. ERD
+
+> แผนภาพนี้เก่ากว่า schema ของ Classroom ตาม ADR-0007 และ ADR-0008
+> แหล่งความจริงคือ `database/core/tables.py` และ `database/rag/tables.py`
 
 ```mermaid
 erDiagram
@@ -501,22 +493,22 @@ use case ลบของโมดูล AI ผ่าน Python interface) ไม
    ถ้าวันไหนเริ่มชนกันบ่อย แยก branch ให้ teammate ใช้เวลาไม่กี่นาที
    ไม่ต้องตัดสินใจตอนนี้
 
-เนื่องจากตกลงว่า "ไม่แยก repo, single node" แล้ว ควรบันทึกเป็น ADR
-ต่อจาก `0003-` ไว้ด้วย เพื่อให้คนที่มาอ่านทีหลังรู้ว่าเป็นการเลือกที่ตั้งใจ
-ไม่ใช่ลืมแยก
+ทั้งสองข้อบันทึกแล้ว: migration history เดียวใน ADR-0004 และ repo กับแอปเดียวใน
+ADR-0005
 
 ### 6. ที่ยังเปิดอยู่
 
 | เรื่อง | สถานะ |
 |---|---|
-| Embedding model ตัวจริง | `VECTOR(768)` เป็น one-way door เปลี่ยนมิติทีหลัง = migrate ทั้งตาราง |
+| Embedding model | ตัดสินแล้ว: `google/gemini-embedding-001` ผ่าน OpenRouter ที่ 768 มิติ (ADR-0009) `VECTOR(768)` ยังเป็น one-way door เปลี่ยนมิติ = migrate ทั้งตารางและ embed ทุก chunk ใหม่ |
 
 ## เทคโนโลยีที่ใช้
 
 - Python 3.12+
 - FastAPI และ Uvicorn
 - SQLModel, SQLAlchemy และ Alembic
-- Neon PostgreSQL
+- Neon PostgreSQL และ pgvector
+- OpenRouter (SDK `openrouter`) สำหรับ embedding และ generation
 - Cloudflare R2 และ Boto3
 - Jinja2
 - Pytest และ Ruff
