@@ -67,9 +67,61 @@ class TestResult:
         return self.verdict is Verdict.PASSED
 
 
+class SubmissionStatus(StrEnum):
+    """Where a Submission is in judging; `done` and `failed` are terminal."""
+
+    RECEIVED = "received"
+    JUDGING = "judging"
+    DONE = "done"
+    FAILED = "failed"
+
+    @property
+    def pending(self) -> bool:
+        return self in (SubmissionStatus.RECEIVED, SubmissionStatus.JUDGING)
+
+    def can_move(self, target: "SubmissionStatus") -> bool:
+        return target in _MOVES[self]
+
+
+# The one transition table. `received` is written by receive, not by a move.
+_MOVES: dict[SubmissionStatus, frozenset[SubmissionStatus]] = {
+    SubmissionStatus.RECEIVED: frozenset(
+        {SubmissionStatus.JUDGING, SubmissionStatus.FAILED}
+    ),
+    SubmissionStatus.JUDGING: frozenset(
+        {SubmissionStatus.DONE, SubmissionStatus.RECEIVED, SubmissionStatus.FAILED}
+    ),
+    SubmissionStatus.DONE: frozenset(),
+    SubmissionStatus.FAILED: frozenset(),
+}
+
+
+class Recovery(StrEnum):
+    """What judging did after the original run was interrupted.
+
+    Set when the worker that started it vanished (its lease expired) or the
+    runner lost the batch. `reconnected`: the saved runner tokens were
+    collected. `rejudged`: the code was sent to the runner again. Declared in
+    rank order.
+    """
+
+    NONE = "none"
+    RECONNECTED = "reconnected"
+    REJUDGED = "rejudged"
+
+    def after(self, event: "Recovery") -> "Recovery":
+        """The marker once `event` happened; it never moves down."""
+        rank = list(Recovery)
+        return max(self, event, key=rank.index)
+
+
 @dataclass(frozen=True, slots=True)
 class Submission:
-    """A Student's graded code for one Posting. `id` is `None` before save."""
+    """A Student's code for one Posting. `id` is `None` before save.
+
+    Only a `done` Submission has a score and results. A Submission built
+    without a status is `done`, as every Submission was before async Submit.
+    """
 
     posting_id: int
     classroom_id: int
@@ -80,11 +132,20 @@ class Submission:
     language: str
     submitted_at: datetime
     is_late: bool
-    score: int
+    score: int | None
     max_score: int
     attempt: int
     results: tuple[TestResult, ...] = field(default_factory=tuple)
+    status: SubmissionStatus = SubmissionStatus.DONE
+    recovery: Recovery = Recovery.NONE
     id: int | None = None
+
+    def __post_init__(self) -> None:
+        done = self.status is SubmissionStatus.DONE
+        if done != (self.score is not None):
+            raise ValueError(f"a {self.status} Submission has a score iff done")
+        if self.results and not done:
+            raise ValueError(f"a {self.status} Submission has no results")
 
     @property
     def passed_count(self) -> int:
@@ -97,6 +158,45 @@ class Submission:
     @property
     def failed(self) -> tuple[TestResult, ...]:
         return tuple(result for result in self.results if not result.passed)
+
+
+@dataclass(frozen=True, slots=True)
+class Claim:
+    """A pending Submission a worker now holds the lease on.
+
+    `tokens` are the runner tokens `started` saved, in Test Case order; a
+    `received` Submission has none. `interrupted` is True when the previous
+    lease expired (its worker vanished) and False when the row was released.
+    """
+
+    submission: Submission
+    tokens: tuple[str, ...]
+    interrupted: bool
+
+    def __post_init__(self) -> None:
+        if not self.submission.status.pending:
+            raise ValueError("only a pending Submission can be claimed")
+        if self.submission.status is SubmissionStatus.RECEIVED and self.tokens:
+            raise ValueError("a received Submission has no runner tokens")
+
+
+class BatchState(StrEnum):
+    FINISHED = "finished"
+    RUNNING = "running"
+    GONE = "gone"
+
+
+@dataclass(frozen=True, slots=True)
+class BatchResult:
+    """What BatchRunner.collect saw. Only a finished batch has executions,
+    one per token in token order; `gone` means the runner lost the batch."""
+
+    state: BatchState
+    executions: tuple[Execution, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.executions and self.state is not BatchState.FINISHED:
+            raise ValueError(f"a {self.state} batch has no executions")
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,7 +225,9 @@ class InstructorTab(StrEnum):
 class StudentSolveView:
     """S-02 for a Member: the problem, their Submissions and what they may do.
 
-    `counted` is the latest Submission, or None before the first one.
+    `counted` is the latest `done` Submission, or None before the first one.
+    `pending` is the Submission being judged (S-02a), else None. `failed` is
+    the latest Submission when judging it failed, else None.
     `update` is the current Version when the counted Submission is on an
     older one (S-02e), else None.
     """
@@ -135,6 +237,8 @@ class StudentSolveView:
     hidden_count: int
     submissions: tuple[Submission, ...]
     counted: Submission | None
+    pending: Submission | None
+    failed: Submission | None
     update: AssignmentVersion | None
     closed: bool
     archived: bool
@@ -154,13 +258,23 @@ class TestFailure:
 
 @dataclass(frozen=True, slots=True)
 class StudentResult:
-    """One Member's row on T-02; `counted` is None if they never submitted."""
+    """One Member's row on T-02.
+
+    `counted` is None until a Submission of theirs is `done`; `pending` says
+    one is being judged.
+    """
 
     student_id: int
     name: str
     student_number: str | None
     counted: Submission | None
+    pending: bool
     attempts: int
+
+    @property
+    def listed(self) -> bool:
+        """Whether the T-02 table shows a row for them."""
+        return self.counted is not None or self.pending
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,6 +326,11 @@ class ClassroomArchivedError(PostingClosedError):
 
 class ResubmissionNotAllowedError(Exception):
     """The Posting allows one Submit only and the Student has used it."""
+
+
+class SubmissionPendingError(Exception):
+    """The Student's earlier Submission on this Posting is still being judged,
+    or this attempt number is already taken (a double-clicked Submit)."""
 
 
 class EmptyCodeError(ValueError):

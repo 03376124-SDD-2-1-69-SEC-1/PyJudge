@@ -9,8 +9,13 @@ environment variable is missing. There is no in-memory mode — a test that want
 one passes a fake from `tests/fakes/` explicitly.
 """
 
+import functools
+import logging
+import threading
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -78,7 +83,11 @@ from questly.core.notifications.ports import EmailSender, NotificationRepository
 from questly.core.notifications.routes import router as notification_router
 from questly.core.notifications.service import DueSoonService, NotificationService
 from questly.core.submissions.pages import router as submission_page_router
-from questly.core.submissions.ports import CodeRunner, SubmissionRepository
+from questly.core.submissions.ports import (
+    BatchRunner,
+    CodeRunner,
+    SubmissionRepository,
+)
 from questly.core.submissions.routes import (
     classroom_router as submission_classroom_router,
 )
@@ -127,6 +136,10 @@ _TEMPLATE_DIR = _WEB_DIR / "templates"
 _STATIC_DIR = _WEB_DIR / "static"
 # The quota line is on every T-03 and T-03c load: give up on OpenRouter fast.
 _QUOTA_TIMEOUT_MS = 5_000
+# How often the sweeper looks for Submissions whose judging must be taken over.
+_SWEEP_SECONDS = 15.0
+
+logger = logging.getLogger("questly.main")
 
 
 DISPLAY_ZONE = ZoneInfo("Asia/Bangkok")
@@ -154,7 +167,11 @@ def asset_url(path: str) -> str:
     return f"/static/{path}?v={version}"
 
 
-def build_code_runner(settings: Settings) -> CodeRunner:
+class Runner(CodeRunner, BatchRunner, Protocol):
+    """One runner serves Run (CodeRunner) and background Submit (BatchRunner)."""
+
+
+def build_code_runner(settings: Settings) -> Runner:
     """Judge0 CE when JUDGE0_URL is set; otherwise the stub, which runs nothing."""
     if not settings.judge0_url:
         return StubCodeRunner()
@@ -186,7 +203,7 @@ def create_app(
     classroom_repository: ClassroomRepository | None = None,
     classroom_stats: ClassroomStats | None = None,
     submission_repository: SubmissionRepository | None = None,
-    code_runner: CodeRunner | None = None,
+    code_runner: Runner | None = None,
     demo_accounts: tuple[DemoAccount, ...] | None = None,
     secure_cookies: bool | None = None,
 ) -> FastAPI:
@@ -352,7 +369,13 @@ def create_app(
     )
 
     application.state.submission_service = SubmissionService(
-        submission_repository, code_runner, assignment_service, classroom_service, clock
+        submission_repository,
+        code_runner,
+        code_runner,
+        assignment_service,
+        classroom_service,
+        version_repository,
+        clock,
     )
 
     if generation_client is None:
@@ -521,6 +544,45 @@ def create_app(
     return application
 
 
+def run_sweeper(
+    recover: Callable[[], None], stop: threading.Event, period_seconds: float
+) -> None:
+    """Call `recover` every `period_seconds` until `stop` is set.
+
+    A failing sweep is logged and the next one runs anyway, so one bad row
+    never ends recovery for the rest.
+    """
+    while not stop.is_set():
+        try:
+            recover()
+        except Exception:
+            logger.exception("judging sweep failed")
+        stop.wait(period_seconds)
+
+
+def start_sweeper(recover: Callable[[], None]) -> None:
+    """Run the sweeper on a daemon thread for the life of the process."""
+    threading.Thread(
+        target=run_sweeper,
+        args=(recover, threading.Event(), _SWEEP_SECONDS),
+        name="judging-sweeper",
+        daemon=True,
+    ).start()
+
+
+@functools.cache
+def production_app() -> FastAPI:
+    """The served app, and the one judging sweeper for this process.
+
+    Started here and never in `create_app`, so tests build apps without
+    threads; a lifespan hook would need `async def`, which this codebase
+    does not use.
+    """
+    application = create_app()
+    start_sweeper(application.state.submission_service.recover)
+    return application
+
+
 def __getattr__(name: str) -> FastAPI:
     """Build the ASGI app the first time `questly.main:app` is resolved.
 
@@ -529,5 +591,5 @@ def __getattr__(name: str) -> FastAPI:
     test does — require a populated `.env`.
     """
     if name == "app":
-        return create_app()
+        return production_app()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

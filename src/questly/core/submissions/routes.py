@@ -4,7 +4,14 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import NoReturn
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 
 from questly.core.assignments.models import TestCaseKind
 from questly.core.auth.current import current_actor
@@ -15,6 +22,7 @@ from questly.core.submissions.models import (
     ResubmissionNotAllowedError,
     RunnerUnavailableError,
     Submission,
+    SubmissionPendingError,
     TestResult,
 )
 from questly.core.submissions.schemas import (
@@ -55,6 +63,12 @@ def domain_errors() -> Iterator[None]:
             "resubmission_not_allowed",
             "This problem allows one submission only",
         )
+    except SubmissionPendingError:
+        _fail(
+            status.HTTP_409_CONFLICT,
+            "submission_pending",
+            "Your last submission is still being judged",
+        )
     except EmptyCodeError:
         _fail(422, "empty_code", "Code is empty")
     except RunnerUnavailableError:
@@ -86,6 +100,8 @@ def submission_response(submission: Submission) -> SubmissionResponse:
         version_number=submission.version_number,
         submitted_at=submission.submitted_at,
         is_late=submission.is_late,
+        status=submission.status,
+        recovery=submission.recovery,
         score=submission.score,
         max_score=submission.max_score,
         passed=submission.passed_count,
@@ -100,16 +116,23 @@ def submission_response(submission: Submission) -> SubmissionResponse:
 
 @classroom_router.post(
     "/{classroom_id}/assignments/{assignment_id}/submissions",
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 def submit(
-    request: Request, classroom_id: int, assignment_id: int, body: CodeRequest
+    request: Request,
+    response: Response,
+    classroom_id: int,
+    assignment_id: int,
+    body: CodeRequest,
+    background_tasks: BackgroundTasks,
 ) -> SubmissionResponse:
+    """Receives the code and judges it in the background; poll `Location`."""
     actor = current_actor(request)
+    service = _service(request)
     with domain_errors():
-        submission = _service(request).submit(
-            actor, classroom_id, assignment_id, body.code
-        )
+        submission = service.submit(actor, classroom_id, assignment_id, body.code)
+    background_tasks.add_task(service.judge, submission.id)
+    response.headers["Location"] = f"{router.prefix}/{submission.id}"
     return submission_response(submission)
 
 
@@ -141,6 +164,7 @@ def run(
 
 @router.get("/{submission_id}")
 def get_submission(request: Request, submission_id: int) -> SubmissionResponse:
+    """A Submission and how far judging it got; for its Student or Instructor."""
     actor = current_actor(request)
     with domain_errors():
         submission = _service(request).get(actor, submission_id)

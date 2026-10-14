@@ -1,9 +1,11 @@
 """Judge0CodeRunner against a real Judge0 CE named by JUDGE0_TEST_URL."""
 
+import uuid
+
 import httpx
 import pytest
 
-from questly.core.submissions.models import ExecutionStatus
+from questly.core.submissions.models import BatchState, ExecutionStatus
 from questly.integrations.judge0 import Judge0CodeRunner
 
 pytestmark = pytest.mark.judge0
@@ -45,3 +47,25 @@ def test_a_program_that_never_ends_hits_the_time_limit(
     )
 
     assert execution.status is ExecutionStatus.TIME_LIMIT
+
+
+def test_start_then_collect_finishes_each_input_in_order(
+    runner: Judge0CodeRunner,
+) -> None:
+    tokens = runner.start(
+        code="print(int(input()) + 1)",
+        language="python3",
+        stdins=["1", "2"],
+        time_limit_seconds=2.0,
+    )
+
+    batch = runner.collect(tokens)
+    while batch.state is BatchState.RUNNING:
+        batch = runner.collect(tokens)
+
+    assert batch.state is BatchState.FINISHED
+    assert [e.stdout for e in batch.executions] == ["2\n", "3\n"]
+
+
+def test_a_token_judge0_never_issued_is_gone(runner: Judge0CodeRunner) -> None:
+    assert runner.collect([str(uuid.uuid4())]).state is BatchState.GONE

@@ -11,6 +11,8 @@ import pytest
 
 from questly.core.assignments.models import Language
 from questly.core.submissions.models import (
+    BatchResult,
+    BatchState,
     Execution,
     ExecutionStatus,
     RunnerUnavailableError,
@@ -56,11 +58,11 @@ class FakeJudge0:
     """Hands out tokens t0, t1, ... and answers each poll from a script.
 
     `polls` is one list per GET: the reply for every token asked about, in
-    order of creation, minus the token field. When the script runs out the
-    last poll repeats.
+    order of creation, minus the token field, or None for a token Judge0 does
+    not know. When the script runs out the last poll repeats.
     """
 
-    def __init__(self, polls: list[list[dict[str, object]]]) -> None:
+    def __init__(self, polls: list[list[dict[str, object] | None]]) -> None:
         self.polls = polls
         self.created: list[dict[str, object]] = []
         self.requests: list[httpx.Request] = []
@@ -89,12 +91,18 @@ class FakeJudge0:
         self.gets += 1
         return httpx.Response(
             200,
-            json={
-                "submissions": [
-                    {"token": token, **replies[int(token[1:])]} for token in tokens
-                ]
-            },
+            json={"submissions": [_reply(token, replies) for token in tokens]},
         )
+
+
+def _reply(
+    token: str, replies: list[dict[str, object] | None]
+) -> dict[str, object] | None:
+    """Judge0 answers null for a token it does not know."""
+    reply = replies[int(token[1:])]
+    if reply is None:
+        return None
+    return {"token": token, **reply}
 
 
 class FakeTime:
@@ -317,3 +325,104 @@ def test_the_app_runs_code_on_judge0_only_when_a_url_is_configured() -> None:
 
     assert isinstance(build_code_runner(off), StubCodeRunner)
     assert isinstance(build_code_runner(on), Judge0CodeRunner)
+
+
+# ---- BatchRunner: start hands a batch over, collect checks on it ----------
+
+_QUEUED = {"status_id": 1, "stdout": None, "stderr": None, "time": None}
+
+
+def test_start_returns_one_token_per_input_in_order_across_chunks() -> None:
+    stdins = [str(n) for n in range(45)]
+    judge0 = FakeJudge0([[_done(3)]])
+
+    tokens = _runner(judge0).start(
+        code="print(input())", language="python3", stdins=stdins, time_limit_seconds=1
+    )
+
+    assert tokens == tuple(f"t{n}" for n in range(45))
+    assert [r.method for r in judge0.requests] == ["POST"] * 3
+    assert [_unb64(str(s["stdin"])) for s in judge0.created] == stdins
+
+
+def test_collect_finished_gives_executions_in_token_order() -> None:
+    judge0 = FakeJudge0([[_done(3, "zero"), _done(5), _done(3, "two")]])
+
+    batch = _runner(judge0).collect(["t2", "t0", "t1"])
+
+    assert batch.state is BatchState.FINISHED
+    assert [e.stdout for e in batch.executions] == ["two", "zero", ""]
+    assert batch.executions[2].status is ExecutionStatus.TIME_LIMIT
+
+
+def test_collect_waits_for_queued_tokens_within_its_budget() -> None:
+    judge0 = FakeJudge0([[_QUEUED], [_done(3, "ok")]])
+    time = FakeTime()
+
+    batch = _runner(judge0, time=time).collect(["t0"])
+
+    assert batch == BatchResult(
+        state=BatchState.FINISHED,
+        executions=(Execution(ExecutionStatus.OK, "ok", "", 0.012),),
+    )
+    assert time.slept == [0.5]
+
+
+def test_collect_says_running_when_its_budget_runs_out() -> None:
+    judge0 = FakeJudge0([[_QUEUED]])
+    time = FakeTime()
+
+    batch = _runner(judge0, time=time).collect(["t0"])
+
+    assert batch == BatchResult(state=BatchState.RUNNING)
+    assert time.now == 20.0
+
+
+@pytest.mark.parametrize(
+    "lost",
+    [None, _done(13), _done(99)],
+    ids=["unknown token", "internal error", "unmapped status"],
+)
+def test_collect_says_gone_when_judge0_lost_or_could_not_judge_a_token(
+    lost: dict[str, object] | None,
+) -> None:
+    judge0 = FakeJudge0([[_done(3, "a"), lost]])
+
+    batch = _runner(judge0).collect(["t0", "t1"])
+
+    assert batch == BatchResult(state=BatchState.GONE)
+
+
+def test_collect_of_nothing_is_finished_without_a_request() -> None:
+    judge0 = FakeJudge0([[_done(3)]])
+
+    assert _runner(judge0).collect([]) == BatchResult(state=BatchState.FINISHED)
+    assert judge0.requests == []
+
+
+def test_run_many_is_unavailable_when_judge0_forgets_a_token() -> None:
+    judge0 = FakeJudge0([[None]])
+
+    with pytest.raises(RunnerUnavailableError):
+        _run_many(_runner(judge0), ["x"])
+
+
+def test_collect_raises_when_judge0_is_unreachable() -> None:
+    def refuse(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused", request=request)
+
+    with pytest.raises(RunnerUnavailableError):
+        _runner(refuse).collect(["t0"])
+
+
+def test_the_stub_hands_out_tokens_and_collects_runtime_errors() -> None:
+    stub = StubCodeRunner()
+
+    tokens = stub.start(
+        code="print(1)", language="python3", stdins=["a", "b"], time_limit_seconds=1
+    )
+    batch = stub.collect(tokens)
+
+    assert tokens == ("stub-1", "stub-2")
+    assert batch.state is BatchState.FINISHED
+    assert [e.status for e in batch.executions] == [ExecutionStatus.RUNTIME_ERROR] * 2

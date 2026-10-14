@@ -1,4 +1,5 @@
-"""CodeRunner adapters: Judge0 CE over its batch API, and a stub that runs nothing."""
+"""CodeRunner and BatchRunner adapters: Judge0 CE over its batch API, and a stub
+that runs nothing."""
 
 import base64
 import logging
@@ -10,6 +11,8 @@ from pydantic import BaseModel, ValidationError
 
 from questly.core.assignments.models import Language
 from questly.core.submissions.models import (
+    BatchResult,
+    BatchState,
     Execution,
     ExecutionStatus,
     RunnerUnavailableError,
@@ -38,10 +41,12 @@ _FINISHED: dict[int, ExecutionStatus] = {
 }
 _FIELDS = "token,stdout,stderr,compile_output,status_id,time"
 
-# A Run or Submit holds its request open while Judge0 works, so the whole
-# batch gets a bound; each HTTP call gets a shorter one.
+# A Run holds its request open while Judge0 works, so the whole batch gets a
+# bound; each HTTP call gets a shorter one. A collect for a background Submit
+# polls for at most _COLLECT_SECONDS, well inside the 90 s judging lease.
 _POLL_INTERVAL_SECONDS = 0.5
 _BATCH_TIMEOUT_SECONDS = 30.0
+_COLLECT_SECONDS = 20.0
 _HTTP_TIMEOUT_SECONDS = 10.0
 
 
@@ -59,16 +64,18 @@ class _Judged(BaseModel):
 
 
 class _Polled(BaseModel):
-    submissions: list[_Judged]
+    # Judge0 answers null for a token it does not know.
+    submissions: list[_Judged | None]
 
 
 class Judge0CodeRunner:
-    """Runs code on Judge0 CE: one batch per call, polled to completion.
+    """Runs code on Judge0 CE as a CodeRunner and as a BatchRunner.
 
-    Synchronous: the caller waits until every input is judged, until
-    `timeout_seconds` pass, or until Judge0 fails, whichever comes first.
-    Anything short of a finished verdict for every input raises
-    RunnerUnavailableError, so nothing half-judged is graded.
+    `run_many` waits until every input is judged, until `timeout_seconds`
+    pass, or until Judge0 fails, whichever comes first; anything short of a
+    finished verdict for every input raises RunnerUnavailableError, so nothing
+    half-judged is graded. `start` and `collect` split that wait so a
+    background Submit can save the tokens in between.
     """
 
     def __init__(
@@ -109,17 +116,42 @@ class Judge0CodeRunner:
         stdins: Sequence[str],
         time_limit_seconds: float,
     ) -> tuple[Execution, ...]:
-        language_id = _language_id(language)
+        _language_id(language)
         if not stdins:
             return ()
         deadline = self._monotonic() + self._timeout
-        tokens = [
+        tokens = self.start(
+            code=code,
+            language=language,
+            stdins=stdins,
+            time_limit_seconds=time_limit_seconds,
+        )
+        batch = self._collect(tokens, deadline)
+        if batch.state is BatchState.RUNNING:
+            raise RunnerUnavailableError(
+                f"Judge0 did not finish within {self._timeout} seconds"
+            )
+        if batch.state is BatchState.GONE:
+            raise RunnerUnavailableError("Judge0 could not judge the code")
+        return batch.executions
+
+    def start(
+        self,
+        *,
+        code: str,
+        language: str,
+        stdins: Sequence[str],
+        time_limit_seconds: float,
+    ) -> tuple[str, ...]:
+        language_id = _language_id(language)
+        return tuple(
             token
             for chunk in _chunks(stdins)
             for token in self._create(code, language_id, chunk, time_limit_seconds)
-        ]
-        judged = self._wait(tokens, deadline)
-        return tuple(_execution(judged[token]) for token in tokens)
+        )
+
+    def collect(self, tokens: Sequence[str]) -> BatchResult:
+        return self._collect(tokens, self._monotonic() + _COLLECT_SECONDS)
 
     def _create(
         self,
@@ -148,23 +180,31 @@ class Judge0CodeRunner:
             raise RunnerUnavailableError("Judge0 answered for a different batch")
         return [item.token for item in created]
 
-    def _wait(self, tokens: list[str], deadline: float) -> dict[str, _Judged]:
-        judged: dict[str, _Judged] = {}
+    def _collect(self, tokens: Sequence[str], deadline: float) -> BatchResult:
+        judged: dict[str, Execution] = {}
         while True:
             pending = [token for token in tokens if token not in judged]
             for chunk in _chunks(pending):
-                for item in self._poll(chunk):
-                    if item.status_id not in _PENDING:
-                        judged[item.token] = item
+                for token, item in zip(chunk, self._poll(chunk), strict=True):
+                    if item is None:
+                        logger.warning("Judge0 does not know token %s", token)
+                        return BatchResult(state=BatchState.GONE)
+                    if item.status_id in _PENDING:
+                        continue
+                    if item.status_id not in _FINISHED:
+                        logger.warning("Judge0 status %d for %s", item.status_id, token)
+                        return BatchResult(state=BatchState.GONE)
+                    judged[token] = _execution(item)
             if len(judged) == len(tokens):
-                return judged
-            if self._monotonic() >= deadline:
-                raise RunnerUnavailableError(
-                    f"Judge0 did not finish within {self._timeout} seconds"
+                return BatchResult(
+                    state=BatchState.FINISHED,
+                    executions=tuple(judged[token] for token in tokens),
                 )
+            if self._monotonic() >= deadline:
+                return BatchResult(state=BatchState.RUNNING)
             self._sleep(self._poll_interval)
 
-    def _poll(self, tokens: Sequence[str]) -> list[_Judged]:
+    def _poll(self, tokens: Sequence[str]) -> list[_Judged | None]:
         params = {
             "tokens": ",".join(tokens),
             "base64_encoded": "true",
@@ -172,9 +212,12 @@ class Judge0CodeRunner:
         }
         reply = self._request("GET", params, None)
         try:
-            return _Polled.model_validate_json(reply.content).submissions
+            polled = _Polled.model_validate_json(reply.content).submissions
         except ValidationError as error:
             raise RunnerUnavailableError("Judge0 sent an unreadable reply") from error
+        if len(polled) != len(tokens):
+            raise RunnerUnavailableError("Judge0 answered for different tokens")
+        return polled
 
     def _request(
         self,
@@ -221,19 +264,13 @@ def _chunks(items: Sequence[str]) -> Iterator[Sequence[str]]:
 
 
 def _execution(judged: _Judged) -> Execution:
-    status = _FINISHED.get(judged.status_id)
-    if status is None:
-        logger.warning("Judge0 status %d for %s", judged.status_id, judged.token)
-        raise RunnerUnavailableError(
-            f"Judge0 could not judge the code (status {judged.status_id})"
-        )
     error = "\n".join(
         text
         for text in (_decode(judged.compile_output), _decode(judged.stderr))
         if text
     )
     return Execution(
-        status=status,
+        status=_FINISHED[judged.status_id],
         stdout=_decode(judged.stdout),
         stderr=error,
         time_seconds=0.0 if judged.time is None else float(judged.time),
@@ -251,7 +288,8 @@ def _decode(text: str | None) -> str:
 
 
 class StubCodeRunner:
-    """Satisfies CodeRunner without Judge0: every run is a runtime error.
+    """Satisfies CodeRunner and BatchRunner without Judge0: every run is a
+    runtime error.
 
     Records each call so a deployment without Judge0 fails visibly instead
     of grading code it never ran.
@@ -265,12 +303,7 @@ class StubCodeRunner:
     ) -> Execution:
         self.calls.append((language, stdin))
         logger.warning("code runner not configured; %s run refused", language)
-        return Execution(
-            status=ExecutionStatus.RUNTIME_ERROR,
-            stdout="",
-            stderr="The code runner is not configured.",
-            time_seconds=0.0,
-        )
+        return _NOT_CONFIGURED
 
     def run_many(
         self,
@@ -289,3 +322,30 @@ class StubCodeRunner:
             )
             for stdin in stdins
         )
+
+    def start(
+        self,
+        *,
+        code: str,
+        language: str,
+        stdins: Sequence[str],
+        time_limit_seconds: float,
+    ) -> tuple[str, ...]:
+        for stdin in stdins:
+            self.calls.append((language, stdin))
+        logger.warning("code runner not configured; %s batch refused", language)
+        return tuple(f"stub-{n}" for n in range(1, len(stdins) + 1))
+
+    def collect(self, tokens: Sequence[str]) -> BatchResult:
+        return BatchResult(
+            state=BatchState.FINISHED,
+            executions=tuple(_NOT_CONFIGURED for _ in tokens),
+        )
+
+
+_NOT_CONFIGURED = Execution(
+    status=ExecutionStatus.RUNTIME_ERROR,
+    stdout="",
+    stderr="The code runner is not configured.",
+    time_seconds=0.0,
+)
