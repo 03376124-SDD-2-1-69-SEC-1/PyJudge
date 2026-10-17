@@ -1,5 +1,7 @@
 """JSON API for Submissions and Runs under /api/v1 (ADR-0007 API contract)."""
 
+import csv
+import io
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import NoReturn
@@ -145,6 +147,78 @@ def list_submissions(
     with domain_errors():
         submissions = _service(request).submissions(actor, classroom_id, assignment_id)
     return [submission_response(submission) for submission in submissions]
+
+
+@classroom_router.get("/{classroom_id}/assignments/{assignment_id}/submissions.csv")
+def export_submissions_csv(
+    request: Request,
+    classroom_id: int,
+    assignment_id: int,
+) -> Response:
+    """Export submission history for an Instructor."""
+    actor = current_actor(request)
+
+    with domain_errors():
+        submissions = _service(request).submissions(actor, classroom_id, assignment_id)
+
+    # Students may view their own submission history but cannot export
+    # the class-wide submission report.
+    role = getattr(actor, "role", None)
+    role_value = getattr(role, "value", role)
+
+    if role_value != "instructor":
+        _fail(
+            status.HTTP_403_FORBIDDEN,
+            "permission_denied",
+            "Instructor access required",
+        )
+
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+
+    writer.writerow(
+        [
+            "Submission ID",
+            "Student ID",
+            "Attempt",
+            "Version",
+            "Submitted At",
+            "Status",
+            "Score",
+            "Max Score",
+            "Passed Tests",
+            "Total Tests",
+            "Late",
+        ]
+    )
+
+    for submission in submissions:
+        writer.writerow(
+            [
+                submission.id,
+                submission.student_id,
+                submission.attempt,
+                submission.version_number,
+                submission.submitted_at.isoformat(),
+                submission.status.value,
+                "" if submission.score is None else submission.score,
+                submission.max_score,
+                submission.passed_count,
+                len(submission.results),
+                submission.is_late,
+            ]
+        )
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="classroom-{classroom_id}'
+                f'-assignment-{assignment_id}-submissions.csv"'
+            )
+        },
+    )
 
 
 @classroom_router.post("/{classroom_id}/assignments/{assignment_id}/runs")

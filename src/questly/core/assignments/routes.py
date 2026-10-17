@@ -5,6 +5,8 @@ Two routers: `router` under /api/v1/assignments for content and Versions,
 Summary tab.
 """
 
+import csv
+import io
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import NoReturn
@@ -352,4 +354,46 @@ def summary(request: Request, classroom_id: int) -> SummaryResponse:
         passed=result.passed,
         total=result.total,
         avg_score=result.avg_score,
+    )
+
+
+@classroom_router.get("/{classroom_id}/summary.csv")
+def export_classroom_summary(request: Request, classroom_id: int) -> Response:
+    """Export the Instructor's classroom score table as CSV."""
+    with domain_errors():
+        result = assignment_service(request).summary(
+            current_actor(request), classroom_id
+        )
+
+    # The summary use case also serves Students.
+    # CSV export is restricted to the Instructor.
+    if not isinstance(result, InstructorSummary):
+        _fail(
+            status.HTTP_403_FORBIDDEN,
+            "permission_denied",
+            "Instructor access required",
+        )
+
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+
+    writer.writerow(["Student", *result.problem_titles, "Total"])
+
+    for row in result.score_table:
+        writer.writerow(
+            [
+                row.student_name,
+                *["" if score is None else score for score in row.scores],
+                row.total,
+            ]
+        )
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="classroom-{classroom_id}-summary.csv"'
+            )
+        },
     )
