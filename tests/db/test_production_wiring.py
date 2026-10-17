@@ -33,7 +33,7 @@ from questly.integrations.email import StubEmailSender
 from questly.main import create_app
 from tests.fakes.app import fake_settings
 from tests.fakes.auth import verification_path
-from tests.fakes.uploads import FakeObjectStorage
+from tests.fakes.documents import FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
 
 pytestmark = pytest.mark.postgres
@@ -299,3 +299,32 @@ def test_admin_model_change_reaches_the_generation_client(
         assert create.call_args.kwargs["model"] == "chosen/by-admin"
     finally:
         settings_repository.update_ai_settings(original_settings)
+
+
+@pytest.mark.usefixtures("empty_core_tables")
+def test_uploading_a_document_records_the_uploader_in_postgres(
+    postgres_url: str, session_factory: SessionFactory
+) -> None:
+    storage = FakeObjectStorage()
+    app = create_app(
+        settings=replace(fake_settings(), database_url=postgres_url),
+        email_sender=StubEmailSender(),
+        object_storage=storage,
+        vector_repository=FakeVectorRepository(),
+    )
+    teacher = _account(session_factory, "somchai.p@kmitl.ac.th", Role.INSTRUCTOR)
+
+    stored = app.state.document_service.store(
+        teacher, filename="lecture.pdf", data=b"%PDF-1.4 lecture"
+    )
+
+    with session_factory() as session:
+        rows = session.execute(
+            text("SELECT id, uploaded_by, r2_object_key FROM core.knowledge_documents")
+        ).all()
+    assert [tuple(row) for row in rows] == [
+        (stored.id, teacher.user_id, stored.object_key)
+    ]
+    assert stored.object_key in storage.objects
+    library = app.state.document_service.list(teacher)
+    assert [item.document for item in library] == [stored]

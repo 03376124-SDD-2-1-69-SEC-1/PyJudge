@@ -15,7 +15,7 @@ from botocore.client import BaseClient
 from botocore.config import Config
 
 from questly.config import Settings
-from questly.core.uploads.models import StoredObject
+from questly.core.documents.models import StoredObject
 
 
 def build_r2_client(settings: Settings) -> BaseClient:
@@ -42,6 +42,14 @@ class R2ObjectStorage:
         """Store `data` under `key` and report where it landed."""
         self._client.put_object(Bucket=self._bucket, Key=key, Body=data)
         return StoredObject(bucket=self._bucket, key=key)
+
+    def get(self, key: str) -> bytes:
+        """Return the bytes stored under `key`."""
+        return self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
+
+    def delete(self, key: str) -> None:
+        """Remove the object under `key`; a missing key is not an error."""
+        self._client.delete_object(Bucket=self._bucket, Key=key)
 
 
 def check_r2(client: BaseClient, bucket: str) -> dict:
