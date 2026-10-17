@@ -197,7 +197,7 @@ line in `config.py`'s `DEFAULT_GENERATION_ALLOWLIST`, the value in
   (`gemma-4-26b` vs `gemma-4-31b`). And `usable` reads 0 yes out of 3 for
   every model — not for a single reason: of the eight judged rows
   carrying a `no`, six fell under the rubric's mechanical rule (some
-  score of 2 or lower — originality 1.0 in all six), while two said `no`
+  score of 2 or lower — originality 2 or lower in all six), while two said `no`
   with every score at 3 or higher (laguna-s's `1073` reply was English
   and lacked the input/output format, and its `1083` reply carried the
   stray Japanese fragment «すべて» alongside missing examples). A
