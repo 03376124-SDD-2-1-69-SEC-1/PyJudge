@@ -126,6 +126,21 @@ class TestSQLDocumentRepository(DocumentRepositoryContract):
 
         return seed
 
+    def test_get_for_owner_counts_saved_drafts(
+        self,
+        repository: SQLKnowledgeDocumentRepository,
+        seed_document: SeedDocument,
+        seed_usage: SeedUsage,
+    ) -> None:
+        """The service refuses to delete a document on this number."""
+        document = seed_document(10, "used.pdf")
+        seed_usage(document.id, 2)
+
+        item = repository.get_for_owner(document.id, 10)
+
+        assert item is not None
+        assert item.used_in == 2
+
     def test_create_records_the_uploader_and_status(
         self,
         session_factory: SessionFactory,

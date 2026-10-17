@@ -108,7 +108,11 @@ class SQLKnowledgeDocumentRepository:
             return DocumentLibraryItem(_to_domain(row), used)
 
     def delete_for_owner(self, document_id: int, uploaded_by: int) -> bool:
-        """Delete an owned, unused document; report whether a row went away."""
+        """Delete an owned, unused document; report whether a row went away.
+
+        No foreign key ties `drafts.document_ids` to this table, so a draft
+        saved after the statement's snapshot can still name a deleted id.
+        """
         statement = delete(KnowledgeDocumentRow).where(
             KnowledgeDocumentRow.id == document_id,
             KnowledgeDocumentRow.uploaded_by == uploaded_by,
