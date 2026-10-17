@@ -14,6 +14,7 @@ from questly.database.core.knowledge_document_repository import (
 )
 from questly.database.core.tables import Classroom as ClassroomRow
 from questly.database.core.tables import DraftRow
+from questly.database.core.tables import KnowledgeDocument as DocumentRow
 from questly.database.core.tables import User as UserRow
 from questly.database.session import SessionFactory
 from tests.contracts.document_repository import (
@@ -98,7 +99,9 @@ class TestSQLDocumentRepository(DocumentRepositoryContract):
 
         def seed(document_id: int, uses: int) -> None:
             with session_factory() as session:
-                owner = session.get(UserRow, 10)
+                document = session.get(DocumentRow, document_id)
+                assert document is not None
+                owner = session.get(UserRow, document.uploaded_by)
                 assert owner is not None
                 classroom = ClassroomRow(
                     instructor_id=owner.id,

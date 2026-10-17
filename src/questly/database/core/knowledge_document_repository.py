@@ -7,7 +7,7 @@ because it is the only layer allowed to see both.
 
 from __future__ import annotations
 
-from sqlalchemy import any_, delete, exists, func
+from sqlalchemy import ColumnElement, ScalarSelect, any_, delete, exists, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 
@@ -32,7 +32,7 @@ def _to_domain(row: KnowledgeDocumentRow) -> KnowledgeDocument:
     )
 
 
-def _draft_uses(document_id: int | object):
+def _draft_uses(document_id: ColumnElement[int]) -> ColumnElement[bool]:
     """Match the drafts that list this document as a source."""
     return document_id == any_(DraftRow.document_ids)
 
@@ -123,7 +123,7 @@ class SQLKnowledgeDocumentRepository:
         return result.rowcount == 1
 
     @staticmethod
-    def _used_in():
+    def _used_in() -> ScalarSelect[int]:
         return (
             select(func.count())
             .select_from(DraftRow)
