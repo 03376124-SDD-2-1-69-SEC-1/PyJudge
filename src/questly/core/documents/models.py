@@ -3,6 +3,13 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
+__all__ = [
+    "DocumentLibraryItem",
+    "DocumentStatus",
+    "KnowledgeDocument",
+    "StoredObject",
+]
+
 
 class DocumentStatus(StrEnum):
     """Where a document is in the ingestion pipeline.
@@ -44,3 +51,11 @@ class KnowledgeDocument:
     content_hash: str
     status: DocumentStatus = DocumentStatus.UPLOADED
     id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentLibraryItem:
+    """A document in an Instructor's library with its saved-draft usage count."""
+
+    document: KnowledgeDocument
+    used_in: int
