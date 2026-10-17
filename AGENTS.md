@@ -141,6 +141,8 @@ The project was renamed to Questly. The package is `src/questly/`, imports are
 tree next to `src/questly/`.
 
 - Before you start work and before you open a PR: `git pull origin dev`.
+  Exception: on a stacked branch (see "Agent workflow rules") never pull
+  `dev`. Update with `git fetch origin && git rebase origin/<dependency-branch>`.
 - New code goes under `src/questly/`. If your branch has `src/<old name>/`, move
   the files into the matching `src/questly/` folder, fix the imports, and delete
   the old folder.
@@ -427,24 +429,29 @@ Anywhere else, `| None` is not allowed.
 
 ## Agent workflow rules
 
-These rules apply to every Claude Code session on this repo, for every team member.
+Binding by team agreement; not covered by tests/architecture/test_conventions.py.
+
+These rules apply to every agent on this repo, for every team member. The
+subagent steps below are how Claude Code does them; another agent does the
+equivalent by hand.
 
 ### Source of truth
-- The ticket row is the spec. A ticket prompt only names the row and any deviation from the default recipe.
-- If the row conflicts with this file, stop and ask.
+- The ticket row is the spec. A ticket prompt only names the row and any deviation from the default recipe, which is the flow in `.claude/commands/start-task.md`.
+- If the row conflicts with this file, stop and ask. The one exception is a row that tells you to edit another person's row or branch: see "Ownership and scope".
 
 ### Stacked branches
 When a ticket depends on a branch that is not merged yet:
 - Branch off it without asking: `git switch -c <type>/<ID>-<slug> origin/<dependency-branch>`.
 - Never push to, rebase, or force-push another person's branch.
-- Never merge `origin/dev` into a stacked branch.
-- After the dependency lands in dev, run `git rebase --onto origin/dev origin/<dependency-branch>`, then `git push --force-with-lease` on your own branch only.
-- Open the PR as a draft against dev, with the title prefix `[stacked on <DEP-ID>]` and the dependency stated in the body.
+- Never `git pull origin dev` on a stacked branch, and never merge `origin/dev` into it. Update with `git fetch origin && git rebase origin/<dependency-branch>`.
+- Open the PR as a draft against dev, with the title prefix `[stacked on <DEP-ID>]`. State the dependency in the body and record the dependency branch's tip SHA (`git rev-parse origin/<dependency-branch>`), because merged branches get deleted.
+- The stacked PR merges only after the dependency's row is done and CI is green. Merge it with a merge commit, never squash, so the dependency author's commits stay theirs.
+- If the dependency lands alone first: `git fetch origin && git rebase --onto origin/dev <recorded SHA>`, then `git push --force-with-lease` on your own branch only.
 
-### Ownership
-- Never edit a row, file, or branch owned by someone else, even if a row says to.
-- Put the change you need under "Needs owner action" in the PR description instead.
-- If finishing the ticket requires changing files in another ticket's scope, stop and ask before editing. List the files and why.
+### Ownership and scope
+Two cases, and only these:
+- A file outside the row's "May touch" column, locked files included: stop and ask before editing. List the files and why.
+- Another person's row or branch: never edit it, even if a row says to. List the change you need under "Needs owner action" in the PR description and continue. This is an exception to "If the row conflicts with this file, stop and ask".
 
 ### Autonomy
 - Without asking: create your branch, run tests, commit, push your own branch, open or update a draft PR.
@@ -452,5 +459,5 @@ When a ticket depends on a branch that is not merged yet:
 
 ### Subagents
 - Before editing, use an Explore subagent to gather facts (the row, the dependency diff, contracts, existing patterns). Keep the main context for edits.
-- Before pushing, run a fresh review subagent that has not seen the work. Give it the row and `git diff origin/<base>...HEAD`, and have it check the row's acceptance criteria and these rules. Fix what it finds, or report it.
+- Before pushing, run a fresh self-check subagent that has not seen the work. Give it the row and `git diff origin/<base>...HEAD`, and have it check the row's acceptance criteria and these rules. Fix what it finds, or report it. The self-check does not replace พาย's review (see "Git").
 - Never let two subagents edit the same files in parallel.

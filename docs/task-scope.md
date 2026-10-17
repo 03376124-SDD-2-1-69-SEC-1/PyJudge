@@ -36,9 +36,13 @@ to `src/questly/` unless they start with `tests/`, `docs/`, `scripts/`,
   contract in `tests/contracts/`, the fake in `tests/fakes/` with its unit
   binding, and its own wiring in `main.py`; the OPS row writes the adapter in
   `database/core/`, binds the same contract in `tests/db/` and builds the
-  adapter in `main.py`. The OPS branch stacks on the slice branch and both
-  land on `dev` together: the slice PR alone leaves production with an
-  unwired port.
+  adapter in `main.py`. The OPS branch stacks on the slice branch (AGENTS.md
+  "Stacked branches"). The OPS PR records the slice branch's tip SHA in its
+  body and merges only after the slice row is done and CI is green, with a
+  merge commit and never a squash, so the slice author's commits land with it.
+  If the slice PR lands alone first, the OPS branch moves with
+  `git rebase --onto origin/dev <recorded SHA>`. The slice PR alone leaves
+  production with an unwired port.
 
 Rows that were closed and no longer apply are in `docs/task-archive.md`.
 
@@ -110,7 +114,7 @@ Rows that were closed and no longer apply are in `docs/task-archive.md`.
 | OPS-27 | พาย | done | `docs/task-scope.md`, `docs/task-archive.md`, `AGENTS.md`, `docs/ui-audit.md` | the task-scope table, the AGENTS.md Status table and ui-audit match dev after UI-02 |
 | OPS-29 | พาย | done | `README.md`, `README.th.md`, `AGENTS.md`, `docs/task-scope.md` | README ทั้งสองภาษาไม่เล่าว่า Core กับ AI เป็นสอง service แล้ว: ตัด banner "Superseded" ออกแล้วเขียนย่อหน้าสถาปัตยกรรมปัจจุบันแทน (แอปเดียว, `core/` และ `ai/` เรียกกันผ่าน `typing.Protocol`, `ai/` ไม่มี route, Neon schema `core`/`rag`, R2, OpenRouter); โครงสร้างโปรเจกต์และโครงสร้างโฟลเดอร์ตรงกับ `src/questly/` บน `dev` หลัง OPS-16; ERD มีหมายเหตุว่าเก่ากว่า ADR-0007/0008 และให้ดู `tables.py`; embedding model ไม่อยู่ในหัวข้อที่ยังเปิดแล้ว (ADR-0009); AGENTS.md "Ports and adapters" เรียก OpenRouter ว่า AI provider ไม่ใช่ AI service. Done — PR #67 |
 | OPS-31 | พาย | done | `docs/task-scope.md`, `AGENTS.md` | พายถือเฉพาะงานที่แตะ `database/` (OPS-18, OPS-20) กับการรีวิว PR: AI-09 ปิดเป็น done และส่วนที่เหลือเป็น AI-10 ของฟิล์ม, OPS-25 ไปที่ฟิล์ม, FE-08 (เหลือ T-06) และ OPS-24 ไปที่นัด; ตาราง Status ใน AGENTS.md ตรงกับเจ้าของใหม่ |
-| OPS-32 | พาย | open | `AGENTS.md`, `docs/task-scope.md` | AGENTS.md ลงท้ายด้วยส่วน "Agent workflow rules" สำหรับทุก Claude Code session: แถวของ ticket คือ spec, stacked branch (แตกจาก dependency, `rebase --onto` หลัง dependency เข้า dev, ห้าม merge `origin/dev` เข้า stack), ความเป็นเจ้าของ (ห้ามแก้แถว ไฟล์ หรือ branch ของคนอื่น ให้ลงใน "Needs owner action" แทน), autonomy (สิ่งที่ agent ทำเองได้ กับสิ่งที่เป็นของคน) และ subagent (Explore ก่อนแก้ และ review ใหม่ก่อน push); ข้อความตรงกับที่ระบุใน PR ทุกตัวอักษร และส่วนอื่นของ AGENTS.md ไม่เปลี่ยน |
+| OPS-32 | พาย | done | `AGENTS.md`, `docs/task-scope.md`, `.claude/commands/start-task.md` | AGENTS.md ลงท้ายด้วยส่วน "Agent workflow rules" สำหรับทุก agent: แถวของ ticket คือ spec, stacked branch (แตกจาก dependency, `rebase --onto` หลัง dependency เข้า dev, ห้าม merge `origin/dev` เข้า stack), ความเป็นเจ้าของ (ห้ามแก้แถว ไฟล์ หรือ branch ของคนอื่น ให้ลงใน "Needs owner action" แทน), autonomy (สิ่งที่ agent ทำเองได้ กับสิ่งที่เป็นของคน) และ subagent (Explore ก่อนแก้ และ self-check ใหม่ก่อน push); ข้อความตรงกับที่ระบุใน PR ทุกตัวอักษร และส่วนอื่นของ AGENTS.md ไม่เปลี่ยน. Done: PR #79 added the section; the OPS-32 reconciliation PR rewrote it (stacked-branch landing, pull exception, ownership and scope, self-check, scope of agents, default recipe), so the byte-for-byte clause and "ส่วนอื่นของ AGENTS.md ไม่เปลี่ยน" no longer hold |
 
 ## The composition root
 
