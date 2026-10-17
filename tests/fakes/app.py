@@ -21,6 +21,7 @@ from questly.core.assignments.ports import (
 from questly.core.auth.pages import DemoAccount
 from questly.core.auth.ports import AuthRepository, Clock
 from questly.core.classrooms.ports import ClassroomRepository, ClassroomStats
+from questly.core.documents.ports import KnowledgeDocumentRepository, ObjectStorage
 from questly.core.generation.ports import (
     DocumentCatalog,
     DraftRepository,
@@ -30,7 +31,6 @@ from questly.core.generation.ports import (
 )
 from questly.core.submissions.ports import SubmissionRepository
 from questly.core.topics.ports import TopicRepository
-from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
 from questly.integrations.email import StubEmailSender
 from questly.main import Runner, create_app
 from tests.fakes.admin import FakeAdminRepository, FakeSystemHealthChecker
@@ -41,6 +41,7 @@ from tests.fakes.assignments import (
 )
 from tests.fakes.auth import FakeAuthRepository, FakeClock
 from tests.fakes.classrooms import FakeClassroomRepository, FakeClassroomStats
+from tests.fakes.documents import FakeKnowledgeDocumentRepository, FakeObjectStorage
 from tests.fakes.generation import (
     FakeDocumentCatalog,
     FakeDraftRepository,
@@ -50,7 +51,6 @@ from tests.fakes.generation import (
 from tests.fakes.notifications import FakeNotificationRepository
 from tests.fakes.submissions import FakeSubmissionRepository, ScriptedCodeRunner
 from tests.fakes.topics import FakeTopicRepository
-from tests.fakes.uploads import FakeKnowledgeDocumentRepository, FakeObjectStorage
 from tests.fakes.vector import FakeVectorRepository
 
 

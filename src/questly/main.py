@@ -66,6 +66,9 @@ from questly.core.classrooms.ports import ClassroomRepository, ClassroomStats
 from questly.core.classrooms.routes import router as classroom_router
 from questly.core.classrooms.service import ClassroomService
 from questly.core.classrooms.stats import ComputedClassroomStats
+from questly.core.documents.ports import KnowledgeDocumentRepository, ObjectStorage
+from questly.core.documents.routes import router as document_router
+from questly.core.documents.service import DocumentService
 from questly.core.generation.pages import router as generation_page_router
 from questly.core.generation.ports import (
     DocumentCatalog,
@@ -97,9 +100,6 @@ from questly.core.submissions.stats import SubmissionPostingStats
 from questly.core.topics.ports import TopicRepository
 from questly.core.topics.routes import router as topic_router
 from questly.core.topics.service import TopicService
-from questly.core.uploads.ports import KnowledgeDocumentRepository, ObjectStorage
-from questly.core.uploads.routes import router as upload_router
-from questly.core.uploads.service import UploadService
 from questly.database.core.admin_repository import SQLAdminRepository
 from questly.database.core.assignment_repository import SQLAssignmentRepository
 from questly.database.core.auth_repository import SQLAuthRepository
@@ -414,7 +414,7 @@ def create_app(
         knowledge_document_repository = SQLKnowledgeDocumentRepository(
             use_session_factory()
         )
-    application.state.upload_service = UploadService(
+    application.state.document_service = DocumentService(
         object_storage,
         knowledge_document_repository,
         max_upload_size_bytes=use_settings().max_upload_size_bytes,
@@ -432,7 +432,7 @@ def create_app(
     application.include_router(draft_router)
     application.include_router(draft_classroom_router)
     application.include_router(generation_page_router)
-    application.include_router(upload_router)
+    application.include_router(document_router)
     application.include_router(notification_router)
     application.include_router(notification_page_router)
     application.include_router(auth_router)
