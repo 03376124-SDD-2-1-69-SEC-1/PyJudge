@@ -259,7 +259,7 @@ def run_case(code: str, stdin: str) -> bool:
     return process.returncode == 0
 
 
-def evaluate_draft(model: str, raw: str, elapsed: float, score: _Score) -> str:
+def evaluate_draft(raw: str, elapsed: float, score: _Score) -> str:
     """Draft-stage checks; returns the draft statement, "" when unusable."""
     score.elapsed_seconds = elapsed
     try:
@@ -300,8 +300,17 @@ def parse_judge_row(
         raise ValueError(f"usable is not yes/no: {usable!r}")
 
     def _star(value: str) -> float | None:
+        """The judge's score, None when empty, error when not an integer 1-5."""
         text = value.strip()
-        return float(text) if text else None
+        if not text:
+            return None
+        try:
+            number = float(text)
+        except ValueError as error:
+            raise ValueError(f"score is not a number: {value!r}") from error
+        if number < 1 or number > 5 or number != int(number):
+            raise ValueError(f"score must be an integer 1-5: {value!r}")
+        return number
 
     return (
         _star(fields[3]),
@@ -310,6 +319,19 @@ def parse_judge_row(
         usable,
         fields[7].strip(),
     )
+
+
+def _reply_raw(reply: object) -> str | None:
+    """The reply's text, or None when OpenRouter returned no choices.
+
+    An empty choices list happens on top-level errors the SDK turns into
+    200s; treating it as text would crash later, so both call sites guard
+    with this helper instead of indexing [0] blind.
+    """
+    if not reply.choices:
+        return None
+    content = reply.choices[0].message.content
+    return content if isinstance(content, str) else ""
 
 
 def judge_statement(
@@ -342,8 +364,10 @@ def judge_statement(
         except (OpenRouterError, NoResponseError) as error:
             score.judge_error = f"judge call failed: {type(error).__name__}"
             return
-        content = reply.choices[0].message.content
-        raw = content if isinstance(content, str) else ""
+        raw = _reply_raw(reply)
+        if raw is None:
+            score.judge_error = "empty choices"
+            return
         raw_path.write_text(raw, encoding="utf-8")
         try:
             thai, clarity, originality, usable, note = parse_judge_row(raw)
@@ -392,9 +416,15 @@ def _for_table(value: object) -> str:
     return "—" if value is None else str(value)
 
 
-def write_results(models: tuple[str, ...], scores: list[_Score]) -> None:
-    """Results so far, after every (model, task) row — a crash keeps the done rows."""
-    summaries = [summarise(m, [s for s in scores if s.model == m]) for m in models]
+def write_results(
+    models: tuple[str, ...], scores: list[_Score]
+) -> tuple[dict[str, object], ...]:
+    """Results so far, after every (model, task) row — a crash keeps the done rows.
+
+    Returns the summaries it built, so the closing table prints the same
+    numbers without computing them twice.
+    """
+    summaries = tuple(summarise(m, [s for s in scores if s.model == m]) for m in models)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "results.json").write_text(
         json.dumps(
@@ -404,6 +434,7 @@ def write_results(models: tuple[str, ...], scores: list[_Score]) -> None:
         ),
         encoding="utf-8",
     )
+    return summaries
 
 
 def main() -> None:
@@ -423,6 +454,7 @@ def main() -> None:
     statements = {task_id: load_statement(task_id) for task_id in task_ids}
     client = OpenRouter(api_key=api_key, timeout_ms=TIMEOUT_MS, retry_config=RETRY)
     scores: list[_Score] = []
+    summaries: tuple[dict[str, object], ...] = ()
 
     for index, model in enumerate(models):
         print(f"\n=== {model} ===")
@@ -444,47 +476,47 @@ def main() -> None:
                 score.error = f"call failed: {type(error).__name__}"
                 print(f"  {task_id}: CALL FAILED {type(error).__name__}")
             else:
-                content = reply.choices[0].message.content
-                raw = content if isinstance(content, str) else ""
-                (model_dir / f"{task_id}.raw").write_text(raw, encoding="utf-8")
-                statement = evaluate_draft(
-                    model, raw, time.monotonic() - started, score
-                )
-                print(
-                    f"  {task_id}: parse={'Y' if score.parse_ok else 'N'} "
-                    f"cases={score.test_cases} "
-                    f"ran={score.runs_passed}/{score.runs_total} "
-                    f"{round(score.elapsed_seconds, 1)}s"
-                )
-                if statement and not arguments.no_judge:
-                    score_dir = model_dir / "judge"
-                    score_dir.mkdir(exist_ok=True)
-                    problem_id = f"pith_{task_id}"
-                    label = f"var-{index + 1:02d}"
-                    judge_statement(
-                        client=client,
-                        judge_model=arguments.judge,
-                        problem_id=problem_id,
-                        label=label,
-                        source=statements[task_id],
-                        candidate=statement,
-                        score=score,
-                        raw_path=score_dir / f"{task_id}.raw",
-                    )
-                    verdict = score.usable or score.judge_error
+                raw = _reply_raw(reply)
+                if raw is None:
+                    score.error = "empty choices"
+                    print(f"  {task_id}: EMPTY CHOICES")
+                else:
+                    (model_dir / f"{task_id}.raw").write_text(raw, encoding="utf-8")
+                    statement = evaluate_draft(raw, time.monotonic() - started, score)
                     print(
-                        f"    judge({arguments.judge}): thai={score.thai_fluency} "
-                        f"clarity={score.clarity} originality={score.originality} "
-                        f"usable={score.usable or '-'} {verdict or 'no reply'}"
+                        f"  {task_id}: parse={'Y' if score.parse_ok else 'N'} "
+                        f"cases={score.test_cases} "
+                        f"ran={score.runs_passed}/{score.runs_total} "
+                        f"{round(score.elapsed_seconds, 1)}s"
                     )
-                    time.sleep(SLEEP_BETWEEN_JUDGE_CALLS)
+                    if statement and not arguments.no_judge:
+                        score_dir = model_dir / "judge"
+                        score_dir.mkdir(exist_ok=True)
+                        problem_id = f"pith_{task_id}"
+                        label = f"var-{index + 1:02d}"
+                        judge_statement(
+                            client=client,
+                            judge_model=arguments.judge,
+                            problem_id=problem_id,
+                            label=label,
+                            source=statements[task_id],
+                            candidate=statement,
+                            score=score,
+                            raw_path=score_dir / f"{task_id}.raw",
+                        )
+                        verdict = score.usable or score.judge_error
+                        print(
+                            f"    judge({arguments.judge}): thai={score.thai_fluency} "
+                            f"clarity={score.clarity} originality={score.originality} "
+                            f"usable={score.usable or '-'} {verdict or 'no reply'}"
+                        )
+                        time.sleep(SLEEP_BETWEEN_JUDGE_CALLS)
             time.sleep(SLEEP_BETWEEN_CALLS)
-            write_results(models, scores)
+            summaries = write_results(models, scores)
 
     header = ("model", "parse", "ran", "thai", "clarity", "originality", "usable")
     print("\n" + " | ".join(header))
-    for m in models:
-        model_score = summarise(m, [s for s in scores if s.model == m])
+    for model_score in summaries:
         print(
             f"{model_score['model']} | {model_score['parse_ok']} | "
             f"{model_score['runs_passed']} | "
