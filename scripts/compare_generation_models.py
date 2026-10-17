@@ -13,8 +13,11 @@
 
 ผลลัพธ์:
 - draft ดิบของแต่ละ (โมเดล × โจทย์) เก็บที่ data/model-comp/<model>/<task>.raw
-- คะแนนรายเกม + คะแนนตัดสิน รวมที่ data/model-comp/results.json (data/
-  อยู่นอก git — ตารางสรุปไปอยู่ใน docs/model-selection.md เอง)
+  และ reply ดิบของตัวตัดสินที่ data/model-comp/<model>/judge/<task>.raw
+- คะแนนรายเกม + คะแนนตัดสิน รวมที่ data/model-comp/results.json เขียนใหม่
+  หลังทุก (โมเดล × โจทย์) เพื่อให้รันค้างเก็บแถวที่เสร็จแล้วไว้ (data/
+  อยู่นอก git — สำเนาผลรันใน repo อยู่ที่ docs/adr/assets/0012-results.json
+  ผูกไว้ใน docs/adr/0012-generation-model-selection.md)
 - พิมพ์ตารางสรุปต่อโมเดลท้ายรัน
 
 รัน (จาก root ของ repo):
@@ -39,6 +42,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -82,13 +86,16 @@ DEFAULT_MODELS = (
 )
 DEFAULT_TASKS = ("0029", "1073", "1083")
 # ตัวตัดสินต้องไม่เป็นโมเดลผู้สมัคร เพื่อไม่ให้ตัดสินตัวเอง
-# (gemma-4-26b อยู่ในตระกูลเดียวกับ gemma-4-31b ที่เป็นผู้สมัคร — เบี่ยงเบยระดับ
-# sibling บันทึกไว้ใน docs/model-selection.md โมเดลอื่นที่ลองแล้ว: api key free
-# ของโครงการเรียกจ่ายหรือ inkling-small/nemotron-lightning ไม่ได้ Forbidden/BadRequest)
+# (gemma-4-26b อยู่ในตระกูลเดียวกับ gemma-4-31b ที่เป็นผู้สมัคร — เบี่ยงเบนระดับ
+# sibling บันทึกไว้ใน docs/adr/0012-generation-model-selection.md โมเดลอื่นที่
+# ลองแล้ว: api key free ของโครงการเรียกจ่ายหรือ inkling-small/nemotron-lightning
+# ไม่ได้ Forbidden/BadRequest)
 JUDGE_MODEL = "google/gemma-4-26b-a4b-it:free"
 
-# The rubric the team's reviewer round uses, kept verbatim; assembled from a
-# line list because long prompt lines would trip E501 inside a string literal.
+# The team's reviewer-round rubric, adapted (ADR-0012 §Judge): the example CSV
+# row is dropped, en dashes become hyphens, and long lines are re-wrapped —
+# the anchor sentences themselves are unchanged. Assembled from a line list
+# because long prompt lines would trip E501 inside a string literal.
 _JUDGE_RUBRIC_LINES = (
     "You are an expert reviewer of competitive-programming problems written in Thai.",
     'You will evaluate ONE AI-generated problem statement (the "candidate")',
@@ -228,15 +235,25 @@ def load_statement(task_id: str) -> str:
 
 
 def run_case(code: str, stdin: str) -> bool:
-    """True when the model's solution exits 0 in time on one input."""
+    """True when the model's solution exits 0 in time on one input.
+
+    The child is sandboxed: the model wrote the code, and it must not get
+    anything worth leaking. `python -I` leaves the import system and user
+    site-packages alone, the cwd is a fresh temporary directory (so no
+    repo file is in reach), and the env carries only PATH — every secret
+    the parent had, including OPENROUTER_API_KEY, stays home.
+    """
     try:
-        process = subprocess.run(
-            [sys.executable, "-c", code],
-            input=stdin,
-            capture_output=True,
-            text=True,
-            timeout=SOLUTION_RUN_TIMEOUT,
-        )
+        with tempfile.TemporaryDirectory() as scratch:
+            process = subprocess.run(
+                [sys.executable, "-I", "-c", code],
+                input=stdin,
+                capture_output=True,
+                text=True,
+                timeout=SOLUTION_RUN_TIMEOUT,
+                cwd=scratch,
+                env={"PATH": os.environ.get("PATH", "")},
+            )
     except subprocess.TimeoutExpired:
         return False
     return process.returncode == 0
@@ -303,8 +320,14 @@ def judge_statement(
     source: str,
     candidate: str,
     score: _Score,
+    raw_path: Path,
 ) -> None:
-    """Record the judge's verdict on one draft statement."""
+    """Record the judge's verdict on one draft statement.
+
+    Every reply the judge sends is written to raw_path before parsing, so
+    the evidence survives even when the reply is malformed or both of the
+    two attempts fail.
+    """
     message = (
         JUDGE_RUBRIC_TEMPLATE.replace("@@PROBLEM_ID@@", problem_id)
         .replace("@@LABEL@@", label)
@@ -321,6 +344,7 @@ def judge_statement(
             return
         content = reply.choices[0].message.content
         raw = content if isinstance(content, str) else ""
+        raw_path.write_text(raw, encoding="utf-8")
         try:
             thai, clarity, originality, usable, note = parse_judge_row(raw)
         except ValueError as error:
@@ -336,20 +360,18 @@ def judge_statement(
         return
 
 
-def _mean(values: list[float]) -> float:
-    return round(sum(values) / len(values), 2) if values else 0.0
+def _mean(values: list[float]) -> float | None:
+    return round(sum(values) / len(values), 2) if values else None
 
 
 def summarise(model: str, scores: list[_Score]) -> dict[str, object]:
     """Per-model row for the closing table and the doc."""
     parse_ok = sum(s.parse_ok for s in scores)
-    runs = {}
     totals = []
-    passed = []
+    ran = []
     for s in scores:
         totals.append(s.runs_total)
-        passed.append(s.runs_passed)
-    runs = (sum(passed), sum(totals))
+        ran.append(s.runs_passed)
     thai = [s.thai_fluency for s in scores if s.thai_fluency is not None]
     clarity = [s.clarity for s in scores if s.clarity is not None]
     originality = [s.originality for s in scores if s.originality is not None]
@@ -357,12 +379,31 @@ def summarise(model: str, scores: list[_Score]) -> dict[str, object]:
     return {
         "model": model,
         "parse_ok": f"{parse_ok}/{len(scores)}",
-        "runs_passed": f"{runs[0]}/{runs[1]}",
+        "runs_passed": f"{sum(ran)}/{sum(totals)}",
         "judge_thai_fluency": _mean(thai),
         "judge_clarity_correctness": _mean(clarity),
         "judge_originality_not_copied": _mean(originality),
         "judge_usable": f"{usable}/{len(scores)}",
     }
+
+
+def _for_table(value: object) -> str:
+    """The table cell for a summary value, "—" when the column is empty."""
+    return "—" if value is None else str(value)
+
+
+def write_results(models: tuple[str, ...], scores: list[_Score]) -> None:
+    """Results so far, after every (model, task) row — a crash keeps the done rows."""
+    summaries = [summarise(m, [s for s in scores if s.model == m]) for m in models]
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    (OUT_DIR / "results.json").write_text(
+        json.dumps(
+            {"rows": [s.as_dict() for s in scores], "summary": summaries},
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
@@ -412,7 +453,7 @@ def main() -> None:
                 print(
                     f"  {task_id}: parse={'Y' if score.parse_ok else 'N'} "
                     f"cases={score.test_cases} "
-                    f"runs={score.runs_passed}/{score.runs_total} "
+                    f"ran={score.runs_passed}/{score.runs_total} "
                     f"{round(score.elapsed_seconds, 1)}s"
                 )
                 if statement and not arguments.no_judge:
@@ -428,6 +469,7 @@ def main() -> None:
                         source=statements[task_id],
                         candidate=statement,
                         score=score,
+                        raw_path=score_dir / f"{task_id}.raw",
                     )
                     verdict = score.usable or score.judge_error
                     print(
@@ -437,26 +479,18 @@ def main() -> None:
                     )
                     time.sleep(SLEEP_BETWEEN_JUDGE_CALLS)
             time.sleep(SLEEP_BETWEEN_CALLS)
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    summaries = [summarise(m, [s for s in scores if s.model == m]) for m in models]
-    (OUT_DIR / "results.json").write_text(
-        json.dumps(
-            {"rows": [s.as_dict() for s in scores], "summary": summaries},
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+            write_results(models, scores)
 
-    header = ("model", "parse", "runs", "thai", "clarity", "originality", "usable")
+    header = ("model", "parse", "ran", "thai", "clarity", "originality", "usable")
     print("\n" + " | ".join(header))
     for m in models:
         model_score = summarise(m, [s for s in scores if s.model == m])
         print(
             f"{model_score['model']} | {model_score['parse_ok']} | "
-            f"{model_score['runs_passed']} | {model_score['judge_thai_fluency']} | "
-            f"{model_score['judge_clarity_correctness']} | "
-            f"{model_score['judge_originality_not_copied']} | "
+            f"{model_score['runs_passed']} | "
+            f"{_for_table(model_score['judge_thai_fluency'])} | "
+            f"{_for_table(model_score['judge_clarity_correctness'])} | "
+            f"{_for_table(model_score['judge_originality_not_copied'])} | "
             f"{model_score['judge_usable']}"
         )
     print(f"\nresults -> {OUT_DIR / 'results.json'}")

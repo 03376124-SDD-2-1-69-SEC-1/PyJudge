@@ -49,11 +49,17 @@ families most likely to draft Thai: the incumbent
 ### Judge
 
 The statement quality of each draft (thai_fluency, clarity_correctness,
-originality_not_copied, usable, Thai note) is scored by the LLM judge the
-team's reviewer round uses, sent verbatim with the source statement and the
-candidate filled into it. `google/gemini-3.8-flash` was tried first and
-the project key cannot pay for it (Forbidden), likewise
-`thinkingmachines/inkling-small:free` and
+originality_not_copied, usable, Thai note) is scored by an LLM judge
+prompted with the team's reviewer-round rubric, **adapted from** it: the
+example CSV row is dropped, en dashes are typed as hyphens, and long lines
+are re-wrapped — the anchor sentences themselves are unchanged. The prompt
+text lives in `scripts/compare_generation_models.py`
+(`_JUDGE_RUBRIC_LINES`). The script now saves every judge reply under
+`data/model-comp/<model>/judge/<task>.raw`; the run this ADR records
+pre-dates that, so its judge output survives only through the
+`judge_note` fields in `docs/adr/assets/0012-results.json`.
+`google/gemini-3.8-flash` was tried first and the project key cannot pay
+for it (Forbidden), likewise `thinkingmachines/inkling-small:free` and
 `nvidia/nemotron-3-lightning:free` (Forbidden/BadRequest), so the judge on
 this run was `google/gemma-4-26b-a4b-it:free`. It is a sibling of the
 candidate `gemma-4-31b` — a residual bias to keep in mind; both were smoke
@@ -61,14 +67,17 @@ tested for parse compliance before the run.
 
 Each (candidate × task) raw reply is kept on this machine under
 `data/model-comp/` (git-ignored), one `.raw` file per reply, and judge
-rows land in `results.json` next to them.
+rows land in `results.json` next to them. The machine-readable copy of
+that `results.json` — the run's own output, numbers unedited — is checked
+into the repo at `docs/adr/assets/0012-results.json`; the printed table
+below is a reading of it.
 
 ## Result
 
-One row per (model × task), the summary printed by the script at
-`data/model-comp/results.json` after the run of 2026-10-17:
+One row per (model × task); the summary columns come from
+`docs/adr/assets/0012-results.json` after the run of 2026-10-17:
 
-| model | parse | solution runs | thai | clarity | originality | usable |
+| model | parse | ran (exit 0) | thai | clarity | originality | usable |
 |---|---|---|---|---|---|---|
 | poolside/laguna-s-2.1:free | 3/3 | 10/10 | 3.0 (empty once) | 4.0 | 2.67 | 0/3 |
 | poolside/laguna-xs-2.1:free | 2/3 | 5/5 | 2.0 | 3.0 | 1.5 | 0/3 |
@@ -77,10 +86,22 @@ One row per (model × task), the summary printed by the script at
 | nvidia/nemotron-3-super-120b-a12b:free | 2/3 | 3/7 | 5.0 | 3.5 | 1.0 | 0/3 |
 | thinkingmachines/inkling:free | 0/3 | — | — | — | — | 0/3 (key forbidden) |
 
+"Ran" means the draft's `reference_solution` exited 0 within the 5 s
+timeout on each of its own inputs. In line with PR #46 the expected
+output is whatever that run printed, so this column says nothing about
+whether the solution answers the source problem correctly. Keep two
+readings of it apart: laguna-s's `10/10` is its `0029` draft
+(5/5) plus its `1073` (2/2) and `1083` (3/3) drafts, while
+nemotron-3-super's `3/7` is its `1073` draft running on all three of its
+inputs against a `1083` draft whose solution exited non-zero on all four
+of its own inputs — those four `expected_output`s would reach the
+Instructor blank, not wrong answers. No output checking exists in this
+comparison, and that limitation was not papered over.
+
 What the per-task rows add, quoting the judge's Thai notes:
 
 - **laguna-s** (the incumbent) is the only candidate that parsed all three
-  and whose reference solution ran clean on all ten of its own inputs.
+  and whose reference solution exited 0 on all ten of its own inputs.
   Its weaknesses: on `1073` it answered in English (thai_fluency empty),
   and the `1083` draft left a stray Japanese fragment «すべて» — a failure
   mode the draft stage cannot catch and only the statement review round
@@ -90,9 +111,9 @@ What the per-task rows add, quoting the judge's Thai notes:
   JSON the production parser rejects.
 - **nemotron-3-super** writes the most natural Thai of the set (thai 5.0
   on both drafts it completed) but recopies the source statement almost
-  word for word (originality 1.0), and its `1083` solution passed 0 of 4
-  of its own test inputs — the expected outputs would all be blanks for
-  the Instructor to fill at T-04. It also broke JSON on `0029`.
+  word for word (originality 1.0), and its `1083` solution exited 0 on 0
+  of 4 of its own test inputs — the expected outputs would all be blanks
+  for the Instructor to fill at T-04. It also broke JSON on `0029`.
 - **nemotron-3-ultra** replied to one call in three; the other two died
   as `ResponseValidationError` before any draft existed.
 - **gemma-4-31b** hit gateway errors on all three calls during this run,
@@ -109,8 +130,9 @@ driving this decision.)
 ## Decision
 
 - `GENERATION_MODEL` / `DEFAULT_GENERATION_MODEL` stays
-  **`poolside/laguna-s-2.1:free`** — the only candidate with a clean
-  format-and-solve record, and production-proven since OPS-23.
+  **`poolside/laguna-s-2.1:free`** — the only candidate that parsed every
+  reply (3/3) and whose solutions exited 0 on all ten of its own inputs,
+  and production-proven since OPS-23.
 - `GENERATION_MODEL_ALLOWLIST` / `DEFAULT_GENERATION_ALLOWLIST` becomes
   the three measured models an Admin may pick on A-01:
   `poolside/laguna-s-2.1:free`, `poolside/laguna-xs-2.1:free`,
@@ -121,11 +143,64 @@ driving this decision.)
   calls die), `gemma-4-31b` (gateway unreachable from this account —
   re-measure if wanted), `inkling` (forbidden for this key), everything
   paid (ADR-0009 keeps generation).
-- No schema change: the model rides per generation call, which A-01
-  already reads from `Settings`.
+- No schema change and no migration: the runtime model is
+  `core.ai_settings.model` — a database row, read in `main.py` when the
+  composition root builds `OpenRouterGenerationClient`
+  (`model=lambda: admin_repository.get_ai_settings().model`). The Admin
+  switches it on A-01 and the next generation call picks the new value
+  up. `Settings` governs only what A-01 may switch to: the allowlist —
+  and `DEFAULT_GENERATION_MODEL` feeds that allowlist fallback (plus the
+  demo seed), never the runtime model by itself.
+
+## Open question: allowlist membership
+
+The Decision above ships all three measured candidates, but the evidence
+only supports the first one. Against each addition:
+
+- `poolside/laguna-xs-2.1:free` — parsed 2 of 3 replies (broken JSON on
+  `1083`), thai_fluency 2.0 with wrong-letter typos ("ด้วนช้า" instead of
+  "ด้วยช้า", "เต็นบรรทัด"), and one of the weakest originality scores
+  (1.5). It also shares the `poolside` provider with laguna-s, so the two
+  together buy no outage redundancy: one provider-side incident takes
+  both off the air at once.
+- `nvidia/nemotron-3-super-120b-a12b:free` — parsed 2 of 3 (broken JSON
+  on `0029`), and its solutions exited 0 on 3 of 7 attempts; its `1083`
+  draft's solution never ran, leaving all four of that draft's
+  `expected_output`s blank. Its Thai wording is the most natural of the
+  set (thai 5.0), but the wording itself is a near-verbatim recopy of the
+  source (originality 1.0).
+
+The options the team may pick from when this ADR is revised:
+
+1. Keep all three — what this ADR records, on the argument that nothing
+   beats the runtime default anywhere and the other two live behind the
+   allowlist as documented trade-offs.
+2. Keep `laguna-s` + `nemotron-3-super` — drops the weakest measured
+   sibling and leaves one model per provider family.
+3. Keep `laguna-s` only — matches what the numbers alone support, at the
+   cost of A-01 having exactly one legible option until the next
+   measurement.
+
+Nothing in the repo enforces one of these; whichever way it goes is one
+line in `config.py`'s `DEFAULT_GENERATION_ALLOWLIST`, the value in
+`.env.example`, and the same numbers re-quoted from
+`docs/adr/assets/0012-results.json`.
 
 ## Consequences
 
+- The judge has never been calibrated against the team's own human
+  scores: two reviewers independently scored `pith_0001`, `pith_0030` and
+  `pith_1087` from this same seed, and disagreed widely. The rubric this
+  ADR's numbers come from has not been compared with either reviewer, so
+  the statement columns (thai/clarity/originality/usable) carry the
+  judge's view alone. It is also a sibling of a candidate
+  (`gemma-4-26b` vs `gemma-4-31b`), and `usable` reads 0/3 for every
+  model only because originality 1.0 forces "no" under the rubric's
+  mechanical rule — treat that rhyme as the rubric's strictness, not as
+  proof every draft is useless. A calibration run on the human-scored
+  rows (same rubric, those three problems, both verdicts side by side)
+  is the follow-up task before the statement columns are treated as
+  ground truth; this ADR does not implement it.
 - OPS-25 can start: structured-output support is verified per model in
   its tests, and the allowlist it must deal with is exactly these three
   `:free` slugs.

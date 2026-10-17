@@ -25,10 +25,13 @@ class MissingConfigurationError(RuntimeError):
 
 DEFAULT_GENERATION_MODEL = "poolside/laguna-s-2.1:free"
 # OPS-26 (ADR-0012) measured six `:free` models on three Thai seed problems;
-# laguna-s was the only one that always parsed and whose solution ran, while
-# laguna-xs is the stable sibling and nemotron-3-super writes the most native
-# Thai. Re-run scripts/compare_generation_models.py when OpenRouter's free
-# tier changes. Do not embed other providers here: ADR-0009.
+# laguna-s was the only one that parsed every reply and whose solution ran
+# (exit 0) on every one of its own inputs. laguna-xs and nemotron-3-super
+# below were also measured, and scored worse — why they are here anyway, and
+# the lighter options the team may still pick, are in the ADR's
+# "Open question: allowlist membership". Re-run
+# scripts/compare_generation_models.py when OpenRouter's free tier changes.
+# Do not add other providers here: ADR-0009.
 DEFAULT_GENERATION_ALLOWLIST = (
     DEFAULT_GENERATION_MODEL,
     "poolside/laguna-xs-2.1:free",
