@@ -28,6 +28,21 @@ def test_unset_allowlist_allows_only_the_generation_model(
     assert config.get_settings().generation_model_allowlist == ("configured/model",)
 
 
+def test_default_allowlist_is_the_ops_26_comparison_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No env at all: A-01 gets the OPS-26 measured allowlist (ADR-0012)."""
+    monkeypatch.delenv("GENERATION_MODEL", raising=False)
+    monkeypatch.delenv("GENERATION_MODEL_ALLOWLIST", raising=False)
+
+    settings = config.get_settings()
+
+    assert settings.generation_model == config.DEFAULT_GENERATION_MODEL
+    assert settings.generation_model_allowlist == config.DEFAULT_GENERATION_ALLOWLIST
+    # the model every generation actually uses stays pickable on A-01
+    assert settings.generation_model in settings.generation_model_allowlist
+
+
 def test_allowlist_is_comma_separated_and_trimmed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
